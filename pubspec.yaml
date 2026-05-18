@@ -1,0 +1,82 @@
+name: smart_laundry_locker
+description: "Smart Laundry Locker - Flutter Mobile App"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # UI / Icons
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.2.1
+  flutter_svg: ^2.0.17
+
+  # Navigation (Expo Router → GoRouter)
+  go_router: ^14.8.1
+
+  # State Management (React Context → Riverpod)
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # Networking (Axios → Dio)
+  dio: ^5.8.0+1
+
+  # Secure Storage (expo-secure-store → flutter_secure_storage)
+  flutter_secure_storage: ^9.2.4
+
+  # Firebase (same as @react-native-firebase)
+  firebase_core: ^3.13.0
+  firebase_auth: ^5.6.0
+  firebase_messaging: ^15.2.5
+
+  # Environment Variables (.env)
+  flutter_dotenv: ^5.2.1
+
+  # Model Serialization (TypeScript interfaces → Freezed)
+  freezed_annotation: ^3.0.0
+  json_annotation: ^4.9.0
+
+  # Image Loading (expo-image → cached_network_image)
+  cached_network_image: ^3.4.1
+
+  # Maps (react-native-maps → google_maps_flutter)
+  google_maps_flutter: ^2.12.2
+
+  # QR Code (react-native-qrcode-svg → qr_flutter)
+  qr_flutter: ^4.1.0
+
+  # Video Player (expo-video → video_player)
+  video_player: ^2.9.5
+
+  # Utilities
+  intl: ^0.19.0              # Date/number formatting
+  url_launcher: ^6.3.1       # Open URLs
+  shimmer: ^3.0.0             # Loading shimmer effects
+  flutter_animate: ^4.5.2    # Easy animations
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+  # Code Generation
+  build_runner: ^2.4.15
+  freezed: ^3.0.6
+  json_serializable: ^6.9.4
+  riverpod_generator: ^2.6.3
+  riverpod_lint: ^2.6.3
+  custom_lint: ^0.7.5
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - .env
+    - assets/
+    - assets/images/
+    - assets/videos/
