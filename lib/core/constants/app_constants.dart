@@ -1,18 +1,33 @@
-/// App-wide constants — replaces constants/ READMEs placeholder values.
+/// Application-wide constants
 class AppConstants {
-  AppConstants._();
+  AppConstants._(); // Private constructor to prevent instantiation
 
-  static const String appName = 'Lock.R Locker';
-  static const String appTagline = 'Locker thông minh, tiện lợi';
+  /// Default avatar URL (empty string means use fallback UI)
+  static const String defaultAvatarUrl = '';
 
-  // Timeouts
-  static const Duration apiTimeout = Duration(seconds: 60);
-  static const Duration splashDuration = Duration(milliseconds: 4500);
+  /// Default cover photo URL (empty string means use fallback UI)
+  static const String defaultCoverPhotoUrl = '';
 
-  // Pagination
-  static const int defaultPageSize = 10;
+  /// Default local asset used when no banner image exists
+  static const String defaultBannerAsset =
+      'assets/icon/logo_revoland_black_169_nobg.png';
 
-  // Token storage keys (same keys as RN SecureStore)
-  static const String accessTokenKey = 'accessToken';
-  static const String refreshTokenKey = 'refreshToken';
+  /// Minimum valid URL length (https://a.co = 13 chars)
+  static const int minValidUrlLength = 10;
+
+  /// Avatar image constraints
+  static const int avatarMaxSizeBytes = 1 * 1024 * 1024; // 1MB
+  static const int avatarMaxWidth = 1024;
+  static const int avatarMaxHeight = 1024;
+  static const int avatarMinQuality = 20;
+  static const int avatarDefaultQuality = 85;
+
+  /// Cover photo constraints
+  static const int coverMaxSizeBytes = 2 * 1024 * 1024; // 2MB
+  static const int coverMaxWidth = 1920;
+  static const int coverMaxHeight = 1080;
+
+  /// Cache constants
+  static const int avatarCacheStaleAfterDays = 90;
+  static const int maxCachedImages = 500;
 }

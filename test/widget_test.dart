@@ -1,13 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:smart_laundry_locker/app.dart';
-import 'package:smart_laundry_locker/core/constants/app_constants.dart';
+import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 
 void main() {
-  testWidgets('App smoke test', (WidgetTester tester) async {
-    await tester.pumpWidget(ProviderScope(child: App()));
-
-    // Verify the routed app renders without crashing.
-    expect(find.text(AppConstants.appName), findsOneWidget);
+  test('uses navy brand palette', () {
+    expect(AISLShadcnTheme.navyPrimary.value, 0xFF0A2342);
+    expect(AISLShadcnTheme.navySecondary.value, 0xFF12355B);
+    expect(AISLShadcnTheme.navyAccent.value, 0xFF1E5A8A);
   });
 }

@@ -1,26 +1,476 @@
+import 'package:smart_laundry_locker/core/network/dio_client.dart';
+import 'package:smart_laundry_locker/core/routing/app_router.dart';
+import 'package:smart_laundry_locker/core/services/app_messenger_service.dart';
+import 'package:smart_laundry_locker/core/services/app_restart_service.dart';
+import 'package:smart_laundry_locker/core/services/token_service.dart';
+import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
+import 'package:smart_laundry_locker/core/services/firebase_messaging_service.dart';
+import 'package:smart_laundry_locker/core/services/courier_mode_provider.dart';
+import 'package:smart_laundry_locker/firebase_options.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+import 'package:smart_laundry_locker/features/notifications/presentation/providers/notification_injection.dart';
+import 'package:smart_laundry_locker/features/profile/presentation/providers/profile_injection.dart';
+import 'package:smart_laundry_locker/core/network/api_client.dart';
+import 'package:smart_laundry_locker/features/wallet/presentation/providers/wallet_provider.dart';
+import 'package:smart_laundry_locker/features/qr_login/presentation/providers/qr_login_provider.dart';
+import 'package:smart_laundry_locker/features/courier_dispatch/presentation/providers/courier_dispatch_injection.dart';
+import 'package:smart_laundry_locker/features/courier_delivery/presentation/providers/courier_delivery_injection.dart';
+import 'package:smart_laundry_locker/features/courier_dispatch/presentation/providers/courier_dispatch_provider.dart';
+import 'package:smart_laundry_locker/features/courier_delivery/presentation/providers/courier_delivery_provider.dart';
+import 'package:smart_laundry_locker/features/courier_dispatch/presentation/widgets/incoming_order_sheet.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:smart_laundry_locker/features/home/presentation/providers/home_provider.dart';
+import 'package:smart_laundry_locker/features/home/data/repositories/home_repository.dart';
+import 'package:smart_laundry_locker/features/vouchers/presentation/providers/voucher_provider.dart';
+import 'dart:async';
 
-import 'app.dart';
-import 'core/firebase/firebase_config.dart';
+class _AislToastWidget extends StatelessWidget {
+  final String msg;
+  const _AislToastWidget({required this.msg});
 
-/// Application entry point.
-///
-/// Initialization order:
-///   1. Flutter engine bindings
-///   2. Load .env (replaces process.env.EXPO_PUBLIC_*)
-///   3. Firebase (TODO: Phase 3)
-///   4. Wrap with ProviderScope (Riverpod — replaces AuthProvider)
-///   5. Run App
-Future<void> main() async {
+  @override
+  Widget build(BuildContext context) {
+    IconData iconData = LucideIcons.info;
+    Color iconColor = AISLShadcnTheme.navyPrimary;
+
+    final lowerMsg = msg.toLowerCase();
+    if (lowerMsg.contains('thành công') ||
+        lowerMsg.contains('thành công!') ||
+        lowerMsg.contains('đã ') ||
+        lowerMsg.contains('xong')) {
+      iconData = LucideIcons.circleCheckBig;
+      iconColor = const Color(0xFF10B981);
+    } else if (lowerMsg.contains('lỗi') ||
+        lowerMsg.contains('thất bại') ||
+        lowerMsg.contains('sai') ||
+        lowerMsg.contains('không thể')) {
+      iconData = LucideIcons.circleAlert;
+      iconColor = const Color(0xFFEF4444);
+    } else if (lowerMsg.contains('cảnh báo') || lowerMsg.contains('chú ý')) {
+      iconData = LucideIcons.triangleAlert;
+      iconColor = const Color(0xFFF59E0B);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 50),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 24),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.85),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(iconData, color: iconColor, size: 20),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Text(
+                    msg,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AislLoadingWidget extends StatelessWidget {
+  final String msg;
+  const _AislLoadingWidget({required this.msg});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 40,
+            width: 40,
+            child: CircularProgressIndicator(
+              strokeWidth: 4,
+              strokeCap: StrokeCap.round,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                AISLShadcnTheme.navyPrimary,
+              ),
+              backgroundColor: const Color(0xFF0A2342).withOpacity(0.15),
+            ),
+          ),
+          if (msg.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Text(
+              msg,
+              style: const TextStyle(
+                color: Colors.black87,
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AislNotifyWidget extends StatelessWidget {
+  final String msg;
+  final IconData icon;
+  final Color iconColor;
+  const _AislNotifyWidget({
+    required this.msg,
+    required this.icon,
+    required this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: IntrinsicHeight(
+          child: Row(
+            children: [
+              Container(width: 6, color: iconColor),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: iconColor.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(icon, size: 20, color: iconColor),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Text(
+                          msg,
+                          style: const TextStyle(
+                            color: Colors.black87,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load environment variables
-  await dotenv.load(fileName: '.env');
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    // Initialize Messaging Service
+    await FirebaseMessagingService.instance.init();
+  } catch (e) {
+    debugPrint(
+      "Firebase init failed (likely missing firebase_options.dart): $e",
+    );
+  }
 
-  // Initialize Firebase using environment variables
-  await FirebaseConfig.initialize();
+  DioClient.instance.init();
+  // Initialize token service from secure storage
+  await TokenService.initializeFromStorage();
 
-  runApp(ProviderScope(child: App()));
+  runApp(const ProviderScope(child: RestartableApp(child: AislApp())));
+}
+
+class GlobalDispatchListener extends StatefulWidget {
+  final Widget child;
+  const GlobalDispatchListener({super.key, required this.child});
+
+  @override
+  State<GlobalDispatchListener> createState() => _GlobalDispatchListenerState();
+}
+
+class _GlobalDispatchListenerState extends State<GlobalDispatchListener> {
+  final List<StreamSubscription<dynamic>> _subscriptions = [];
+  final Set<String> _activeDispatchIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _listenToOrders();
+    });
+  }
+
+  void _listenToOrders() {
+    if (!mounted) return;
+
+    final dispatchProvider = context.read<CourierDispatchProvider>();
+
+    // Listen for new orders
+    final orderSub = dispatchProvider.newOrderStream.listen((dispatchData) {
+      final dispatchId = dispatchData['dispatchId']?.toString();
+      if (dispatchId == null) return;
+
+      if (_activeDispatchIds.contains(dispatchId)) {
+        debugPrint('Dispatch $dispatchId already shown, skipping.');
+        return;
+      }
+
+      _activeDispatchIds.add(dispatchId);
+
+      _showIncomingOrderSheet(dispatchData, dispatchProvider, dispatchId);
+    });
+
+    // Listen for orders taken elsewhere
+    final takenSub = dispatchProvider.dispatchTakenStream.listen((data) {
+      final dispatchId = data['dispatchId']?.toString();
+      if (dispatchId != null && _activeDispatchIds.contains(dispatchId)) {
+        debugPrint('Order $dispatchId taken elsewhere. Closing sheet.');
+        final navContext = AppRouter.navigatorKey.currentContext;
+        if (navContext != null) {
+          _activeDispatchIds.remove(dispatchId);
+          Navigator.of(navContext).pop();
+        }
+      }
+    });
+
+    // Listen for orders cancelled by customer
+    final cancelledSub = dispatchProvider.dispatchCancelledStream.listen((
+      data,
+    ) {
+      final dispatchId = data['dispatchId']?.toString();
+      if (dispatchId != null && _activeDispatchIds.contains(dispatchId)) {
+        debugPrint('Order $dispatchId cancelled by customer. Closing sheet.');
+        final navContext = AppRouter.navigatorKey.currentContext;
+        if (navContext != null) {
+          _activeDispatchIds.remove(dispatchId);
+          Navigator.of(navContext).pop();
+          SmartDialog.showToast('Người gửi đã hủy đơn hàng $dispatchId');
+        }
+      }
+    });
+
+    _subscriptions.add(orderSub);
+    _subscriptions.add(takenSub);
+    _subscriptions.add(cancelledSub);
+  }
+
+  void _showIncomingOrderSheet(
+    Map<String, dynamic> dispatchData,
+    CourierDispatchProvider provider,
+    String dispatchId,
+  ) {
+    final navContext = AppRouter.navigatorKey.currentContext;
+    if (navContext == null) {
+      _activeDispatchIds.remove(dispatchId);
+      return;
+    }
+
+    showCupertinoModalPopup<void>(
+      context: navContext,
+      barrierDismissible: false,
+      useRootNavigator: true,
+      builder: (context) => IncomingOrderSheet(
+        dispatchData: dispatchData,
+        onAccept: () async {
+          final deliveryProvider = navContext.read<CourierDeliveryProvider>();
+          final success = await deliveryProvider.acceptOrder(dispatchId);
+          if (success) {
+            provider.removePendingById(dispatchId);
+            _activeDispatchIds.remove(dispatchId);
+            if (navContext.mounted) {
+              Navigator.of(navContext).pop();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (navContext.mounted) {
+                  SmartDialog.showToast('Đã nhận đơn hàng!');
+                  navContext.push(
+                    AppRouter.activeDelivery,
+                    extra: deliveryProvider.activeOrder,
+                  );
+                  unawaited(provider.fetchActiveOrders());
+                }
+              });
+            }
+          } else {
+            SmartDialog.showToast(
+              deliveryProvider.error ?? 'Không thể nhận đơn hàng',
+            );
+          }
+        },
+        onDecline: () async {
+          final deliveryProvider = context.read<CourierDeliveryProvider>();
+          await deliveryProvider.rejectOrder(
+            dispatchId,
+            reason: 'Declined by courier',
+          );
+          provider.removePendingById(dispatchId);
+          _activeDispatchIds.remove(dispatchId);
+          SmartDialog.showToast('Đã từ chối đơn hàng');
+        },
+      ),
+    ).then((_) {
+      _activeDispatchIds.remove(dispatchId);
+    });
+  }
+
+  @override
+  void dispose() {
+    for (var sub in _subscriptions) {
+      sub.cancel();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+class AislApp extends StatelessWidget {
+  const AislApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => CourierModeProvider()..init()),
+        ChangeNotifierProvider(
+          create: (_) =>
+              NotificationInjection.provideNotificationProvider(ApiClient())
+                ..loadUnreadCount(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              WalletProvider(apiClient: ApiClient())..getWalletBalance(),
+        ),
+        ChangeNotifierProvider(create: (_) => QrLoginProvider()),
+        ChangeNotifierProvider(
+          create: (_) => ProfileInjection.provideProfileProvider(ApiClient()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              CourierDispatchInjection.provideCourierDispatchProvider(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              CourierDeliveryInjection.provideCourierDeliveryProvider(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              HomeProvider(HomeRepository(ApiClient()))..loadHomeData(),
+        ),
+        ChangeNotifierProvider(create: (_) => VoucherProvider()),
+      ],
+      child: ShadApp.router(
+        title: 'Lockerly',
+        routerConfig: AppRouter.router,
+        theme: AISLShadcnTheme.lightTheme,
+        darkTheme: AISLShadcnTheme.darkTheme,
+        themeMode: ThemeMode.light,
+        builder: (context, child) {
+          return GlobalDispatchListener(
+            child: ScaffoldMessenger(
+              key: AppMessengerService.scaffoldMessengerKey,
+              child: FlutterSmartDialog.init(
+                toastBuilder: (String msg) => _AislToastWidget(msg: msg),
+                loadingBuilder: (String msg) => _AislLoadingWidget(msg: msg),
+                notifyStyle: FlutterSmartNotifyStyle(
+                  successBuilder: (msg) => _AislNotifyWidget(
+                    msg: msg,
+                    icon: LucideIcons.circleCheckBig,
+                    iconColor: const Color(0xFF10B981),
+                  ),
+                  failureBuilder: (msg) => _AislNotifyWidget(
+                    msg: msg,
+                    icon: LucideIcons.circleX,
+                    iconColor: const Color(0xFFEF4444),
+                  ),
+                  warningBuilder: (msg) => _AislNotifyWidget(
+                    msg: msg,
+                    icon: LucideIcons.triangleAlert,
+                    iconColor: const Color(0xFFF59E0B),
+                  ),
+                  alertBuilder: (msg) => _AislNotifyWidget(
+                    msg: msg,
+                    icon: LucideIcons.info,
+                    iconColor: AISLShadcnTheme.navyPrimary,
+                  ),
+                  errorBuilder: (msg) => _AislNotifyWidget(
+                    msg: msg,
+                    icon: LucideIcons.octagonAlert,
+                    iconColor: const Color(0xFFEF4444),
+                  ),
+                ),
+              )(context, child ?? const SizedBox.shrink()),
+            ),
+          );
+        },
+      ),
+    );
+  }
 }

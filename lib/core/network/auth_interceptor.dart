@@ -1,103 +1,45 @@
+import 'package:smart_laundry_locker/core/network/dio_client.dart';
+import 'package:smart_laundry_locker/core/routing/app_router.dart';
+import 'package:smart_laundry_locker/core/services/token_service.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import '../config/env_config.dart';
-import '../config/api_endpoints.dart';
-import 'token_storage.dart';
 
-/// Interceptor to handle Bearer tokens and 401 Unauthorized token refresh.
-/// Mapped from RN's api.ts interceptor logic.
-class AuthInterceptor extends QueuedInterceptor {
-  final Dio dio;
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 
-  /// Optional callback to force logout if refresh token is invalid
-  /// Set this from the AuthProvider (similar to RN's _logoutCallback)
-  static Future<void> Function()? onForceLogout;
-
-  AuthInterceptor(this.dio);
+/// Interceptor to handle authentication errors (401 Unauthorized)
+class AuthInterceptor extends Interceptor {
+  static bool _isHandling401 = false;
 
   @override
-  Future<void> onRequest(
-    RequestOptions options,
-    RequestInterceptorHandler handler,
-  ) async {
-    final token = await TokenStorage.getAccessToken();
-
-    if (token != null && token.isNotEmpty) {
-      options.headers['Authorization'] = 'Bearer $token';
-    }
-
-    if (kDebugMode) {
-      print('API Request: [${options.method}] ${options.uri}');
-    }
-
-    return handler.next(options);
-  }
-
-  @override
-  Future<void> onError(
-    DioException err,
-    ErrorInterceptorHandler handler,
-  ) async {
-    final response = err.response;
-
-    // Check for "E_LOYALTY001" (usually indicates JWT userId no longer exists)
-    final responseData = response?.data;
-    if (response?.statusCode == 400 &&
-        responseData is Map &&
-        responseData['code'] == 'E_LOYALTY001') {
-      await _handleForceLogout();
-      return handler.next(err);
-    }
-
-    // Handle 401 Unauthorized token refresh
-    if (response?.statusCode == 401) {
-      // Create a new separate Dio instance for refreshing to avoid interceptor loop
-      final refreshDio = Dio(BaseOptions(baseUrl: EnvConfig.apiUrl));
-      final refreshToken = await TokenStorage.getRefreshToken();
-
-      if (refreshToken == null || refreshToken.isEmpty) {
-        await _handleForceLogout();
+  void onError(DioException err, ErrorInterceptorHandler handler) async {
+    if (err.response?.statusCode == 401) {
+      if (_isHandling401) {
         return handler.next(err);
       }
+      _isHandling401 = true;
 
-      try {
-        final refreshResponse = await refreshDio.post(
-          ApiEndpoints.refreshToken,
-          data: {'refreshToken': refreshToken},
-        );
+      debugPrint(
+        'AuthInterceptor: 401 Unauthorized detected. Triggering logout.',
+      );
 
-        if (refreshResponse.statusCode == 200) {
-          final data = refreshResponse.data['data'];
-          final newAccessToken = data['accessToken'];
-          final newRefreshToken = data['refreshToken'] ?? refreshToken;
+      // 1. Clear local tokens
+      await TokenService.clearTokens();
 
-          await TokenStorage.setTokens(newAccessToken, newRefreshToken);
+      // 2. Clear Dio authorization header
+      DioClient.instance.clearAuthToken();
 
-          // Retry the original request with the new token
-          final options = err.requestOptions;
-          options.headers['Authorization'] = 'Bearer $newAccessToken';
+      // 3. Show notification
+      SmartDialog.showToast('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
 
-          final retryResponse = await dio.fetch(options);
-          return handler.resolve(retryResponse);
-        } else {
-          await _handleForceLogout();
-          return handler.next(err);
-        }
-      } catch (e) {
-        await _handleForceLogout();
-        return handler.next(err);
-      }
+      // 4. Redirect to onboarding
+      AppRouter.router.go(AppRouter.onboarding);
+
+      // Reset flag after a delay to allow navigation to complete
+      Future.delayed(const Duration(seconds: 2), () {
+        _isHandling401 = false;
+      });
     }
 
     return handler.next(err);
-  }
-
-  Future<void> _handleForceLogout() async {
-    await TokenStorage.clearTokens();
-    if (onForceLogout != null) {
-      try {
-        await onForceLogout!();
-      } catch (_) {}
-    }
   }
 }

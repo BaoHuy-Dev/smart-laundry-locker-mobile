@@ -1,31 +1,27 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:envied/envied.dart';
 
-/// Environment configuration — replaces process.env.EXPO_PUBLIC_* from React Native.
-///
-/// Usage:
-///   EnvConfig.apiUrl  // → "http://10.0.2.2:8080/api"
-class EnvConfig {
-  EnvConfig._();
+part 'env_config.g.dart';
 
-  static String get apiUrl =>
-      dotenv.env['API_URL'] ?? 'http://10.0.2.2:8080/api';
+@Envied(path: '.env')
+abstract class EnvConfig {
+  @EnviedField(
+    varName: 'API_BASE_URL',
+    defaultValue: 'https://api-dev.aisl.io.vn',
+    //'http://10.0.2.2:3000', // 10.0.2.2 is Android emulator's alias for host localhost
+  )
+  static const String apiBaseUrl = _EnvConfig.apiBaseUrl;
 
-  static String get firebaseApiKey => dotenv.env['FIREBASE_API_KEY'] ?? '';
+  // Web Client ID (for backend authentication - server-side verification)
+  // @EnviedField(varName: 'GOOGLE_WEB_CLIENT_ID', defaultValue: '')
+  // static const String googleWebClientId = _EnvConfig.googleWebClientId;
 
-  static String get firebaseAuthDomain =>
-      dotenv.env['FIREBASE_AUTH_DOMAIN'] ?? '';
+  // @EnviedField(varName: 'GOOGLE_MAPS_API_KEY', defaultValue: '')
+  // static const String googleMapsApiKey = _EnvConfig.googleMapsApiKey;
 
-  static String get firebaseProjectId =>
-      dotenv.env['FIREBASE_PROJECT_ID'] ?? '';
+  // iOS Client ID (for iOS native authentication)
+  // @EnviedField(varName: 'GOOGLE_IOS_CLIENT_ID', defaultValue: '')
+  // static const String googleIosClientId = _EnvConfig.googleIosClientId;
 
-  static String get firebaseStorageBucket =>
-      dotenv.env['FIREBASE_STORAGE_BUCKET'] ?? '';
-
-  static String get firebaseMessagingSenderId =>
-      dotenv.env['FIREBASE_MESSAGING_SENDER_ID'] ?? '';
-
-  static String get firebaseAppId => dotenv.env['FIREBASE_APP_ID'] ?? '';
-
-  static String get firebaseMeasurementId =>
-      dotenv.env['FIREBASE_MEASUREMENT_ID'] ?? '';
+  // @EnviedField(varName: 'GOOGLE_ANDROID_CLIENT_ID', defaultValue: '')
+  // static const String googleAndroidClientId = _EnvConfig.googleAndroidClientId;
 }
