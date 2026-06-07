@@ -1,7 +1,7 @@
 import 'package:smart_laundry_locker/core/routing/main_navigation_wrapper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
-import 'package:smart_laundry_locker/features/auth/presentation/pages/onboarding_page.dart';
+import 'package:smart_laundry_locker/features/auth/presentation/pages/login_screen.dart';
 import 'package:smart_laundry_locker/features/auth/presentation/pages/otp_page.dart';
 import 'package:smart_laundry_locker/features/auth/presentation/pages/splash_screen.dart';
 import 'package:smart_laundry_locker/features/home/presentation/pages/home_page.dart';
@@ -109,7 +109,7 @@ class AppRouter {
       GoRoute(path: splash, builder: (context, state) => const SplashScreen()),
       GoRoute(
         path: onboarding,
-        builder: (context, state) => const OnboardingPage(),
+        builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
         path: otp,
