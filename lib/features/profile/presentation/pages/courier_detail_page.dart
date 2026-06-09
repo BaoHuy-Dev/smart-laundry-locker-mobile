@@ -260,7 +260,7 @@ class _CourierDetailPageState extends State<CourierDetailPage> {
                 aspectRatio: 16 / 9,
                 child: hasImage
                     ? Image.network(
-                        url!,
+                        url,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
                           return Container(

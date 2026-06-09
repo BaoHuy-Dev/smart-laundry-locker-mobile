@@ -35,7 +35,6 @@ class TokenService {
     ]);
     DioClient.instance.setAuthToken(accessToken);
     authState.value = true;
-    authState.notifyListeners();
   }
 
   static Future<String?> getAccessToken() async {
@@ -63,7 +62,6 @@ class TokenService {
     ]);
     DioClient.instance.clearAuthToken();
     authState.value = false;
-    authState.notifyListeners();
   }
 
   static Future<bool> isLoggedIn() async {

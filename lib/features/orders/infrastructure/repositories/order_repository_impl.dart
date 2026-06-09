@@ -3,7 +3,6 @@ import 'package:smart_laundry_locker/core/network/api_client.dart';
 import 'package:smart_laundry_locker/features/orders/domain/entities/courier_order.dart';
 import 'package:smart_laundry_locker/features/orders/domain/entities/courier_today_stats.dart';
 import 'package:smart_laundry_locker/features/orders/domain/entities/order.dart';
-import 'package:smart_laundry_locker/features/orders/domain/entities/order_detail.dart';
 import 'package:smart_laundry_locker/core/domain/entities/pagination.dart';
 import 'package:smart_laundry_locker/features/orders/domain/repositories/order_repository.dart';
 import 'package:smart_laundry_locker/features/orders/infrastructure/data_sources/order_remote_data_source.dart';

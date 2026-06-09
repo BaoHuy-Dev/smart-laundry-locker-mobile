@@ -1,6 +1,5 @@
 import 'package:smart_laundry_locker/core/constants/app_colors.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
-import 'package:smart_laundry_locker/features/locker/application/use_cases/control_locker_use_case.dart';
 import 'package:smart_laundry_locker/features/locker/domain/entities/fixed_rent_entity.dart';
 import 'package:smart_laundry_locker/features/locker/presentation/bloc/locker_rent_bloc.dart';
 import 'package:smart_laundry_locker/features/locker/presentation/bloc/locker_rent_event.dart';
@@ -114,6 +113,7 @@ class ConfirmRentPage extends StatelessWidget {
     );
   }
 
+  // ignore: unused_element
   Widget _buildPaymentCard() {
     return _cardWrapper(
       child: Column(

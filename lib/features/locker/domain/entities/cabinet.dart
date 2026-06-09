@@ -34,7 +34,7 @@ class Cabinet {
   });
 
   /// Business logic: Tổng số locker trong cabinet
-  int get totalLockers => (totalRows ?? 0) * (totalColumns ?? 0);
+  int get totalLockers => totalRows * totalColumns;
 
   /// Business logic: Kiểm tra cabinet có kết nối không
   bool get isConnected =>
@@ -45,10 +45,7 @@ class Cabinet {
 
   /// Business logic: Kiểm tra vị trí locker có hợp lệ không
   bool isValidPosition(int row, int column) {
-    return row >= 0 &&
-        row < (totalRows ?? 0) &&
-        column >= 0 &&
-        column < (totalColumns ?? 0);
+    return row >= 0 && row < totalRows && column >= 0 && column < totalColumns;
   }
 
   Cabinet copyWith({

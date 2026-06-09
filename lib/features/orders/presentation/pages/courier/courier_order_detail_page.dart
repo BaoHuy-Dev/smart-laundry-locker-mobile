@@ -41,7 +41,6 @@ class _CourierOrderDetailPageState extends State<CourierOrderDetailPage> {
 
   Cabinet? _originCabinet;
   Cabinet? _destinationCabinet;
-  bool _isLoadingCabinets = false;
   String? _initError;
 
   @override
@@ -122,7 +121,6 @@ class _CourierOrderDetailPageState extends State<CourierOrderDetailPage> {
     final destinationId = order.destinationCabinetId?.trim();
 
     setState(() {
-      _isLoadingCabinets = true;
       _originCabinet = null;
       _destinationCabinet = null;
     });
@@ -142,9 +140,7 @@ class _CourierOrderDetailPageState extends State<CourierOrderDetailPage> {
     }
 
     if (!mounted) return;
-    setState(() {
-      _isLoadingCabinets = false;
-    });
+    setState(() {});
   }
 
   @override
@@ -241,29 +237,22 @@ class _CourierOrderDetailPageState extends State<CourierOrderDetailPage> {
                   pickNonEmpty(originDetail?.note);
 
               final originCabinetName =
-                  (_originCabinet?.name?.trim().isNotEmpty ?? false)
-                  ? _originCabinet!.name.trim()
-                  : (order.originCabinetId ?? '-');
+                  pickNonEmpty(_originCabinet?.name) ??
+                  (order.originCabinetId ?? '-');
               final originCabinetAddress =
-                  (_originCabinet?.address?.trim().isNotEmpty ?? false)
-                  ? _originCabinet!.address!.trim()
-                  : (_originCabinet?.locationName?.trim().isNotEmpty ?? false)
-                  ? _originCabinet!.locationName!.trim()
-                  : '-';
+                  pickNonEmpty(_originCabinet?.address) ??
+                  pickNonEmpty(_originCabinet?.locationName) ??
+                  '-';
 
               final destinationCabinetName =
                   pickNonEmpty(destinationDetail?.receiverAddress) ??
-                  ((_destinationCabinet?.name?.trim().isNotEmpty ?? false)
-                      ? _destinationCabinet!.name.trim()
-                      : (order.destinationCabinetId ?? '-'));
+                  pickNonEmpty(_destinationCabinet?.name) ??
+                  (order.destinationCabinetId ?? '-');
               final destinationCabinetAddress =
                   pickNonEmpty(destinationDetail?.receiverAddress) ??
-                  ((_destinationCabinet?.address?.trim().isNotEmpty ?? false)
-                      ? _destinationCabinet!.address!.trim()
-                      : (_destinationCabinet?.locationName?.trim().isNotEmpty ??
-                            false)
-                      ? _destinationCabinet!.locationName!.trim()
-                      : '-');
+                  pickNonEmpty(_destinationCabinet?.address) ??
+                  pickNonEmpty(_destinationCabinet?.locationName) ??
+                  '-';
 
               // `/logistics/courier/accept` trả về địa chỉ người gửi (dispatch.senderAddress)
               final senderAddressRaw =
@@ -338,7 +327,7 @@ class _CourierOrderDetailPageState extends State<CourierOrderDetailPage> {
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
-                                    'Loại mặt hàng: ${originDetail!.itemType == 'FOOD' ? 'Đồ ăn' : 'Hàng hóa khác'}',
+                                    'Loại mặt hàng: ${originDetail.itemType == 'FOOD' ? 'Đồ ăn' : 'Hàng hóa khác'}',
                                     style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w700,
@@ -784,10 +773,10 @@ class _CourierOrderDetailPageState extends State<CourierOrderDetailPage> {
                           const SizedBox(height: 12),
                           _infoRow(
                             'Người nhận',
-                            receiverName ?? '--',
+                            receiverName,
                             valueColor: Colors.black87,
                           ),
-                          if (receiverPhone != null &&
+                          if (receiverPhoneRaw != null &&
                               receiverPhone.isNotEmpty) ...[
                             _infoRow(
                               'SĐT',
@@ -842,7 +831,7 @@ class _CourierOrderDetailPageState extends State<CourierOrderDetailPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            noteText ?? '--',
+                            noteText,
                             style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
@@ -880,7 +869,7 @@ class _CourierOrderDetailPageState extends State<CourierOrderDetailPage> {
                                             builder: (context) {
                                               final isOrigin =
                                                   originDetail != null &&
-                                                  detail.id == originDetail!.id;
+                                                  detail.id == originDetail.id;
                                               final title = isOrigin
                                                   ? 'Thông tin lấy hàng'
                                                   : 'Thông tin giao hàng';
@@ -940,7 +929,7 @@ class _CourierOrderDetailPageState extends State<CourierOrderDetailPage> {
                                   builder: (context) {
                                     final isOrigin =
                                         originDetail != null &&
-                                        detail.id == originDetail!.id;
+                                        detail.id == originDetail.id;
                                     return _buildPhotoEvidence(
                                       detail,
                                       title: isOrigin

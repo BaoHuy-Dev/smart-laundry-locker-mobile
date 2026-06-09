@@ -84,7 +84,7 @@ class LockerRepositoryImpl implements LockerRepository {
 
       // Cache locations nếu có local data source
       if (_localDataSource != null) {
-        await _localDataSource!.cacheLocations(response.locations);
+        await _localDataSource.cacheLocations(response.locations);
       }
 
       // Convert models to entities
@@ -101,7 +101,7 @@ class LockerRepositoryImpl implements LockerRepository {
     } on NetworkException catch (e) {
       // Try to get from cache if network error
       if (_localDataSource != null) {
-        final cached = await _localDataSource!.getCachedLocations();
+        final cached = await _localDataSource.getCachedLocations();
         if (cached != null && cached.isNotEmpty) {
           final locations = cached.map((m) => m.toEntity()).toList();
           return Right(
@@ -137,7 +137,7 @@ class LockerRepositoryImpl implements LockerRepository {
 
       // Cache location
       if (_localDataSource != null) {
-        await _localDataSource!.cacheLocation(model);
+        await _localDataSource.cacheLocation(model);
       }
 
       return Right(model.toEntity());
@@ -146,7 +146,7 @@ class LockerRepositoryImpl implements LockerRepository {
     } on NetworkException catch (e) {
       // Try to get from cache
       if (_localDataSource != null) {
-        final cached = await _localDataSource!.getCachedLocationById(id);
+        final cached = await _localDataSource.getCachedLocationById(id);
         if (cached != null) {
           return Right(cached.toEntity());
         }
@@ -178,7 +178,7 @@ class LockerRepositoryImpl implements LockerRepository {
 
       // Cache cabinets
       if (_localDataSource != null) {
-        await _localDataSource!.cacheCabinetsByLocation(
+        await _localDataSource.cacheCabinetsByLocation(
           locationId,
           response.cabinets,
         );
@@ -227,7 +227,7 @@ class LockerRepositoryImpl implements LockerRepository {
 
       // Cache cabinets
       if (_localDataSource != null) {
-        await _localDataSource!.cacheCabinets(response.cabinets);
+        await _localDataSource.cacheCabinets(response.cabinets);
       }
 
       final cabinets = response.cabinets.map((m) => m.toEntity()).toList();
@@ -280,7 +280,7 @@ class LockerRepositoryImpl implements LockerRepository {
 
       // Cache lockers
       if (_localDataSource != null) {
-        await _localDataSource!.cacheLockersByCabinet(
+        await _localDataSource.cacheLockersByCabinet(
           cabinetId,
           response.lockers,
         );
@@ -335,7 +335,7 @@ class LockerRepositoryImpl implements LockerRepository {
 
       // Cache lockers
       if (_localDataSource != null) {
-        await _localDataSource!.cacheLockersByCabinet(
+        await _localDataSource.cacheLockersByCabinet(
           cabinetId,
           response.lockers,
         );
@@ -347,7 +347,7 @@ class LockerRepositoryImpl implements LockerRepository {
     } on NetworkException catch (e) {
       // Try to get from cache
       if (_localDataSource != null) {
-        final cached = await _localDataSource!.getCachedLockersByCabinet(
+        final cached = await _localDataSource.getCachedLockersByCabinet(
           cabinetId,
         );
         if (cached != null && cached.isNotEmpty) {

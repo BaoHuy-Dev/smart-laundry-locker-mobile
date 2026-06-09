@@ -3,7 +3,6 @@ import 'package:smart_laundry_locker/features/orders/domain/entities/order_detai
 import 'package:smart_laundry_locker/core/domain/entities/pagination.dart';
 import 'package:smart_laundry_locker/features/orders/domain/entities/courier_order.dart';
 import 'package:smart_laundry_locker/features/orders/domain/entities/courier_today_stats.dart';
-import 'package:smart_laundry_locker/features/locker/domain/repositories/locker_repository.dart';
 import 'package:dartz/dartz.dart' hide Order;
 import 'package:smart_laundry_locker/core/errors/failures.dart';
 

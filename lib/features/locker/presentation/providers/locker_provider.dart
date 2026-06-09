@@ -18,7 +18,6 @@ import 'package:smart_laundry_locker/features/locker/domain/entities/cabinet.dar
 import 'package:smart_laundry_locker/features/locker/domain/entities/locker.dart';
 import 'package:smart_laundry_locker/features/locker/domain/entities/locker_location.dart';
 import 'package:smart_laundry_locker/core/domain/entities/pagination.dart';
-import 'package:smart_laundry_locker/features/locker/domain/repositories/locker_repository.dart';
 import 'package:smart_laundry_locker/features/locker/infrastructure/models/responses/lockers_response.dart';
 import 'package:smart_laundry_locker/core/errors/failures.dart';
 import 'package:dartz/dartz.dart';

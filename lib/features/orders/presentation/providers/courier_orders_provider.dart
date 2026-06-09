@@ -1,4 +1,3 @@
-import 'package:smart_laundry_locker/features/orders/domain/entities/order_detail.dart';
 import 'package:smart_laundry_locker/features/orders/domain/entities/courier_today_stats.dart';
 import 'package:smart_laundry_locker/core/domain/entities/pagination.dart';
 import 'package:smart_laundry_locker/core/errors/failures.dart';

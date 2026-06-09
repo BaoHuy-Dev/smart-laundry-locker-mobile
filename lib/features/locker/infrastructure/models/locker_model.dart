@@ -1,5 +1,4 @@
 import 'package:smart_laundry_locker/features/locker/domain/entities/locker.dart';
-import 'package:smart_laundry_locker/features/locker/domain/value_objects/locker_size.dart';
 import 'package:smart_laundry_locker/features/locker/domain/value_objects/locker_status.dart';
 import 'package:smart_laundry_locker/features/locker/infrastructure/models/locker_size_model.dart';
 import 'package:json_annotation/json_annotation.dart';

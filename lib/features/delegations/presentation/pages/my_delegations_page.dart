@@ -2,7 +2,6 @@ import 'package:smart_laundry_locker/core/routing/app_router.dart';
 import 'package:smart_laundry_locker/features/delegations/presentation/providers/delegation_provider.dart';
 import 'package:smart_laundry_locker/features/delegations/presentation/providers/delegation_injection.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
-import 'package:smart_laundry_locker/shared/shared.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';

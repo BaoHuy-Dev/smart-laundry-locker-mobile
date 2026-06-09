@@ -421,7 +421,6 @@ class _OrderPageState extends State<OrderPage>
                                           final status = 'Đã hoàn thành';
                                           final from = job.originName;
                                           final to = job.destinationName;
-                                          final orderType = job.order.orderType;
                                           final isLogistics =
                                               job.order.isLogistics;
 

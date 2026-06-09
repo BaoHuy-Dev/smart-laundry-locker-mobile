@@ -8,7 +8,6 @@ import 'package:smart_laundry_locker/core/network/api_client.dart';
 import 'package:smart_laundry_locker/features/courier_registration/presentation/providers/courier_registration_injection.dart';
 import 'package:smart_laundry_locker/features/courier_registration/presentation/providers/courier_registration_provider.dart';
 import 'package:smart_laundry_locker/features/courier_registration/presentation/pages/courier_registration_status_page.dart';
-import 'package:go_router/go_router.dart';
 
 class CourierRegistrationPage extends StatefulWidget {
   const CourierRegistrationPage({super.key});

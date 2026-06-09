@@ -165,8 +165,6 @@ class _QrScannerPageState extends State<QrScannerPage>
                         return const Icon(Icons.flash_auto, color: Colors.blue);
                       case TorchState.unavailable:
                         return const Icon(Icons.flash_off, color: Colors.red);
-                      default:
-                        return const Icon(Icons.flash_off, color: Colors.grey);
                     }
                   },
                 ),
