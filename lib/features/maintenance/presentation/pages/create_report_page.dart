@@ -169,7 +169,7 @@ class _CreateReportPageState extends State<CreateReportPage> {
         for (final locker in lockers) {
           final address = (cabinet.address?.trim().isNotEmpty ?? false)
               ? cabinet.address!.trim()
-              : (location.address ?? location.name);
+              : location.address;
           final lockerLabel = locker.displayPosition;
           final optionId = '${cabinet.id}::${locker.id}';
 

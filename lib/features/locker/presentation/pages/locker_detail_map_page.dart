@@ -138,7 +138,7 @@ class _LockerDetailMapPageState extends ConsumerState<LockerDetailMapPage> {
           ),
         ],
       );
-    } catch (e, st) {
+    } catch (e) {
       mapStack = Center(
         child: Padding(
           padding: const EdgeInsets.all(24),

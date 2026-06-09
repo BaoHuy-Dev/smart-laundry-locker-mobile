@@ -14,7 +14,6 @@ import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:smart_laundry_locker/features/orders/domain/entities/courier_order.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
-import 'package:smart_laundry_locker/features/orders/presentation/widgets/order_status_colors.dart';
 import 'package:smart_laundry_locker/shared/widgets/app_bar.dart';
 import 'package:intl/intl.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
@@ -195,9 +194,6 @@ class _ActiveDeliveryPageState extends State<ActiveDeliveryPage> {
       CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(60)),
     );
   }
-
-  String _fmtDate(DateTime? d) =>
-      d == null ? '--' : DateFormat('dd/MM/yyyy HH:mm').format(d.toLocal());
 
   String _fmtCurrency(double v) =>
       NumberFormat.currency(locale: 'vi_VN', symbol: '₫').format(v);

@@ -1,14 +1,7 @@
-import 'package:dartz/dartz.dart';
 import 'package:flutter/foundation.dart';
 
-import 'package:smart_laundry_locker/core/network/api_client.dart';
 import 'courier_mode_service.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
-import 'package:smart_laundry_locker/features/profile/infrastructure/data_sources/profile_remote_data_source_impl.dart';
-import 'package:smart_laundry_locker/features/profile/infrastructure/repositories/profile_repository_impl.dart';
-import 'package:smart_laundry_locker/features/staff_application/domain/entities/staff_application.dart';
-import 'package:smart_laundry_locker/features/staff_application/infrastructure/data_sources/staff_application_remote_data_source_impl.dart';
-import 'package:smart_laundry_locker/features/staff_application/infrastructure/repositories/staff_application_repository_impl.dart';
 
 class CourierModeProvider extends ChangeNotifier {
   bool _isCourierModeActive = false;

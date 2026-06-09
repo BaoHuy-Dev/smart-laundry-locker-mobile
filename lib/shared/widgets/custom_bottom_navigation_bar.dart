@@ -1,7 +1,6 @@
 import 'package:smart_laundry_locker/core/widgets/qr_scanner_button.dart';
 import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:flutter/material.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// Builder function for custom icons
 typedef IconBuilder = Widget Function(Color color, double size);

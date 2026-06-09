@@ -25,7 +25,6 @@ import 'package:smart_laundry_locker/features/staff_application/presentation/pro
 import 'package:smart_laundry_locker/features/staff_application/presentation/providers/staff_application_provider.dart';
 import 'package:smart_laundry_locker/shared/shared.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
-import 'package:smart_laundry_locker/features/courier_registration/presentation/pages/courier_registration_status_page.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_laundry_locker/shared/widgets/unauthenticated_placeholder.dart';

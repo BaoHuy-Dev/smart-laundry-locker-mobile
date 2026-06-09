@@ -16,7 +16,7 @@ class MaintenanceReportModel extends MaintenanceReport {
     super.cabinetName,
     required super.title,
     required super.description,
-    @JsonKey(defaultValue: []) required super.photoUrls,
+    required super.photoUrls,
     required super.status,
     super.staffNote,
     required super.createdAt,

@@ -3034,7 +3034,7 @@ class _LockerActionPageState extends ConsumerState<LockerActionPage> {
             child: GestureDetector(
               onTap: () {
                 setState(() {
-                  _receiverAddressController.text = loc.address ?? '';
+                  _receiverAddressController.text = loc.address;
                   _selectedReceiverLocation = loc;
                 });
               },
@@ -3076,7 +3076,7 @@ class _LockerActionPageState extends ConsumerState<LockerActionPage> {
                             ),
                           ),
                           Text(
-                            loc.address ?? '',
+                            loc.address,
                             style: const TextStyle(
                               fontSize: 12,
                               color: Colors.grey,

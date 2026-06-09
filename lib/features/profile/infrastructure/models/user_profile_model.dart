@@ -1,5 +1,4 @@
 import 'package:smart_laundry_locker/features/profile/domain/entities/user_profile.dart';
-import 'package:flutter/foundation.dart';
 import 'package:json_annotation/json_annotation.dart';
 
 part 'user_profile_model.g.dart';
