@@ -31,8 +31,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<Map<String, dynamic>> login(LoginRequestModel request) async {
     final response = await _apiClient.post<Map<String, dynamic>>(
-      '$_basePath/login',
-      data: request.toJson(),
+      '/api/auth/login',
+      data: {'identifier': request.email, 'password': request.password},
     );
 
     return _extractData(response);
