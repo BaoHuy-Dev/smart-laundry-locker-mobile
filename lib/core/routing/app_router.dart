@@ -48,6 +48,7 @@ import 'package:smart_laundry_locker/features/orders/domain/entities/courier_ord
 import 'package:smart_laundry_locker/features/courier_delivery/infrastructure/models/responses.dart';
 import 'package:smart_laundry_locker/features/orders/domain/entities/order.dart';
 import 'package:smart_laundry_locker/features/orders/presentation/pages/customer/customer_order_detail_page.dart';
+import 'package:smart_laundry_locker/features/user_laundry/presentation/pages/user_laundry_order_page.dart';
 import 'package:geolocator/geolocator.dart';
 
 class AppRouter {
@@ -84,6 +85,7 @@ class AppRouter {
   static const String orderDetail = '/orders/detail';
   static const String myDelegations = '/my-delegations';
   static const String myVouchers = '/my-vouchers';
+  static const String userLaundryOrder = '/user/laundry-order';
 
   static final GlobalKey<NavigatorState> navigatorKey =
       GlobalKey<NavigatorState>();
@@ -157,6 +159,11 @@ class AppRouter {
       GoRoute(
         path: lockerMap,
         builder: (context, state) => const LockerMapPage(),
+      ),
+      GoRoute(
+        path: userLaundryOrder,
+        name: 'user_laundry_order',
+        builder: (context, state) => const UserLaundryOrderPage(),
       ),
       ShellRoute(
         builder: (context, state, child) {

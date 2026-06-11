@@ -725,7 +725,16 @@ class _HomePageState extends State<HomePage>
                 ),
               ),
               const SizedBox(width: 8),
-              const Expanded(child: SizedBox()),
+              Expanded(
+                child: _buildExpressCard(
+                  'Giat do',
+                  'Tao don',
+                  LucideIcons.washingMachine,
+                  const Color(0xFFF4F7FF),
+                  AISLShadcnTheme.navyPrimary,
+                  () => context.push(AppRouter.userLaundryOrder),
+                ),
+              ),
               const SizedBox(width: 8),
               const Expanded(child: SizedBox()),
             ],
