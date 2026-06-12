@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
 import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
+import 'package:smart_laundry_locker/core/routing/role_routes.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -24,8 +25,11 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     final hasToken = await TokenService.hasToken();
+    if (!mounted) return;
     if (hasToken) {
-      context.go(AppRouter.home);
+      final roles = await TokenService.getCurrentRoles();
+      if (!mounted) return;
+      context.go(homeForRoles(roles));
     } else {
       context.go(AppRouter.onboarding);
     }
@@ -46,7 +50,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 borderRadius: BorderRadius.circular(32),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF0A2342).withOpacity(0.2),
+                    color: const Color(0xFF0A2342).withValues(alpha: 0.2),
                     blurRadius: 24,
                     offset: const Offset(0, 10),
                   ),

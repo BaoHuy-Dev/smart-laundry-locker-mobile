@@ -49,6 +49,11 @@ import 'package:smart_laundry_locker/features/courier_delivery/infrastructure/mo
 import 'package:smart_laundry_locker/features/orders/domain/entities/order.dart';
 import 'package:smart_laundry_locker/features/orders/presentation/pages/customer/customer_order_detail_page.dart';
 import 'package:smart_laundry_locker/features/user_laundry/presentation/pages/user_laundry_order_page.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/manager_home_page.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/maintenance_home_page.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/send_parcel_page.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/rent_locker_page.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/my_locker_orders_page.dart';
 import 'package:geolocator/geolocator.dart';
 
 class AppRouter {
@@ -86,6 +91,11 @@ class AppRouter {
   static const String myDelegations = '/my-delegations';
   static const String myVouchers = '/my-vouchers';
   static const String userLaundryOrder = '/user/laundry-order';
+  static const String managerHome = '/manager';
+  static const String maintenanceHome = '/maintenance-home';
+  static const String sendParcel = '/locker/send-parcel';
+  static const String rentLocker = '/locker/rent';
+  static const String myLockerOrders = '/locker/my-orders';
 
   static final GlobalKey<NavigatorState> navigatorKey =
       GlobalKey<NavigatorState>();
@@ -389,6 +399,31 @@ class AppRouter {
         path: myDelegations,
         name: 'my_delegations',
         builder: (context, state) => const MyDelegationsPage(),
+      ),
+      GoRoute(
+        path: managerHome,
+        name: 'manager_home',
+        builder: (context, state) => const ManagerHomePage(),
+      ),
+      GoRoute(
+        path: maintenanceHome,
+        name: 'maintenance_home',
+        builder: (context, state) => const MaintenanceHomePage(),
+      ),
+      GoRoute(
+        path: sendParcel,
+        name: 'send_parcel',
+        builder: (context, state) => const SendParcelPage(),
+      ),
+      GoRoute(
+        path: rentLocker,
+        name: 'rent_locker',
+        builder: (context, state) => const RentLockerPage(),
+      ),
+      GoRoute(
+        path: myLockerOrders,
+        name: 'my_locker_orders',
+        builder: (context, state) => const MyLockerOrdersPage(),
       ),
       GoRoute(
         path: myVouchers,
