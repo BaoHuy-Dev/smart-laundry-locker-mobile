@@ -8,7 +8,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:smart_laundry_locker/features/notifications/presentation/providers/notification_provider.dart';
-import 'package:smart_laundry_locker/features/locker/presentation/pages/locker_action_page.dart';
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
 import 'package:smart_laundry_locker/features/wallet/presentation/providers/wallet_provider.dart';
 import 'package:smart_laundry_locker/core/services/courier_mode_provider.dart';
@@ -170,7 +169,7 @@ class _HomePageState extends State<HomePage>
               borderRadius: BorderRadius.circular(8),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -296,7 +295,7 @@ class _HomePageState extends State<HomePage>
             children: [
               Icon(
                 LucideIcons.megaphone,
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.white.withValues(alpha: 0.3),
                 size: 48,
               ),
               const SizedBox(height: 12),
@@ -315,7 +314,7 @@ class _HomePageState extends State<HomePage>
                   'Đăng ký trở thành Đối tác để đặt quảng cáo tại đây!',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha: 0.7),
                     fontSize: 13,
                   ),
                 ),
@@ -392,7 +391,7 @@ class _HomePageState extends State<HomePage>
                     shape: BoxShape.circle,
                     color: _currentBannerIndex == index
                         ? Colors.white
-                        : Colors.white.withOpacity(0.4),
+                        : Colors.white.withValues(alpha: 0.4),
                   ),
                 ),
               ),
@@ -462,7 +461,7 @@ class _HomePageState extends State<HomePage>
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: Colors.black.withValues(alpha: 0.04),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -559,7 +558,7 @@ class _HomePageState extends State<HomePage>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -682,8 +681,7 @@ class _HomePageState extends State<HomePage>
                   LucideIcons.key,
                   const Color(0xFFF0F7FF),
                   Colors.blue.shade500,
-                  () =>
-                      context.push('/locker-action', extra: LockerAction.rent),
+                  () => context.push(AppRouter.rentLocker),
                 ),
               ),
               const SizedBox(width: 8),
@@ -705,8 +703,7 @@ class _HomePageState extends State<HomePage>
                   LucideIcons.send,
                   const Color(0xFFF3FAF4),
                   Colors.green.shade500,
-                  () =>
-                      context.push('/locker-action', extra: LockerAction.send),
+                  () => context.push(AppRouter.sendParcel),
                 ),
               ),
             ],
@@ -736,7 +733,16 @@ class _HomePageState extends State<HomePage>
                 ),
               ),
               const SizedBox(width: 8),
-              const Expanded(child: SizedBox()),
+              Expanded(
+                child: _buildExpressCard(
+                  'Đơn tủ',
+                  'Theo dõi',
+                  LucideIcons.package,
+                  const Color(0xFFFFF4F6),
+                  Colors.pink.shade500,
+                  () => context.push(AppRouter.myLockerOrders),
+                ),
+              ),
             ],
           ),
         ],
@@ -768,11 +774,11 @@ class _HomePageState extends State<HomePage>
                 child: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.6),
+                    color: Colors.white.withValues(alpha: 0.6),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: iconColor.withOpacity(0.2),
+                        color: iconColor.withValues(alpha: 0.2),
                         blurRadius: 8,
                         spreadRadius: 1,
                       ),
@@ -824,7 +830,7 @@ class _HomePageState extends State<HomePage>
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 16,
             offset: const Offset(0, 10),
           ),
@@ -836,7 +842,7 @@ class _HomePageState extends State<HomePage>
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: AISLShadcnTheme.navyPrimary.withOpacity(0.10),
+              color: AISLShadcnTheme.navyPrimary.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
@@ -892,7 +898,7 @@ class _HomePageState extends State<HomePage>
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 16,
               offset: const Offset(0, 10),
             ),
@@ -905,8 +911,8 @@ class _HomePageState extends State<HomePage>
               height: 44,
               decoration: BoxDecoration(
                 color: isOnline
-                    ? const Color(0xFF16A34A).withOpacity(0.10)
-                    : AISLShadcnTheme.navyPrimary.withOpacity(0.10),
+                    ? const Color(0xFF16A34A).withValues(alpha: 0.10)
+                    : AISLShadcnTheme.navyPrimary.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
@@ -993,13 +999,13 @@ class _HomePageState extends State<HomePage>
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 16,
               offset: const Offset(0, 10),
             ),
           ],
           border: Border.all(
-            color: AISLShadcnTheme.navyPrimary.withOpacity(0.1),
+            color: AISLShadcnTheme.navyPrimary.withValues(alpha: 0.1),
           ),
         ),
         child: Row(
@@ -1008,7 +1014,7 @@ class _HomePageState extends State<HomePage>
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: AISLShadcnTheme.navyPrimary.withOpacity(0.10),
+                color: AISLShadcnTheme.navyPrimary.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: const Icon(
@@ -1114,10 +1120,11 @@ class _HomePageState extends State<HomePage>
     if (!context.mounted) return;
 
     final position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
     );
 
     // Sync to backend immediately
+    if (!context.mounted) return;
     context.read<CourierDispatchProvider>().goOnlineWithLocation(
       position.latitude,
       position.longitude,
@@ -1279,7 +1286,7 @@ class _CourierAction extends StatelessWidget {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: AISLShadcnTheme.navyPrimary.withOpacity(0.12),
+              color: AISLShadcnTheme.navyPrimary.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: AISLShadcnTheme.navyPrimary, size: 22),

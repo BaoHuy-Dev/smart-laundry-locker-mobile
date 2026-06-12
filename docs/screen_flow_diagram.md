@@ -1,5 +1,9 @@
 # AISL App Screen Flow Diagrams
 
+<!-- CURRENT_STATUS_START -->
+> **Cập nhật 2026-06-13:** Tài liệu này đã được rà soát để bám theo trạng thái hiện tại của dự án. Backend Phase 2 cho locker flow đã triển khai SEND / RENTAL / QR / RBAC / maintenance; FE admin build pass; Flutter mobile đã có luồng Customer, Manager và Maintenance. Nguồn trạng thái chuẩn: `laundry-locker-microservices/docs/CURRENT_PROJECT_STATUS.md`, `RUN_RESULT.md`, `LOCKER_FLOW_PLAN.md`.
+<!-- CURRENT_STATUS_END -->
+
 Tài liệu này cung cấp các sơ đồ luồng màn hình (Screen Flow Diagrams) cho cả 2 vai trò khách hàng (Customer) và người giao hàng (Courier) được quét trực tiếp từ cấu trúc file source code của ứng dụng.
 
 **Quá trình scan trực tiếp từ codebase `/lib/features/` đã xác định chính xác các màn hình thực tế (không dùng thông tin mẫu từ Internet):**

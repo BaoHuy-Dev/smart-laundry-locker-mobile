@@ -10,5 +10,5 @@ part of 'env_config.dart';
 // ignore_for_file: type=lint
 // generated_from: .env
 final class _EnvConfig {
-  static const String apiBaseUrl = 'https://api-dev.aisl.io.vn';
+  static const String apiBaseUrl = 'http://10.0.2.2:8080';
 }

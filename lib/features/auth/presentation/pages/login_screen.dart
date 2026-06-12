@@ -1,6 +1,9 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:smart_laundry_locker/core/routing/app_router.dart';
+import 'package:smart_laundry_locker/core/network/dio_client.dart';
+import 'package:smart_laundry_locker/core/routing/role_routes.dart';
+import 'package:smart_laundry_locker/core/services/token_service.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -10,13 +13,13 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
-  bool _isPhoneMethod = true;
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _otpController = TextEditingController();
-  bool _isOtpSent = false;
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
+  final TextEditingController _identifierController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _obscure = true;
+  String? _error;
 
   late AnimationController _animationController;
   late Animation<double> _logoScale;
@@ -45,12 +48,13 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       ),
     );
 
-    _formSlide = Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(0.4, 1.0, curve: Curves.easeOutCubic),
-      ),
-    );
+    _formSlide = Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero)
+        .animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: const Interval(0.4, 1.0, curve: Curves.easeOutCubic),
+          ),
+        );
 
     _animationController.forward();
   }
@@ -58,19 +62,47 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   @override
   void dispose() {
     _animationController.dispose();
-    _phoneController.dispose();
-    _emailController.dispose();
-    _otpController.dispose();
+    _identifierController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
-  void _handleAction() {
-    if (_isOtpSent) {
-      context.go(AppRouter.home);
-    } else {
-      setState(() {
-        _isOtpSent = true;
-      });
+  Future<void> _handleLogin() async {
+    final identifier = _identifierController.text.trim();
+    final password = _passwordController.text;
+    if (identifier.isEmpty || password.isEmpty) {
+      setState(() => _error = 'Nhập email/SĐT và mật khẩu');
+      return;
+    }
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final res = await DioClient.instance.dio.post(
+        '/api/auth/login',
+        data: {'identifier': identifier, 'password': password},
+      );
+      final data = res.data?['data'] as Map<String, dynamic>?;
+      final access = data?['accessToken'] as String?;
+      final refresh = data?['refreshToken'] as String?;
+      if (access == null || refresh == null) {
+        throw Exception('Token missing');
+      }
+      await TokenService.saveTokens(access, refresh);
+      final roles = await TokenService.getCurrentRoles();
+      if (!mounted) return;
+      context.go(homeForRoles(roles));
+    } on DioException catch (e) {
+      final msg =
+          (e.response?.data is Map && (e.response?.data['message'] is String))
+          ? e.response?.data['message'] as String
+          : 'Đăng nhập thất bại — kiểm tra tài khoản/mật khẩu';
+      setState(() => _error = msg);
+    } catch (_) {
+      setState(() => _error = 'Đăng nhập thất bại — thử lại sau');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -86,7 +118,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             padding: const EdgeInsets.only(top: 80, bottom: 40),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFF001F2D), Color(0xFF003D5B), Color(0xFF0077B6)],
+                colors: [
+                  Color(0xFF001F2D),
+                  Color(0xFF003D5B),
+                  Color(0xFF0077B6),
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -103,7 +139,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     height: 180,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.04),
+                      color: Colors.white.withValues(alpha: 0.04),
                     ),
                   ),
                 ),
@@ -115,7 +151,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     height: 140,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFF00B4D8).withOpacity(0.08),
+                      color: const Color(0xFF00B4D8).withValues(alpha: 0.08),
                     ),
                   ),
                 ),
@@ -130,7 +166,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           height: 100,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white.withOpacity(0.15)),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.15),
+                            ),
                           ),
                           alignment: Alignment.center,
                           child: Container(
@@ -138,9 +176,13 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                             height: 84,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: Colors.white.withOpacity(0.1),
+                              color: Colors.white.withValues(alpha: 0.1),
                             ),
-                            child: const Icon(LucideIcons.box, size: 40, color: Colors.white),
+                            child: const Icon(
+                              LucideIcons.box,
+                              size: 40,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
@@ -164,7 +206,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         'Locker thông minh, tiện lợi',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withValues(alpha: 0.8),
                         ),
                       ),
                     ),
@@ -173,7 +215,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               ],
             ),
           ),
-          
+
           // Form Container
           Expanded(
             child: SlideTransition(
@@ -194,158 +236,117 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Method Toggle
-                        Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF5F5F5),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          padding: const EdgeInsets.all(4),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      _isPhoneMethod = true;
-                                      _isOtpSent = false;
-                                    });
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    decoration: BoxDecoration(
-                                      color: _isPhoneMethod ? Colors.white : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(12),
-                                      boxShadow: _isPhoneMethod ? [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.05),
-                                          blurRadius: 4,
-                                          offset: const Offset(0, 2),
-                                        )
-                                      ] : null,
-                                    ),
-                                    child: Text(
-                                      'Số điện thoại',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontWeight: _isPhoneMethod ? FontWeight.bold : FontWeight.normal,
-                                        color: _isPhoneMethod ? const Color(0xFF003D5B) : Colors.grey,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      _isPhoneMethod = false;
-                                      _isOtpSent = false;
-                                    });
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                    decoration: BoxDecoration(
-                                      color: !_isPhoneMethod ? Colors.white : Colors.transparent,
-                                      borderRadius: BorderRadius.circular(12),
-                                      boxShadow: !_isPhoneMethod ? [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.05),
-                                          blurRadius: 4,
-                                          offset: const Offset(0, 2),
-                                        )
-                                      ] : null,
-                                    ),
-                                    child: Text(
-                                      'Email',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontWeight: !_isPhoneMethod ? FontWeight.bold : FontWeight.normal,
-                                        color: !_isPhoneMethod ? const Color(0xFF003D5B) : Colors.grey,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                        const Text(
+                          'Đăng nhập',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E293B),
                           ),
                         ),
-                        const SizedBox(height: 24),
-                        
-                        // Inputs
-                        Text(
-                          _isOtpSent ? 'Mã xác thực (OTP)' : (_isPhoneMethod ? 'Số điện thoại' : 'Email'),
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B)),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Dùng email hoặc số điện thoại đã đăng ký',
+                          style: TextStyle(fontSize: 13, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 20),
+                        const Text(
+                          'Email / Số điện thoại',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Color(0xFF1E293B),
+                          ),
                         ),
                         const SizedBox(height: 8),
-                        
-                        if (!_isOtpSent)
-                          Container(
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8F9FA),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
-                            ),
-                            child: Row(
-                              children: [
-                                if (_isPhoneMethod) ...[
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                                    decoration: const BoxDecoration(
-                                      border: Border(right: BorderSide(color: Color(0xFFE2E8F0))),
-                                    ),
-                                    child: const Text('+84', style: TextStyle(fontWeight: FontWeight.bold)),
+                        TextField(
+                          controller: _identifierController,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: _inputDecoration(
+                            'email@example.com',
+                            icon: LucideIcons.user,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Mật khẩu',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _passwordController,
+                          obscureText: _obscure,
+                          onSubmitted: (_) => _handleLogin(),
+                          decoration:
+                              _inputDecoration(
+                                '••••••••',
+                                icon: LucideIcons.lock,
+                              ).copyWith(
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscure
+                                        ? LucideIcons.eye
+                                        : LucideIcons.eyeOff,
+                                    size: 18,
+                                    color: Colors.grey,
                                   ),
-                                ],
-                                Expanded(
-                                  child: TextField(
-                                    controller: _isPhoneMethod ? _phoneController : _emailController,
-                                    keyboardType: _isPhoneMethod ? TextInputType.phone : TextInputType.emailAddress,
-                                    decoration: InputDecoration(
-                                      hintText: _isPhoneMethod ? '987 654 321' : 'example@email.com',
-                                      border: InputBorder.none,
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                                    ),
-                                  ),
+                                  onPressed: () =>
+                                      setState(() => _obscure = !_obscure),
                                 ),
-                              ],
+                              ),
+                        ),
+                        if (_error != null) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF2F2),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: const Color(0xFFFECACA),
+                              ),
                             ),
-                          )
-                        else
-                          TextField(
-                            controller: _otpController,
-                            keyboardType: TextInputType.number,
-                            maxLength: 6,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 24, letterSpacing: 8),
-                            decoration: InputDecoration(
-                              counterText: '',
-                              filled: true,
-                              fillColor: const Color(0xFFF8F9FA),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                            child: Text(
+                              _error!,
+                              style: const TextStyle(
+                                color: Color(0xFFB91C1C),
+                                fontSize: 13,
                               ),
                             ),
                           ),
-                        
+                        ],
                         const SizedBox(height: 24),
-                        
-                        // Action Button
                         ElevatedButton(
-                          onPressed: _handleAction,
+                          onPressed: _isLoading ? null : _handleLogin,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF0077B6),
                             padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                             elevation: 0,
                           ),
-                          child: _isLoading 
-                            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                            : Text(
-                                _isOtpSent ? 'Xác nhận' : 'Gửi mã OTP',
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                              ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  'Đăng nhập',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
                         ),
                       ],
                     ),
@@ -355,6 +356,23 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String hint, {required IconData icon}) {
+    return InputDecoration(
+      hintText: hint,
+      prefixIcon: Icon(icon, size: 18, color: Colors.grey),
+      filled: true,
+      fillColor: const Color(0xFFF8F9FA),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
     );
   }

@@ -19,9 +19,9 @@ MaintenanceReportModel _$MaintenanceReportModelFromJson(
   cabinetName: json['cabinetName'] as String?,
   title: json['title'] as String,
   description: json['description'] as String,
-  photoUrls:
-      (json['photoUrls'] as List<dynamic>?)?.map((e) => e as String).toList() ??
-      [],
+  photoUrls: (json['photoUrls'] as List<dynamic>)
+      .map((e) => e as String)
+      .toList(),
   status: json['status'] as String,
   staffNote: json['staffNote'] as String?,
   createdAt: DateTime.parse(json['createdAt'] as String),
