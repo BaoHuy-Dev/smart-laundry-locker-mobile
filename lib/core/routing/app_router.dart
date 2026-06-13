@@ -54,6 +54,9 @@ import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/main
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/send_parcel_page.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/rent_locker_page.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/my_locker_orders_page.dart';
+import 'package:smart_laundry_locker/features/stores/domain/entities/store.dart';
+import 'package:smart_laundry_locker/features/stores/presentation/pages/stores_page.dart';
+import 'package:smart_laundry_locker/features/stores/presentation/pages/store_detail_page.dart';
 import 'package:geolocator/geolocator.dart';
 
 class AppRouter {
@@ -96,6 +99,8 @@ class AppRouter {
   static const String sendParcel = '/locker/send-parcel';
   static const String rentLocker = '/locker/rent';
   static const String myLockerOrders = '/locker/my-orders';
+  static const String stores = '/stores';
+  static const String storeDetail = '/stores/detail';
 
   static final GlobalKey<NavigatorState> navigatorKey =
       GlobalKey<NavigatorState>();
@@ -429,6 +434,28 @@ class AppRouter {
         path: myVouchers,
         name: 'my_vouchers',
         builder: (context, state) => const MyVouchersPage(),
+      ),
+      GoRoute(
+        path: stores,
+        name: 'stores',
+        builder: (context, state) => const StoresPage(),
+      ),
+      GoRoute(
+        path: storeDetail,
+        name: 'store_detail',
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is Store) {
+            return StoreDetailPage(store: extra);
+          }
+          final id = int.tryParse(
+            extra is String ? extra : (state.uri.queryParameters['id'] ?? ''),
+          );
+          if (id != null) {
+            return StoreDetailPage(storeId: id);
+          }
+          return const StoresPage();
+        },
       ),
     ],
   );
