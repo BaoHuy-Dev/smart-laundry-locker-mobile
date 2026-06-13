@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/locker_picker.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/ops_widgets.dart';
 
-/// RENTAL flow: pick cabinet + cell type + duration, pay-per-hour,
-/// multi-use PIN until the rental deadline.
+/// RENTAL flow: chọn tủ + loại ô + thời lượng, trả tiền theo giờ, PIN dùng
+/// nhiều lần tới hết hạn thuê (khớp `order-service` createRental/extend/end).
 class RentLockerPage extends StatefulWidget {
   const RentLockerPage({super.key});
 
@@ -14,12 +18,16 @@ class RentLockerPage extends StatefulWidget {
 
 class _RentLockerPageState extends State<RentLockerPage> {
   static const _rates = {'STANDARD': 5000, 'XL': 10000};
+  static const _quickHours = [2, 4, 8, 12, 24];
 
   final _service = LockerOpsService();
+  final _noteCtrl = TextEditingController();
+
   List<Map<String, dynamic>> _lockers = [];
   int? _lockerId;
   String _cellType = 'STANDARD';
   double _hours = 4;
+  bool _loadingLockers = true;
   bool _loading = false;
   Map<String, dynamic>? _order;
 
@@ -29,6 +37,12 @@ class _RentLockerPageState extends State<RentLockerPage> {
     _loadLockers();
   }
 
+  @override
+  void dispose() {
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadLockers() async {
     try {
       final lockers = await _service.lockers();
@@ -36,8 +50,11 @@ class _RentLockerPageState extends State<RentLockerPage> {
       setState(() {
         _lockers = lockers.where((l) => l['status'] == 'ACTIVE').toList();
         if (_lockers.isNotEmpty) _lockerId = _lockers.first['id'] as int?;
+        _loadingLockers = false;
       });
     } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingLockers = false);
       _snack(LockerOpsService.errorMessage(e));
     }
   }
@@ -52,6 +69,7 @@ class _RentLockerPageState extends State<RentLockerPage> {
         lockerId: _lockerId!,
         cellType: _cellType,
         hours: _hours.round(),
+        note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
       );
       if (!mounted) return;
       setState(() => _order = order);
@@ -80,16 +98,18 @@ class _RentLockerPageState extends State<RentLockerPage> {
 
   void _snack(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FA),
+      backgroundColor: AISLShadcnTheme.navySurface,
       appBar: AppBar(
         title: const Text('Thuê tủ giữ đồ'),
-        backgroundColor: opsDark,
+        backgroundColor: AISLShadcnTheme.navyPrimary,
         foregroundColor: Colors.white,
       ),
       body: _order == null ? _buildForm() : _buildResult(),
@@ -97,133 +117,219 @@ class _RentLockerPageState extends State<RentLockerPage> {
   }
 
   Widget _buildForm() {
+    if (_loadingLockers) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text('Chọn tủ', style: TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<int>(
-          initialValue: _lockerId,
-          items: _lockers
-              .map(
-                (l) => DropdownMenuItem(
-                  value: l['id'] as int?,
-                  child: Text('${l['name'] ?? l['code']}'),
-                ),
-              )
-              .toList(),
-          onChanged: (v) => setState(() => _lockerId = v),
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.white,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
+        const OpsBanner(
+          text: 'Thuê ô để giữ đồ cá nhân theo giờ. PIN mở ô được dùng nhiều '
+              'lần trong suốt kỳ thuê.',
+          icon: LucideIcons.lockKeyhole,
         ),
-        const SizedBox(height: 16),
-        const Text('Loại ô', style: TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
+        const SizedBox(height: 20),
+        const OpsSectionLabel('Chọn tủ', icon: LucideIcons.warehouse),
+        LockerPickerField(
+          lockers: _lockers,
+          selectedId: _lockerId,
+          onSelected: (l) => setState(() => _lockerId = l['id'] as int?),
+        ),
+        const SizedBox(height: 20),
+        const OpsSectionLabel('Loại ô', icon: LucideIcons.boxes),
         Row(
           children: [
-            _cellOption('STANDARD', 'Ô thường', '45×30×50cm — 5.000đ/giờ'),
+            _cellCard(
+              value: 'STANDARD',
+              icon: LucideIcons.box,
+              title: 'Ô thường',
+              size: '45 × 30 × 50 cm',
+              rate: '5.000đ/giờ',
+            ),
             const SizedBox(width: 12),
-            _cellOption('XL', 'Ô vali (XL)', '30×80×40cm — 10.000đ/giờ'),
+            _cellCard(
+              value: 'XL',
+              icon: LucideIcons.luggage,
+              title: 'Ô vali (XL)',
+              size: '30 × 80 × 40 cm',
+              rate: '10.000đ/giờ',
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        const OpsSectionLabel('Thời gian thuê', icon: LucideIcons.timer),
+        Wrap(
+          spacing: 8,
+          children: [
+            for (final h in _quickHours) _quickChip(h),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Expanded(
+              child: Slider(
+                value: _hours,
+                min: 1,
+                max: 72,
+                divisions: 71,
+                activeColor: opsPrimary,
+                label: '${_hours.round()}h',
+                onChanged: (v) => setState(() => _hours = v),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: opsPrimary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${_hours.round()} giờ',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: opsPrimary,
+                ),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 16),
-        Text(
-          'Thời gian thuê: ${_hours.round()} giờ',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        Slider(
-          value: _hours,
-          min: 1,
-          max: 72,
-          divisions: 71,
-          activeColor: opsPrimary,
-          label: '${_hours.round()}h',
-          onChanged: (v) => setState(() => _hours = v),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Tạm tính'),
-              Text(
-                '${_price ~/ 1000}.000đ',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-            ],
+        const OpsSectionLabel('Ghi chú', icon: LucideIcons.stickyNote),
+        TextField(
+          controller: _noteCtrl,
+          maxLines: 2,
+          decoration: InputDecoration(
+            hintText: 'Tùy chọn...',
+            prefixIcon: const Icon(LucideIcons.pencil, size: 18, color: opsMutedText),
+            filled: true,
+            fillColor: Colors.white,
+            border: _border(opsBorder),
+            enabledBorder: _border(opsBorder),
+            focusedBorder: _border(opsPrimary, width: 1.6),
           ),
         ),
-        const SizedBox(height: 24),
-        ElevatedButton(
-          onPressed: _loading ? null : _create,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: opsPrimary,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: _loading
-              ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
-                )
-              : const Text(
-                  'Thuê ngay',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+        const SizedBox(height: 16),
+        _priceCard(),
+        const SizedBox(height: 20),
+        OpsPrimaryButton(
+          label: 'Thuê ngay',
+          icon: LucideIcons.lockKeyhole,
+          loading: _loading,
+          onPressed: _create,
         ),
-      ],
+      ].animate(interval: 40.ms).fadeIn(duration: 250.ms).slideY(begin: 0.06),
     );
   }
 
-  Widget _cellOption(String value, String title, String subtitle) {
+  Widget _priceCard() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [opsDark, AISLShadcnTheme.navySecondary],
+        ),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          const Icon(LucideIcons.wallet, color: Colors.white70, size: 22),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Tạm tính',
+                style: TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+              Text(
+                '${typeLabel('RENTAL')} · ${_hours.round()} giờ',
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+            ],
+          ),
+          const Spacer(),
+          Text(
+            fmtPrice(_price),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 22,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _quickChip(int h) {
+    final selected = _hours.round() == h;
+    return ChoiceChip(
+      label: Text('${h}h'),
+      selected: selected,
+      showCheckmark: false,
+      backgroundColor: Colors.white,
+      selectedColor: opsPrimary,
+      side: BorderSide(color: selected ? opsPrimary : opsBorder),
+      labelStyle: TextStyle(
+        color: selected ? Colors.white : opsDark,
+        fontWeight: FontWeight.w700,
+      ),
+      onSelected: (_) => setState(() => _hours = h.toDouble()),
+    );
+  }
+
+  Widget _cellCard({
+    required String value,
+    required IconData icon,
+    required String title,
+    required String size,
+    required String rate,
+  }) {
     final selected = _cellType == value;
     return Expanded(
       child: GestureDetector(
         onTap: () => setState(() => _cellType = value),
-        child: Container(
-          padding: const EdgeInsets.all(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: selected ? opsPrimary.withValues(alpha: 0.08) : Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            color: selected ? opsPrimary.withValues(alpha: 0.06) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: selected ? opsPrimary : const Color(0xFFE2E8F0),
-              width: 2,
+              color: selected ? opsPrimary : opsBorder,
+              width: selected ? 1.8 : 1,
             ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                children: [
+                  Icon(icon, color: selected ? opsPrimary : opsMutedText, size: 22),
+                  const Spacer(),
+                  if (selected)
+                    const Icon(LucideIcons.circleCheck, color: opsPrimary, size: 18),
+                ],
+              ),
+              const SizedBox(height: 10),
               Text(
                 title,
                 style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: selected ? opsPrimary : Colors.black87,
+                  fontWeight: FontWeight.w800,
+                  color: selected ? opsPrimary : opsDark,
                 ),
               ),
               const SizedBox(height: 4),
+              Text(size, style: const TextStyle(fontSize: 11, color: opsMutedText)),
+              const SizedBox(height: 2),
               Text(
-                subtitle,
-                style: const TextStyle(fontSize: 11, color: Colors.grey),
+                rate,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: opsDark,
+                ),
               ),
             ],
           ),
@@ -239,71 +345,107 @@ class _RentLockerPageState extends State<RentLockerPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Card(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
+        OpsCard(
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
                       'Đơn ${order['orderCode'] ?? ''}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: opsDark,
+                      ),
                     ),
-                    StatusChip(status),
-                  ],
-                ),
-                const Divider(height: 24),
-                Text(
-                  started
-                      ? 'Kỳ thuê đang chạy — PIN mở ô nhiều lần tới ${order['pickupDeadline'] ?? ''}'
-                      : 'Ô số ${order['sendBoxId']} đã giữ chỗ. Mở ô bằng PIN và bỏ đồ vào.',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.grey),
-                ),
+                  ),
+                  StatusChip(status),
+                ],
+              ),
+              const Divider(height: 24, color: opsBorder),
+              _ResultHeadline(
+                icon: started ? LucideIcons.lockKeyhole : LucideIcons.packageOpen,
+                title: started ? 'Kỳ thuê đang chạy' : 'Đã giữ ô — bỏ đồ vào',
+                subtitle: started
+                    ? 'PIN mở ô nhiều lần tới ${fmtDateTime(order['pickupDeadline'])}.'
+                    : 'Nhập PIN để mở ô số ${order['sendBoxId'] ?? '-'} và đặt đồ vào.',
+              ),
+              const SizedBox(height: 16),
+              AccessCredentials(
+                pin: order['pinCode'] as String?,
+                qrToken: order['qrToken'] as String?,
+                caption: 'PIN dùng nhiều lần trong kỳ thuê',
+              ),
+              if (order['pickupDeadline'] != null) ...[
                 const SizedBox(height: 16),
-                AccessCredentials(
-                  pin: order['pinCode'] as String?,
-                  qrToken: order['qrToken'] as String?,
+                OpsBanner(
+                  tone: OpsBannerTone.info,
+                  icon: LucideIcons.clock,
+                  text: 'Hết hạn thuê: ${fmtDateTime(order['pickupDeadline'])} '
+                      '(${fmtRemaining(order['pickupDeadline'])}). '
+                      'Trả ô trễ sẽ phát sinh phí quá giờ.',
                 ),
               ],
-            ),
+            ],
           ),
-        ),
+        ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.05),
         const SizedBox(height: 16),
         if (!started)
-          ElevatedButton(
-            onPressed: _loading ? null : _confirmDrop,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: opsPrimary,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text(
-              'Tôi đã bỏ đồ — bắt đầu kỳ thuê',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+          OpsPrimaryButton(
+            label: 'Tôi đã bỏ đồ — bắt đầu kỳ thuê',
+            icon: LucideIcons.check,
+            loading: _loading,
+            onPressed: _confirmDrop,
           )
         else
-          OutlinedButton(
+          OpsPrimaryButton(
+            label: 'Xong — xem trong Đơn của tôi',
+            icon: LucideIcons.house,
             onPressed: () => context.pop(),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text('Xong — xem trong Đơn của tôi'),
           ),
+      ],
+    );
+  }
+
+  OutlineInputBorder _border(Color color, {double width = 1}) =>
+      OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: color, width: width),
+      );
+}
+
+class _ResultHeadline extends StatelessWidget {
+  const _ResultHeadline({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(icon, size: 30, color: opsPrimary),
+        const SizedBox(height: 8),
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 16,
+            color: opsDark,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 13, color: opsMutedText, height: 1.4),
+        ),
       ],
     );
   }
