@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/locker_picker.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/ops_widgets.dart';
 
-/// SEND flow — stage 1: create order + drop PIN; stage 2: confirm drop,
-/// receiver PIN is issued and pushed to the receiver's account.
+/// SEND flow (gửi hàng C2C qua tủ).
+/// Stage 1: tạo đơn + nhận PIN bỏ hàng. Stage 2: xác nhận đã bỏ hàng → PIN
+/// nhận hàng được sinh mới và gửi cho người nhận (đúng luồng PIN 2 giai đoạn
+/// của backend `order-service`).
 class SendParcelPage extends StatefulWidget {
   const SendParcelPage({super.key});
 
@@ -21,6 +28,7 @@ class _SendParcelPageState extends State<SendParcelPage> {
 
   List<Map<String, dynamic>> _lockers = [];
   int? _lockerId;
+  bool _loadingLockers = true;
   bool _loading = false;
   Map<String, dynamic>? _order;
 
@@ -30,6 +38,14 @@ class _SendParcelPageState extends State<SendParcelPage> {
     _loadLockers();
   }
 
+  @override
+  void dispose() {
+    _phoneCtrl.dispose();
+    _nameCtrl.dispose();
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadLockers() async {
     try {
       final lockers = await _service.lockers();
@@ -37,8 +53,11 @@ class _SendParcelPageState extends State<SendParcelPage> {
       setState(() {
         _lockers = lockers.where((l) => l['status'] == 'ACTIVE').toList();
         if (_lockers.isNotEmpty) _lockerId = _lockers.first['id'] as int?;
+        _loadingLockers = false;
       });
     } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingLockers = false);
       _snack(LockerOpsService.errorMessage(e));
     }
   }
@@ -47,14 +66,14 @@ class _SendParcelPageState extends State<SendParcelPage> {
     if (!(_formKey.currentState?.validate() ?? false) || _lockerId == null) {
       return;
     }
+    FocusScope.of(context).unfocus();
     setState(() => _loading = true);
     try {
       final order = await _service.createSend(
         lockerId: _lockerId!,
         receiverPhone: _phoneCtrl.text.trim(),
-        receiverName: _nameCtrl.text.trim().isEmpty
-            ? null
-            : _nameCtrl.text.trim(),
+        receiverName:
+            _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
         note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
       );
       if (!mounted) return;
@@ -84,217 +103,322 @@ class _SendParcelPageState extends State<SendParcelPage> {
 
   void _snack(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FA),
+      backgroundColor: AISLShadcnTheme.navySurface,
       appBar: AppBar(
         title: const Text('Gửi hàng qua tủ'),
-        backgroundColor: opsDark,
+        backgroundColor: AISLShadcnTheme.navyPrimary,
         foregroundColor: Colors.white,
       ),
       body: _order == null ? _buildForm() : _buildResult(),
     );
   }
 
+  // ---- Stage 1: form ----
   Widget _buildForm() {
+    if (_loadingLockers) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return Form(
       key: _formKey,
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text('Chọn tủ', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<int>(
-            initialValue: _lockerId,
-            items: _lockers
-                .map(
-                  (l) => DropdownMenuItem(
-                    value: l['id'] as int?,
-                    child: Text('${l['name'] ?? l['code']}'),
-                  ),
-                )
-                .toList(),
-            onChanged: (v) => setState(() => _lockerId = v),
-            decoration: _input('Tủ gần bạn'),
-          ),
+          const _SendStepper(active: 0),
           const SizedBox(height: 16),
-          const Text(
-            'Số điện thoại người nhận',
-            style: TextStyle(fontWeight: FontWeight.bold),
+          const OpsBanner(
+            text: 'Gửi hàng cho người khác qua tủ: bạn bỏ hàng vào ô bằng PIN, '
+                'hệ thống sinh PIN mới gửi người nhận để họ tới lấy.',
+            icon: LucideIcons.packagePlus,
           ),
-          const SizedBox(height: 8),
-          TextFormField(
+          const SizedBox(height: 20),
+          const OpsSectionLabel('Chọn tủ', icon: LucideIcons.warehouse),
+          LockerPickerField(
+            lockers: _lockers,
+            selectedId: _lockerId,
+            onSelected: (l) => setState(() => _lockerId = l['id'] as int?),
+          ),
+          const SizedBox(height: 20),
+          const OpsSectionLabel('Người nhận', icon: LucideIcons.userRound),
+          _field(
             controller: _phoneCtrl,
+            hint: 'Số điện thoại người nhận',
+            icon: LucideIcons.phone,
             keyboardType: TextInputType.phone,
-            decoration: _input('VD: 0900000000'),
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             validator: (v) => (v == null || v.trim().length < 9)
                 ? 'Nhập số điện thoại hợp lệ'
                 : null,
           ),
-          const SizedBox(height: 16),
-          const Text(
-            'Tên người nhận (tùy chọn)',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
+          const SizedBox(height: 10),
+          _field(
             controller: _nameCtrl,
-            decoration: _input('Nguyễn Văn A'),
+            hint: 'Tên người nhận (tùy chọn)',
+            icon: LucideIcons.idCard,
+          ),
+          const SizedBox(height: 20),
+          const OpsSectionLabel('Ghi chú', icon: LucideIcons.stickyNote),
+          _field(
+            controller: _noteCtrl,
+            hint: 'VD: Hàng dễ vỡ, gọi trước khi lấy...',
+            icon: LucideIcons.pencil,
+            maxLines: 2,
           ),
           const SizedBox(height: 16),
-          const Text('Ghi chú', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: _noteCtrl,
-            decoration: _input('Hàng dễ vỡ...'),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: _loading ? null : _create,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: opsPrimary,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          Row(
+            children: [
+              const Icon(LucideIcons.receiptText, size: 16, color: opsMutedText),
+              const SizedBox(width: 6),
+              const Text('Phí gửi', style: TextStyle(color: opsMutedText)),
+              const Spacer(),
+              Text(
+                fmtPrice(15000),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                  color: opsDark,
+                ),
               ),
-            ),
-            child: _loading
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : const Text(
-                    'Tạo đơn & lấy PIN bỏ hàng',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
+            ],
+          ),
+          const SizedBox(height: 20),
+          OpsPrimaryButton(
+            label: 'Tạo đơn & lấy PIN bỏ hàng',
+            icon: LucideIcons.arrowRight,
+            loading: _loading,
+            onPressed: _create,
+          ),
+        ].animate(interval: 40.ms).fadeIn(duration: 250.ms).slideY(begin: 0.06),
+      ),
+    );
+  }
+
+  // ---- Stage 2: result ----
+  Widget _buildResult() {
+    final order = _order!;
+    final status = order['status'] as String?;
+    final isDropped = status == 'STORING';
+    final hasReceiverAccount = order['receiverId'] != null;
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _SendStepper(active: isDropped ? 2 : 1),
+        const SizedBox(height: 16),
+        OpsCard(
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Đơn ${order['orderCode'] ?? ''}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: opsDark,
+                      ),
                     ),
                   ),
+                  StatusChip(status),
+                ],
+              ),
+              const Divider(height: 24, color: opsBorder),
+              if (!isDropped) ...[
+                _ResultHeadline(
+                  icon: LucideIcons.packageOpen,
+                  title: 'Bước 1 — Bỏ hàng vào ô',
+                  subtitle:
+                      'Đến tủ, nhập PIN bên dưới để mở ô số ${order['sendBoxId'] ?? '-'}, '
+                      'đặt hàng vào rồi đóng cửa.',
+                ),
+              ] else ...[
+                _ResultHeadline(
+                  icon: LucideIcons.packageCheck,
+                  title: 'Bước 2 — Đã bỏ hàng xong',
+                  subtitle: hasReceiverAccount
+                      ? 'PIN nhận hàng đã được gửi tới tài khoản người nhận.'
+                      : 'Hãy chuyển mã PIN nhận hàng bên dưới cho người nhận.',
+                ),
+              ],
+              const SizedBox(height: 16),
+              AccessCredentials(
+                pin: order['pinCode'] as String?,
+                qrToken: order['qrToken'] as String?,
+                caption: isDropped
+                    ? 'Người nhận nhập PIN / quét QR tại tủ để lấy hàng'
+                    : 'Nhập PIN hoặc quét QR tại tủ để mở ô và bỏ hàng',
+              ),
+              if (isDropped && order['pickupDeadline'] != null) ...[
+                const SizedBox(height: 16),
+                OpsBanner(
+                  tone: OpsBannerTone.warning,
+                  icon: LucideIcons.clock,
+                  text: 'Người nhận cần lấy hàng trước '
+                      '${fmtDateTime(order['pickupDeadline'])} '
+                      '(${fmtRemaining(order['pickupDeadline'])}).',
+                ),
+              ],
+            ],
+          ),
+        ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.05),
+        const SizedBox(height: 16),
+        if (!isDropped)
+          OpsPrimaryButton(
+            label: 'Tôi đã bỏ hàng vào ô',
+            icon: LucideIcons.check,
+            loading: _loading,
+            onPressed: _confirmDrop,
+          )
+        else
+          OpsPrimaryButton(
+            label: 'Hoàn tất',
+            icon: LucideIcons.house,
+            onPressed: () => context.pop(),
+          ),
+      ],
+    );
+  }
+
+  Widget _field({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    String? Function(String?)? validator,
+    int maxLines = 1,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      validator: validator,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        hintText: hint,
+        prefixIcon: Icon(icon, size: 18, color: opsMutedText),
+        filled: true,
+        fillColor: Colors.white,
+        border: _border(opsBorder),
+        enabledBorder: _border(opsBorder),
+        focusedBorder: _border(opsPrimary, width: 1.6),
+        errorBorder: _border(const Color(0xFFEF4444)),
+        focusedErrorBorder: _border(const Color(0xFFEF4444), width: 1.6),
+      ),
+    );
+  }
+
+  OutlineInputBorder _border(Color color, {double width = 1}) =>
+      OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: color, width: width),
+      );
+}
+
+/// Two-step progress header for the SEND flow.
+class _SendStepper extends StatelessWidget {
+  const _SendStepper({required this.active});
+
+  /// 0 = form, 1 = drop pending, 2 = handed to receiver.
+  final int active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _step(1, 'Bỏ hàng', done: active >= 2, current: active <= 1),
+        _connector(active >= 2),
+        _step(2, 'Người nhận lấy', done: false, current: active >= 2),
+      ],
+    );
+  }
+
+  Widget _step(int n, String label, {required bool done, required bool current}) {
+    final color = done || current ? opsPrimary : const Color(0xFFCBD5E1);
+    return Expanded(
+      child: Column(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: current ? opsPrimary : color.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+              border: Border.all(color: color, width: 1.6),
+            ),
+            child: done
+                ? const Icon(LucideIcons.check, size: 16, color: Colors.white)
+                : Text(
+                    '$n',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: current ? Colors.white : color,
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: done || current ? opsDark : const Color(0xFF94A3B8),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildResult() {
-    final order = _order!;
-    final status = order['status'] as String?;
-    final isDropped = status == 'STORING';
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Card(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Đơn ${order['orderCode'] ?? ''}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    StatusChip(status),
-                  ],
-                ),
-                const Divider(height: 24),
-                if (!isDropped) ...[
-                  const Text(
-                    'Bước 1 — Bỏ hàng vào ô',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Đến tủ, nhập PIN dưới đây để mở ô số ${order['sendBoxId']}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                ] else ...[
-                  const Text(
-                    'Bước 2 — Đã bỏ hàng xong',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'PIN nhận hàng đã gửi tới ${order['receiverId'] != null ? 'tài khoản người nhận' : 'bạn — hãy chuyển cho người nhận'}:',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                AccessCredentials(
-                  pin: order['pinCode'] as String?,
-                  qrToken: order['qrToken'] as String?,
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        if (!isDropped)
-          ElevatedButton(
-            onPressed: _loading ? null : _confirmDrop,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: opsPrimary,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text(
-              'Tôi đã bỏ hàng vào ô',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          )
-        else
-          OutlinedButton(
-            onPressed: () => context.pop(),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text('Hoàn tất'),
-          ),
-      ],
-    );
-  }
+  Widget _connector(bool active) => Container(
+        width: 28,
+        height: 2,
+        margin: const EdgeInsets.only(bottom: 22),
+        color: active ? opsPrimary : const Color(0xFFE2E8F0),
+      );
+}
 
-  InputDecoration _input(String hint) => InputDecoration(
-    hintText: hint,
-    filled: true,
-    fillColor: Colors.white,
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-    ),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-    ),
-  );
+class _ResultHeadline extends StatelessWidget {
+  const _ResultHeadline({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+  final IconData icon;
+  final String title;
+  final String subtitle;
 
   @override
-  void dispose() {
-    _phoneCtrl.dispose();
-    _nameCtrl.dispose();
-    _noteCtrl.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(icon, size: 30, color: opsPrimary),
+        const SizedBox(height: 8),
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 16,
+            color: opsDark,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 13, color: opsMutedText, height: 1.4),
+        ),
+      ],
+    );
   }
 }
