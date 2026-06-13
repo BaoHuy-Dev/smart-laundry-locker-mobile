@@ -133,6 +133,8 @@ class _HomePageState extends State<HomePage>
                         const SizedBox(height: 100),
                       ] else ...[
                         _buildMainActions(context),
+                        const SizedBox(height: 16),
+                        _buildStoresEntry(context),
                         const SizedBox(height: 24),
                         const SizedBox(height: 40),
                         _buildWelcomeSection(context),
@@ -746,6 +748,62 @@ class _HomePageState extends State<HomePage>
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStoresEntry(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => context.push(AppRouter.stores),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AISLShadcnTheme.navyPrimary,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  LucideIcons.store,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Khám phá cửa hàng',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Tìm cửa hàng & tủ gần bạn',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Colors.white70),
+            ],
+          ),
+        ),
       ),
     );
   }
