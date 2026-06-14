@@ -70,24 +70,28 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
   Future<void> _openDirections() async {
     final store = _store;
     if (store == null) return;
-    final Uri? uri;
     if (store.hasLocation) {
-      uri = Uri.parse(
-        'https://www.google.com/maps/search/?api=1'
-        '&query=${store.latitude},${store.longitude}',
+      // In-app directions map (route drawn from current location).
+      context.push(
+        AppRouter.directions,
+        extra: {
+          'lat': store.latitude,
+          'lng': store.longitude,
+          'title': store.name,
+          'subtitle': store.address,
+        },
       );
-    } else if ((store.address ?? '').isNotEmpty) {
-      uri = Uri.parse(
-        'https://www.google.com/maps/search/?api=1'
-        '&query=${Uri.encodeComponent(store.address!)}',
-      );
-    } else {
-      uri = null;
+      return;
     }
-    if (uri == null) {
+    // No coordinates: fall back to an address search in the maps app.
+    if ((store.address ?? '').isEmpty) {
       _toast('Cửa hàng chưa có vị trí.');
       return;
     }
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1'
+      '&query=${Uri.encodeComponent(store.address!)}',
+    );
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {

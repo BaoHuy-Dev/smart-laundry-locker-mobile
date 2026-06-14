@@ -32,6 +32,7 @@ import 'package:smart_laundry_locker/features/subscription/presentation/pages/pl
 import 'package:smart_laundry_locker/features/transactions/presentation/pages/transactions_page.dart';
 import 'package:smart_laundry_locker/features/transactions/presentation/pages/top_up_page.dart';
 import 'package:smart_laundry_locker/core/presentation/pages/qr_scanner_page.dart';
+import 'package:smart_laundry_locker/core/presentation/pages/directions_map_page.dart';
 import 'package:smart_laundry_locker/features/notifications/presentation/pages/notification_list_page.dart';
 import 'package:smart_laundry_locker/features/vouchers/presentation/pages/my_vouchers_page.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
@@ -58,6 +59,7 @@ import 'package:smart_laundry_locker/features/stores/domain/entities/store.dart'
 import 'package:smart_laundry_locker/features/stores/presentation/pages/stores_page.dart';
 import 'package:smart_laundry_locker/features/stores/presentation/pages/store_detail_page.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 
 class AppRouter {
   static const String splash = '/';
@@ -101,6 +103,7 @@ class AppRouter {
   static const String myLockerOrders = '/locker/my-orders';
   static const String stores = '/stores';
   static const String storeDetail = '/stores/detail';
+  static const String directions = '/directions';
 
   static final GlobalKey<NavigatorState> navigatorKey =
       GlobalKey<NavigatorState>();
@@ -455,6 +458,28 @@ class AppRouter {
             return StoreDetailPage(storeId: id);
           }
           return const StoresPage();
+        },
+      ),
+      GoRoute(
+        path: directions,
+        name: 'directions',
+        builder: (context, state) {
+          final extra = state.extra;
+          final map = extra is Map<String, dynamic>
+              ? extra
+              : const <String, dynamic>{};
+          final lat = (map['lat'] as num?)?.toDouble();
+          final lng = (map['lng'] as num?)?.toDouble();
+          if (lat == null || lng == null) {
+            return const Scaffold(
+              body: Center(child: Text('Thiếu toạ độ điểm đến.')),
+            );
+          }
+          return DirectionsMapPage(
+            destination: LatLng(lat, lng),
+            title: (map['title'] as String?) ?? 'Điểm đến',
+            subtitle: map['subtitle'] as String?,
+          );
         },
       ),
     ],
