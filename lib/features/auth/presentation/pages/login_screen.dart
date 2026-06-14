@@ -5,6 +5,21 @@ import 'package:smart_laundry_locker/core/network/dio_client.dart';
 import 'package:smart_laundry_locker/core/routing/role_routes.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
+
+/// Dev-only demo accounts for the quick-login buttons (debug builds only).
+/// Credentials match the seeded dev accounts documented in the backend run
+/// guides (HANDOFF_CODEX / RUN_RESULT).
+const List<({String label, String email, String password})> _kDemoAccounts = [
+  (label: 'Khách hàng', email: 'demo@laundry.test', password: 'secret123'),
+  (label: 'Quản lý', email: 'manager@laundry.test', password: 'Manager@123456'),
+  (
+    label: 'Bảo trì',
+    email: 'maintenance@laundry.test',
+    password: 'Maint@123456',
+  ),
+  (label: 'Admin', email: 'admin@laundry.test', password: 'Admin@123456'),
+];
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -104,6 +119,60 @@ class _LoginScreenState extends State<LoginScreen>
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _quickLogin(String email, String password) async {
+    _identifierController.text = email;
+    _passwordController.text = password;
+    await _handleLogin();
+  }
+
+  Widget _buildQuickLogin() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            const Expanded(child: Divider()),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                'Đăng nhập nhanh (DEV)',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ),
+            const Expanded(child: Divider()),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: WrapAlignment.center,
+          children: [
+            for (final account in _kDemoAccounts)
+              OutlinedButton.icon(
+                onPressed: _isLoading
+                    ? null
+                    : () => _quickLogin(account.email, account.password),
+                icon: const Icon(LucideIcons.zap, size: 14),
+                label: Text(account.label),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF0077B6),
+                  side: const BorderSide(color: Color(0xFF0077B6)),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Chỉ hiển thị ở bản debug. Cần backend có sẵn các tài khoản demo.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+        ),
+      ],
+    );
   }
 
   @override
@@ -348,6 +417,7 @@ class _LoginScreenState extends State<LoginScreen>
                                   ),
                                 ),
                         ),
+                        if (kDebugMode) _buildQuickLogin(),
                       ],
                     ),
                   ),
