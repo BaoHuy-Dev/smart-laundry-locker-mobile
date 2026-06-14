@@ -6,6 +6,8 @@ import 'package:smart_laundry_locker/features/locker/presentation/widgets/locker
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:smart_laundry_locker/core/routing/app_router.dart';
 
 class LockerDetailMapPage extends ConsumerStatefulWidget {
   final LockerLocation location;
@@ -169,6 +171,20 @@ class _LockerDetailMapPageState extends ConsumerState<LockerDetailMapPage> {
 
     return Scaffold(
       appBar: AppBar(title: Text(widget.location.name)),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.push(
+          AppRouter.directions,
+          extra: {
+            'lat': widget.location.coordinate.latitude,
+            'lng': widget.location.coordinate.longitude,
+            'title': widget.location.name,
+          },
+        ),
+        backgroundColor: const Color(0xFF0A2342),
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.directions),
+        label: const Text('Chỉ đường'),
+      ),
       body: mapStack,
     );
   }
