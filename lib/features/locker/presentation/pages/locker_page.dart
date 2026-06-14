@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/location_services.dart';
 import 'package:smart_laundry_locker/shared/widgets/unauthenticated_placeholder.dart';
 import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 
@@ -152,6 +153,10 @@ class _LockerPageState extends ConsumerState<LockerPage> {
                     ),
                   ),
                 ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 4, 20, 10),
+                child: LockerUtilitiesRow(),
               ),
               Expanded(child: _buildLocationsList(state)),
             ],
