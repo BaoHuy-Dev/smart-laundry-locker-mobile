@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
-import 'package:smart_laundry_locker/shared/widgets/app_bar.dart';
+import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 import '../providers/voucher_provider.dart';
 import '../../data/models/voucher_model.dart';
 
@@ -38,66 +38,66 @@ class _MyVouchersPageState extends State<MyVouchersPage>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [
-            CustomSliverAppBar(
-              title: 'Ưu đãi của tôi',
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.black87,
-              actions: [
-                IconButton(
-                  icon: const Icon(LucideIcons.refreshCw, size: 20),
-                  onPressed: () {
-                    context.read<VoucherProvider>().loadMyVouchers();
-                  },
-                ),
-              ],
+      body: Column(
+        children: [
+          BrandHeroHeader(
+            title: 'Ưu đãi của tôi',
+            subtitle: 'Mã giảm giá & quà tặng của bạn',
+            onBack: () => context.pop(),
+            trailing: BrandCircleIconButton(
+              icon: LucideIcons.refreshCw,
+              onTap: () => context.read<VoucherProvider>().loadMyVouchers(),
             ),
-            SliverToBoxAdapter(
-              child: Container(
-                color: Colors.white,
-                child: TabBar(
-                  controller: _tabController,
-                  indicatorColor: AISLShadcnTheme.bluePrimary,
-                  labelColor: AISLShadcnTheme.bluePrimary,
-                  unselectedLabelColor: Colors.grey.shade500,
-                  labelStyle: const TextStyle(
-                    fontFamily: 'Manrope',
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                  tabs: const [
-                    Tab(text: 'Khả dụng'),
-                    Tab(text: 'Lịch sử'),
-                  ],
-                ),
-              ),
-            ),
-          ];
-        },
-        body: Consumer<VoucherProvider>(
-          builder: (context, provider, child) {
-            if (provider.isLoading) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            final activeVouchers = provider.vouchers
-                .where((v) => v.status == 'UNUSED')
-                .toList();
-            final inactiveVouchers = provider.vouchers
-                .where((v) => v.status != 'UNUSED')
-                .toList();
-
-            return TabBarView(
+          ),
+          Container(
+            color: Colors.white,
+            child: TabBar(
               controller: _tabController,
-              children: [
-                _buildVoucherList(activeVouchers, provider),
-                _buildVoucherList(inactiveVouchers, provider, isInactive: true),
+              indicatorColor: AislBrand.blue,
+              labelColor: AislBrand.navy,
+              unselectedLabelColor: Colors.grey.shade500,
+              labelStyle: const TextStyle(
+                fontFamily: 'Manrope',
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+              tabs: const [
+                Tab(text: 'Khả dụng'),
+                Tab(text: 'Lịch sử'),
               ],
-            );
-          },
-        ),
+            ),
+          ),
+          Expanded(
+            child: Consumer<VoucherProvider>(
+              builder: (context, provider, child) {
+                if (provider.isLoading) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: AislBrand.navy),
+                  );
+                }
+
+                final activeVouchers = provider.vouchers
+                    .where((v) => v.status == 'UNUSED')
+                    .toList();
+                final inactiveVouchers = provider.vouchers
+                    .where((v) => v.status != 'UNUSED')
+                    .toList();
+
+                return TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildVoucherList(activeVouchers, provider),
+                    _buildVoucherList(
+                      inactiveVouchers,
+                      provider,
+                      isInactive: true,
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -156,9 +156,7 @@ class _MyVouchersPageState extends State<MyVouchersPage>
 
   Widget _buildVoucherCard(VoucherModel voucher, bool isInactive) {
     final formatCurrency = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
-    final color = isInactive
-        ? Colors.grey.shade400
-        : AISLShadcnTheme.navyPrimary;
+    final color = isInactive ? Colors.grey.shade400 : AislBrand.navy;
 
     String rewardText = '';
     if (voucher.rewardType == 'DISCOUNT_FIXED') {
@@ -182,7 +180,7 @@ class _MyVouchersPageState extends State<MyVouchersPage>
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -196,7 +194,7 @@ class _MyVouchersPageState extends State<MyVouchersPage>
             Container(
               width: 100,
               decoration: BoxDecoration(
-                color: color.withOpacity(isInactive ? 0.3 : 0.1),
+                color: color.withValues(alpha: isInactive ? 0.3 : 0.1),
                 border: Border(
                   right: BorderSide(
                     color: Colors.grey.shade200,
@@ -296,7 +294,7 @@ class _MyVouchersPageState extends State<MyVouchersPage>
                     decoration: BoxDecoration(
                       color: isInactive
                           ? Colors.transparent
-                          : Colors.blue.withOpacity(0.1),
+                          : Colors.blue.withValues(alpha: 0.1),
                       border: Border.all(
                         color: isInactive
                             ? Colors.grey.shade300

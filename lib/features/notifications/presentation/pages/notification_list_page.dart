@@ -1,8 +1,9 @@
-import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:smart_laundry_locker/features/notifications/domain/entities/notification_model.dart';
 import 'package:smart_laundry_locker/features/notifications/presentation/providers/notification_provider.dart';
 import 'package:smart_laundry_locker/shared/widgets/unauthenticated_placeholder.dart';
+import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
@@ -52,10 +53,6 @@ class _NotificationListPageState extends State<NotificationListPage> {
     if (payload == null) return;
 
     // TODO: Routing logic based on actionType
-    // Example:
-    // if (payload.actionType == 'OPEN_ORDER_DETAIL' && payload.referenceId != null) {
-    //   context.push('/orders/detail', extra: payload.referenceId!);
-    // }
   }
 
   @override
@@ -65,107 +62,156 @@ class _NotificationListPageState extends State<NotificationListPage> {
       builder: (context, isLoggedIn, child) {
         if (!isLoggedIn) {
           return Scaffold(
-            appBar: AppBar(
-              title: const Text('Thông báo'),
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.black,
-              elevation: 0,
-            ),
-            body: const UnauthenticatedPlaceholder(
-              message: 'Bạn cần đăng nhập để xem thông báo',
+            backgroundColor: const Color(0xFFF7FAFC),
+            body: Column(
+              children: [
+                BrandHeroHeader(
+                  title: 'Thông báo',
+                  subtitle: 'Cập nhật mới nhất từ Lockerly',
+                  onBack: () => context.pop(),
+                ),
+                const Expanded(
+                  child: UnauthenticatedPlaceholder(
+                    message: 'Bạn cần đăng nhập để xem thông báo',
+                  ),
+                ),
+              ],
             ),
           );
         }
 
         return Scaffold(
-          backgroundColor: Colors.grey.shade50,
-          appBar: AppBar(
-            title: const Text('Thông báo'),
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.black,
-            elevation: 0,
-            actions: [
-              Consumer<NotificationProvider>(
-                builder: (context, provider, _) {
-                  return IconButton(
-                    icon: const Icon(LucideIcons.refreshCw, size: 18),
-                    onPressed: () {
-                      provider.loadNotifications(refresh: true);
-                    },
-                  );
-                },
-              ),
-              Consumer<NotificationProvider>(
-                builder: (context, provider, _) {
-                  if (provider.unreadCount == 0 ||
-                      provider.notifications.isEmpty) {
-                    return const SizedBox.shrink();
-                  }
-                  return TextButton.icon(
-                    onPressed: () {
-                      provider.markAllAsRead();
-                    },
-                    icon: const Icon(LucideIcons.checkCheck, size: 18),
-                    label: const Text('Đọc tất cả'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AISLShadcnTheme.navyPrimary,
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-          body: Consumer<NotificationProvider>(
-            builder: (context, provider, _) {
-              if (provider.isLoading && provider.notifications.isEmpty) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              if (provider.error != null && provider.notifications.isEmpty) {
-                return _buildErrorState(provider);
-              }
-
-              if (provider.notifications.isEmpty) {
-                return _buildEmptyState();
-              }
-
-              return RefreshIndicator(
-                onRefresh: () => provider.loadNotifications(refresh: true),
-                color: AISLShadcnTheme.navyPrimary,
-                child: ListView.separated(
-                  controller: _scrollController,
-                  itemCount: provider.notifications.length + 1,
-                  separatorBuilder: (context, index) =>
-                      Divider(height: 1, color: Colors.grey.shade200),
-                  itemBuilder: (context, index) {
-                    if (index == provider.notifications.length) {
-                      if (provider.isLoadingMore) {
-                        return const Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Center(child: CircularProgressIndicator()),
-                        );
-                      }
-                      if (!provider.hasMore &&
-                          provider.notifications.isNotEmpty) {
-                        return Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Center(
-                            child: Text(
-                              'Đã xem hết thông báo',
-                              style: TextStyle(color: Colors.grey.shade500),
+          backgroundColor: const Color(0xFFF7FAFC),
+          body: Column(
+            children: [
+              BrandHeroHeader(
+                title: 'Thông báo',
+                subtitle: 'Cập nhật mới nhất từ Lockerly',
+                onBack: () => context.pop(),
+                trailing: Consumer<NotificationProvider>(
+                  builder: (context, provider, _) {
+                    final showMarkAll = provider.unreadCount > 0 &&
+                        provider.notifications.isNotEmpty;
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (showMarkAll) ...[
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => provider.markAllAsRead(),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.1),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    LucideIcons.checkCheck,
+                                    size: 14,
+                                    color: AislBrand.navy,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Đọc tất cả',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: AislBrand.navy,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        );
-                      }
-                      return const SizedBox(height: 32);
-                    }
-
-                    final notification = provider.notifications[index];
-                    return _buildNotificationItem(notification);
+                          const SizedBox(width: 8),
+                        ],
+                        BrandCircleIconButton(
+                          icon: LucideIcons.refreshCw,
+                          onTap: () =>
+                              provider.loadNotifications(refresh: true),
+                        ),
+                      ],
+                    );
                   },
                 ),
-              );
-            },
+              ),
+              Expanded(
+                child: Consumer<NotificationProvider>(
+                  builder: (context, provider, _) {
+                    if (provider.isLoading && provider.notifications.isEmpty) {
+                      return const Center(
+                        child: CircularProgressIndicator(color: AislBrand.navy),
+                      );
+                    }
+
+                    if (provider.error != null &&
+                        provider.notifications.isEmpty) {
+                      return _buildErrorState(provider);
+                    }
+
+                    if (provider.notifications.isEmpty) {
+                      return _buildEmptyState();
+                    }
+
+                    return RefreshIndicator(
+                      onRefresh: () =>
+                          provider.loadNotifications(refresh: true),
+                      color: AislBrand.navy,
+                      child: ListView.separated(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.only(top: 4),
+                        itemCount: provider.notifications.length + 1,
+                        separatorBuilder: (context, index) =>
+                            Divider(height: 1, color: Colors.grey.shade200),
+                        itemBuilder: (context, index) {
+                          if (index == provider.notifications.length) {
+                            if (provider.isLoadingMore) {
+                              return const Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              );
+                            }
+                            if (!provider.hasMore &&
+                                provider.notifications.isNotEmpty) {
+                              return Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Center(
+                                  child: Text(
+                                    'Đã xem hết thông báo',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade500,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                            return const SizedBox(height: 32);
+                          }
+
+                          final notification = provider.notifications[index];
+                          return _buildNotificationItem(notification);
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -226,7 +272,8 @@ class _NotificationListPageState extends State<NotificationListPage> {
           ElevatedButton(
             onPressed: () => provider.loadNotifications(refresh: true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AISLShadcnTheme.navyPrimary,
+              backgroundColor: AislBrand.navy,
+              foregroundColor: Colors.white,
             ),
             child: const Text('Thử lại'),
           ),
@@ -240,21 +287,22 @@ class _NotificationListPageState extends State<NotificationListPage> {
     return InkWell(
       onTap: () => _handleNotificationTap(notification),
       child: Container(
-        color: isUnread ? Colors.blue.shade50 : Colors.white,
+        color: isUnread ? const Color(0xFFEFF6FF) : Colors.white,
         padding: const EdgeInsets.all(16),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icon Placeholder
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isUnread ? Colors.blue.shade100 : Colors.grey.shade100,
+                color: isUnread
+                    ? AislBrand.navy.withValues(alpha: 0.12)
+                    : Colors.grey.shade100,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 _getIconForType(notification.dataPayload?.actionType),
-                color: isUnread ? Colors.blue.shade700 : Colors.grey.shade600,
+                color: isUnread ? AislBrand.navy : Colors.grey.shade600,
                 size: 24,
               ),
             ),
@@ -285,7 +333,7 @@ class _NotificationListPageState extends State<NotificationListPage> {
                           height: 8,
                           margin: const EdgeInsets.only(left: 8),
                           decoration: const BoxDecoration(
-                            color: Colors.blue,
+                            color: AislBrand.cyan,
                             shape: BoxShape.circle,
                           ),
                         ),

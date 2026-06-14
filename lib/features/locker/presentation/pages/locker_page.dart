@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
 import 'package:smart_laundry_locker/shared/widgets/unauthenticated_placeholder.dart';
+import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 
 class LockerPage extends ConsumerStatefulWidget {
   const LockerPage({super.key});
@@ -91,83 +92,67 @@ class _LockerPageState extends ConsumerState<LockerPage> {
       builder: (context, isLoggedIn, child) {
         if (!isLoggedIn) {
           return Scaffold(
-            backgroundColor: Colors.white,
-            appBar: AppBar(
-              backgroundColor: Colors.white,
-              elevation: 0,
-              centerTitle: true,
-              title: const Text(
-                'DANH SÁCH TỦ',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+            backgroundColor: const Color(0xFFF7FAFC),
+            body: Column(
+              children: const [
+                BrandHeroHeader(
+                  title: 'Danh sách tủ',
+                  subtitle: 'Đăng nhập để xem các tủ khả dụng',
                 ),
-              ),
-            ),
-            body: const UnauthenticatedPlaceholder(
-              message: 'Bạn cần đăng nhập để xem danh sách tủ',
+                Expanded(
+                  child: UnauthenticatedPlaceholder(
+                    message: 'Bạn cần đăng nhập để xem danh sách tủ',
+                  ),
+                ),
+              ],
             ),
           );
         }
 
         return Scaffold(
-          backgroundColor: Colors.white,
-          appBar: AppBar(
-            backgroundColor: Colors.white,
-            elevation: 0,
-            centerTitle: true,
-            title: const Text(
-              'DANH SÁCH TỦ',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
-              ),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(LucideIcons.mapPin, color: Colors.black87),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LockerMapPage(),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
+          backgroundColor: const Color(0xFFF7FAFC),
           body: Column(
             children: [
-              // Search bar
+              BrandHeroHeader(
+                title: 'Danh sách tủ',
+                subtitle: 'Chọn tủ để xem chi tiết',
+                trailing: BrandCircleIconButton(
+                  icon: LucideIcons.mapPin,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LockerMapPage(),
+                      ),
+                    );
+                  },
+                ),
+              ),
               Padding(
-                padding: const EdgeInsets.all(16),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Tìm kiếm...',
-                      hintStyle: TextStyle(color: Colors.grey[600]),
-                      prefixIcon: Icon(
-                        LucideIcons.search,
-                        color: Colors.grey[600],
-                      ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Tìm kiếm tủ...',
+                    prefixIcon: const Icon(LucideIcons.search, size: 18),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: AislBrand.chipBorder),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: AislBrand.chipBorder),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: AislBrand.blue),
                     ),
                   ),
                 ),
               ),
-              // Danh sách tủ
               Expanded(child: _buildLocationsList(state)),
             ],
           ),
@@ -230,7 +215,7 @@ class _LockerPageState extends ConsumerState<LockerPage> {
       },
       child: ListView.separated(
         controller: _scrollController,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
         itemCount: state.locations.length + (state.isLoadingMore ? 1 : 0),
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
@@ -273,7 +258,7 @@ class _LockerItemSkeleton extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),

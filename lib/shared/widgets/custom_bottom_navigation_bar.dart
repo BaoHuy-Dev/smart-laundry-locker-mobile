@@ -1,11 +1,11 @@
-import 'package:smart_laundry_locker/core/widgets/qr_scanner_button.dart';
-import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:flutter/material.dart';
 
 /// Builder function for custom icons
 typedef IconBuilder = Widget Function(Color color, double size);
 
-/// Custom bottom navigation bar with 5 items using Lucide icons or custom SVGs
+/// Floating navy bottom navigation bar (ported from the legacy React Native
+/// customer app): a rounded navy pill with a raised, gradient QR action in the
+/// center. Active tabs use a soft white highlight + cyan text/icon.
 class CustomBottomNavigationBar extends StatelessWidget {
   final int currentIndex;
   final void Function(int) onTap;
@@ -20,76 +20,34 @@ class CustomBottomNavigationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = AISLShadcnTheme.lightTheme;
-
-    return Material(
-      color: theme.colorScheme.background,
-      elevation: 8,
-      shadowColor: Colors.black12,
-      child: SafeArea(
-        child: SizedBox(
-          height: 78,
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: Container(
+          height: 64,
+          decoration: BoxDecoration(
+            color: AislBrand.navBar,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.25),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: items.asMap().entries.map((entry) {
               final index = entry.key;
               final item = entry.value;
-
               final isActive = currentIndex == index;
-              const activeColor = AISLShadcnTheme.navyPrimary;
-              final inactiveColor = theme.colorScheme.mutedForeground;
-              final color = isActive ? activeColor : inactiveColor;
 
               if (item.isProminent) {
-                return Expanded(
-                  child: Center(
-                    child: Transform.translate(
-                      offset: const Offset(0, -4),
-                      child: QrScannerButton(
-                        onTap: () => onTap(index),
-                        isActive: isActive,
-                      ),
-                    ),
-                  ),
-                );
+                return _buildProminent(item, index);
               }
-
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () => onTap(index),
-                  behavior: HitTestBehavior.opaque,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildIcon(
-                          isActive ? item.activeIcon : item.icon,
-                          color,
-                          size: 24,
-                        ),
-                        if (item.label.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            item.label,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: isActive
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              color: color,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              );
+              return _buildItem(item, index, isActive);
             }).toList(),
           ),
         ),
@@ -97,7 +55,86 @@ class CustomBottomNavigationBar extends StatelessWidget {
     );
   }
 
-  Widget _buildIcon(dynamic icon, Color color, {double size = 24}) {
+  Widget _buildItem(NavigationItem item, int index, bool isActive) {
+    final color = isActive ? Colors.white : AislBrand.navInactive;
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => onTap(index),
+        child: Center(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: isActive
+                  ? Colors.white.withValues(alpha: 0.14)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildIcon(isActive ? item.activeIcon : item.icon, color),
+                if (item.label.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    item.label,
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                      color: color,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProminent(NavigationItem item, int index) {
+    return Expanded(
+      child: Center(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => onTap(index),
+          child: Transform.translate(
+            offset: const Offset(0, -10),
+            child: Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  colors: [AislBrand.cyan, AislBrand.blue],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                border: Border.all(color: Colors.white, width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: AislBrand.cyan.withValues(alpha: 0.5),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: _buildIcon(item.icon, Colors.white, size: 26),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIcon(dynamic icon, Color color, {double size = 22}) {
     if (icon is IconData) {
       return Icon(icon, size: size, color: color);
     } else if (icon is IconBuilder) {

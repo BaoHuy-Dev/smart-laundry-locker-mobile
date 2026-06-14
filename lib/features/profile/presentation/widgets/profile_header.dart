@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:smart_laundry_locker/core/services/image_cache_manager.dart';
 import 'package:smart_laundry_locker/shared/utils/avatar_url_helper.dart';
 import 'package:smart_laundry_locker/shared/widgets/app_cached_image.dart';
+import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// Profile header widget with user information
@@ -34,14 +35,17 @@ class ProfileHeader extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 12),
       padding: const EdgeInsets.all(26),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200, width: 0.5),
+        gradient: const LinearGradient(
+          colors: AislBrand.brandGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+            color: AislBrand.navy.withValues(alpha: 0.30),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -110,7 +114,7 @@ class ProfileHeader extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.white,
-                border: Border.all(color: Colors.grey.shade200, width: 2),
+                border: Border.all(color: Colors.white, width: 3),
               ),
               child: ClipOval(
                 clipBehavior: Clip.hardEdge,
@@ -247,18 +251,18 @@ class ProfileHeader extends StatelessWidget {
     return Container(
       width: 100,
       height: 100,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.blue.shade50,
+        color: Colors.white,
       ),
       child: Center(
         child: Text(
           firstLetter,
-          style: TextStyle(
+          style: const TextStyle(
             fontFamily: 'Manrope',
             fontSize: 36,
-            fontWeight: FontWeight.w600,
-            color: Colors.blue.shade700,
+            fontWeight: FontWeight.w700,
+            color: AislBrand.navy,
           ),
         ),
       ),
@@ -274,8 +278,8 @@ class ProfileHeader extends StatelessWidget {
           style: const TextStyle(
             fontFamily: 'Manrope',
             fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
           ),
           textAlign: TextAlign.center,
         ),
@@ -288,7 +292,7 @@ class ProfileHeader extends StatelessWidget {
             style: const TextStyle(
               fontFamily: 'Manrope',
               fontSize: 14,
-              color: Colors.black54,
+              color: Colors.white70,
             ),
             textAlign: TextAlign.center,
           ),
