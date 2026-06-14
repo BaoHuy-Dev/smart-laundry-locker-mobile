@@ -30,6 +30,54 @@ class LockerRemoteDataSourceImpl implements LockerRemoteDataSource {
 
   // ==================== LOCATIONS ====================
 
+  /// Current backend exposes GET /api/lockers as a flat list (no server-side
+  /// paging/search). We fetch all lockers, map each to the location model with
+  /// null-safe defaults, and filter client-side. Shared by the customer /
+  /// courier / default location listings so the "Tủ" tab works for any role.
+  Future<LocationsResponse> _fetchLockerLocations({String? search}) async {
+    final response = await _apiClient.get<dynamic>('/api/lockers');
+    final raw = response.data;
+    final List<dynamic> items = raw is Map<String, dynamic>
+        ? (raw['data'] as List<dynamic>? ?? const <dynamic>[])
+        : (raw is List ? raw : const <dynamic>[]);
+
+    final query = (search ?? '').trim().toLowerCase();
+
+    final locations = <Map<String, dynamic>>[];
+    for (final item in items) {
+      if (item is! Map<String, dynamic>) continue;
+      final code = (item['code'] ?? '').toString();
+      final lockerName = (item['name'] ?? code).toString();
+      final addr = (item['address'] ?? '').toString();
+      final status = (item['status'] ?? 'ACTIVE').toString().toUpperCase();
+
+      if (query.isNotEmpty &&
+          !lockerName.toLowerCase().contains(query) &&
+          !code.toLowerCase().contains(query) &&
+          !addr.toLowerCase().contains(query)) {
+        continue;
+      }
+
+      locations.add(<String, dynamic>{
+        'id': (item['id'] ?? '').toString(),
+        'name': lockerName,
+        'address': addr,
+        // Missing coordinates -> NaN so LockerLocation.hasValidCoordinate is
+        // false and the detail page shows a friendly "no map" message instead
+        // of dropping a pin at (0,0). The list itself only uses name/address.
+        'latitude': (item['latitude'] as num?)?.toDouble() ?? double.nan,
+        'longitude': (item['longitude'] as num?)?.toDouble() ?? double.nan,
+        'isActive': status == 'ACTIVE',
+      });
+    }
+
+    final count = locations.length;
+    return LocationsResponse.fromJson(<String, dynamic>{
+      'locations': locations,
+      'pagination': {'total': count, 'page': 1, 'limit': count > 0 ? count : 10},
+    });
+  }
+
   @override
   Future<LocationsResponse> getLocations({
     int page = 1,
@@ -38,63 +86,24 @@ class LockerRemoteDataSourceImpl implements LockerRemoteDataSource {
     String? name,
     String? address,
     bool? isActive,
-  }) async {
-    final queryParams = <String, dynamic>{
-      'page': page,
-      'limit': limit,
-      if (search != null && search.isNotEmpty) 'search': search,
-      if (name != null && name.isNotEmpty) 'name': name,
-      if (address != null && address.isNotEmpty) 'address': address,
-      if (isActive != null) 'isActive': isActive,
-    };
-
-    final response = await _apiClient.get<Map<String, dynamic>>(
-      '/locations',
-      queryParameters: queryParams,
-    );
-
-    return LocationsResponse.fromJson(_extractData(response));
-  }
+  }) =>
+      _fetchLockerLocations(search: search ?? name);
 
   @override
   Future<LocationsResponse> getLocationsForCustomer({
     int page = 1,
     int limit = 10,
     String? search,
-  }) async {
-    final queryParams = <String, dynamic>{
-      'page': page,
-      'limit': limit,
-      if (search != null && search.isNotEmpty) 'search': search,
-    };
-
-    final response = await _apiClient.get<Map<String, dynamic>>(
-      '/locations/customer',
-      queryParameters: queryParams,
-    );
-
-    return LocationsResponse.fromJson(_extractData(response));
-  }
+  }) =>
+      _fetchLockerLocations(search: search);
 
   @override
   Future<LocationsResponse> getLocationsForCourier({
     int page = 1,
     int limit = 10,
     String? search,
-  }) async {
-    final queryParams = <String, dynamic>{
-      'page': page,
-      'limit': limit,
-      if (search != null && search.isNotEmpty) 'search': search,
-    };
-
-    final response = await _apiClient.get<Map<String, dynamic>>(
-      '/locations/courier',
-      queryParameters: queryParams,
-    );
-
-    return LocationsResponse.fromJson(_extractData(response));
-  }
+  }) =>
+      _fetchLockerLocations(search: search);
 
   @override
   Future<LockerLocationModel> getLocationById(String id) async {

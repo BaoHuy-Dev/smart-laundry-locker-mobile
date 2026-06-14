@@ -5,8 +5,10 @@ import 'package:dio/dio.dart';
 class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
   final ApiClient _apiClient;
 
-  static const String _basePath = '/users';
-  static const String _courierBasePath = '/staff-applications';
+  // Current backend (laundry-locker-microservices) user-service endpoints.
+  // Self profile lives under /api/user/** (singular); get-by-id is /api/users/{id}.
+  static const String _basePath = '/api/user';
+  static const String _courierBasePath = '/api/staff-applications';
 
   ProfileRemoteDataSourceImpl(this._apiClient);
 
@@ -16,22 +18,30 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
 
     final nestedUser = data['user'];
     if (nestedUser is Map<String, dynamic>) {
-      return nestedUser;
+      return _normalize(nestedUser);
     }
 
-    return data;
+    return _normalize(data);
+  }
+
+  /// Backend returns numeric `id` (e.g. 2). The mobile models parse `id` as a
+  /// String, so normalize it here to avoid a JSON cast crash.
+  Map<String, dynamic> _normalize(Map<String, dynamic> raw) {
+    final out = Map<String, dynamic>.from(raw);
+    if (out['id'] != null) out['id'] = out['id'].toString();
+    return out;
   }
 
   @override
   Future<Map<String, dynamic>> getProfile() async {
-    final response = await _apiClient.get('$_basePath/me');
+    final response = await _apiClient.get('$_basePath/profile');
     final profile = _extractData(response);
     final phone = profile['phoneNumber']?.toString();
     final userId = profile['id']?.toString();
     final needEnrichPhone = phone == null || phone.trim().isEmpty;
     if (needEnrichPhone && userId != null && userId.isNotEmpty) {
       try {
-        final detailResponse = await _apiClient.get('$_basePath/$userId');
+        final detailResponse = await _apiClient.get('/api/users/$userId');
         final detail = _extractData(detailResponse);
         return <String, dynamic>{
           ...detail,
@@ -49,7 +59,8 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     required String userId,
     required Map<String, dynamic> data,
   }) async {
-    final response = await _apiClient.put('$_basePath/$userId', data: data);
+    // Self-update endpoint resolves the user from the JWT (X-User-Id), no id in path.
+    final response = await _apiClient.put('$_basePath/profile', data: data);
     return _extractData(response);
   }
 
@@ -69,7 +80,10 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       'files': await MultipartFile.fromFile(filePath, filename: fileName),
     });
 
-    final response = await _apiClient.put('$_basePath/$userId', data: formData);
+    // NOTE: backend PUT /api/user/avatar expects a JSON {imageUrl} (a hosted URL),
+    // not a multipart file upload. Until an image-hosting endpoint exists this
+    // will not persist the avatar; path is aligned so it no longer 404s.
+    final response = await _apiClient.put('$_basePath/avatar', data: formData);
 
     return _extractData(response);
   }
@@ -80,8 +94,8 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     required String currentPassword,
   }) async {
     final response = await _apiClient.post(
-      '/auth/login',
-      data: {'email': email, 'password': currentPassword},
+      '/api/auth/login',
+      data: {'identifier': email, 'password': currentPassword},
     );
 
     final data = _extractData(response);
@@ -94,9 +108,10 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     required String email,
     required String newPassword,
   }) async {
-    final response = await _apiClient.post(
-      '/auth/change-password',
-      data: {'email': email, 'newPassword': newPassword},
+    // Self password change resolves the user from the JWT (X-User-Id).
+    final response = await _apiClient.put(
+      '$_basePath/password',
+      data: {'newPassword': newPassword},
     );
     final data = response.data;
     if (data is Map<String, dynamic>) {
