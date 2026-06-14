@@ -17,13 +17,32 @@ class MaintenanceHomePage extends StatefulWidget {
 class _MaintenanceHomePageState extends State<MaintenanceHomePage>
     with SingleTickerProviderStateMixin {
   final _service = LockerOpsService();
-  late final TabController _tabs = TabController(length: 2, vsync: this);
+  late final TabController _tabs = TabController(length: 3, vsync: this);
 
   List<Map<String, dynamic>> _faults = [];
   List<Map<String, dynamic>> _reports = [];
   List<Map<String, dynamic>> _myReports = [];
   bool _loading = true;
   String? _myUserId;
+
+  // Inspection tab state
+  List<Map<String, dynamic>> _lockers = [];
+  int? _selectedLockerId;
+  Map<String, dynamic>? _layout;
+  bool _layoutLoading = false;
+
+  List<Map<String, dynamic>> get _lockerOptions => _lockers
+      .where((locker) => _asInt(locker['id']) != null)
+      .toList(growable: false);
+
+  Map<String, dynamic>? get _selectedLocker {
+    final selectedId = _selectedLockerId;
+    if (selectedId == null) return null;
+    for (final locker in _lockerOptions) {
+      if (_asInt(locker['id']) == selectedId) return locker;
+    }
+    return null;
+  }
 
   @override
   void initState() {
@@ -38,12 +57,27 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
       final faults = await _service.faults();
       final reports = await _service.reports();
       final mine = await _service.reports(mine: true);
+      final lockers = await _service.lockers();
       if (!mounted) return;
       setState(() {
         _faults = faults;
         _reports = reports;
         _myReports = mine;
+        _lockers = lockers;
       });
+      final validSelected = lockers.any(
+        (locker) => _asInt(locker['id']) == _selectedLockerId,
+      );
+      final firstId = lockers.isNotEmpty ? _asInt(lockers.first['id']) : null;
+      final nextSelectedId = validSelected ? _selectedLockerId : firstId;
+      if (nextSelectedId == null) {
+        setState(() {
+          _selectedLockerId = null;
+          _layout = null;
+        });
+      } else {
+        await _selectLocker(nextSelectedId);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -52,6 +86,26 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
       }
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _selectLocker(int lockerId) async {
+    setState(() {
+      _selectedLockerId = lockerId;
+      _layoutLoading = true;
+    });
+    try {
+      final layout = await _service.layout(lockerId);
+      if (!mounted) return;
+      setState(() => _layout = layout);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(LockerOpsService.errorMessage(e))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _layoutLoading = false);
     }
   }
 
@@ -78,9 +132,9 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
 
   Future<void> _openDirections(Map<String, dynamic> item) async {
     final opened = await openLockerDirections(
-      latitude: _asDouble(item['lockerLatitude']),
-      longitude: _asDouble(item['lockerLongitude']),
-      address: item['lockerAddress']?.toString(),
+      latitude: _asDouble(item['lockerLatitude'] ?? item['latitude']),
+      longitude: _asDouble(item['lockerLongitude'] ?? item['longitude']),
+      address: (item['lockerAddress'] ?? item['address'])?.toString(),
     );
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -104,10 +158,12 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
         ],
         bottom: TabBar(
           controller: _tabs,
+          isScrollable: true,
           indicatorColor: Colors.white,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white60,
           tabs: [
+            const Tab(text: 'Kiểm tra tủ'),
             Tab(text: 'Sự cố ($openCount)'),
             Tab(
               text:
@@ -120,9 +176,469 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
           ? const Center(child: CircularProgressIndicator())
           : TabBarView(
               controller: _tabs,
-              children: [_buildQueue(), _buildMine()],
+              children: [_buildInspect(), _buildQueue(), _buildMine()],
             ),
     );
+  }
+
+  // ---- Tab 1: inspect lockers (browse cabinet, see cell status, report/clear) ----
+  Widget _buildInspect() {
+    final cells =
+        (_layout?['cells'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final lockerOptions = _lockerOptions;
+    final selectedLocker = _selectedLocker;
+    final rows = <int, List<Map<String, dynamic>>>{};
+    for (final c in cells) {
+      rows.putIfAbsent(_asInt(c['rowIndex']) ?? 0, () => []).add(c);
+    }
+    final sortedRows = rows.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    final selectedValue =
+        lockerOptions.any((locker) => _asInt(locker['id']) == _selectedLockerId)
+        ? _selectedLockerId
+        : null;
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Text(
+            'Chọn tủ để kiểm tra',
+            style: TextStyle(fontWeight: FontWeight.w800, color: opsDark),
+          ),
+          const SizedBox(height: 8),
+          if (lockerOptions.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(
+                child: Text(
+                  'Chưa có tủ nào',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+            )
+          else
+            DropdownButtonFormField<int>(
+              initialValue: selectedValue,
+              isExpanded: true,
+              items: [
+                for (final l in lockerOptions)
+                  DropdownMenuItem(
+                    value: _asInt(l['id']),
+                    child: Text(
+                      '${l['name'] ?? l['code'] ?? 'Tủ'} (${l['code'] ?? ''})',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              onChanged: (v) {
+                if (v != null) _selectLocker(v);
+              },
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
+          if (selectedLocker != null) ...[
+            _selectedLockerCard(selectedLocker, cells),
+            const SizedBox(height: 12),
+          ],
+          if (_layoutLoading)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_layout != null) ...[
+            _layoutSummary(),
+            const SizedBox(height: 8),
+            _statusLegend(),
+            const SizedBox(height: 12),
+            if (_layout?['landingPad'] == true)
+              Container(
+                padding: const EdgeInsets.all(10),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.flight_land,
+                      color: Color(0xFF7C3AED),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Bãi đáp drone trên nóc · marker ${_layout?['landingMarkerId'] ?? ''}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF7C3AED),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            for (final row in sortedRows) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Text(
+                  'Hàng ${row.key}',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ),
+              Row(
+                children: [
+                  for (final c in _sortCellsByColumn(row.value))
+                    Expanded(child: _cellTile(c)),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+            const SizedBox(height: 8),
+            const Text(
+              'Chạm vào một ô để báo hỏng hoặc mở lại ô sau khi sửa.',
+              style: TextStyle(fontSize: 12, color: opsMutedText),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _selectedLockerCard(
+    Map<String, dynamic> locker,
+    List<Map<String, dynamic>> cells,
+  ) {
+    final status = locker['status']?.toString();
+    final address = locker['address']?.toString();
+    final reserved = _countCells(cells, 'RESERVED');
+    final occupied = _countCells(cells, 'OCCUPIED');
+    final hasLocation =
+        _asDouble(locker['latitude']) != null ||
+        (address != null && address.trim().isNotEmpty);
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: opsBorder),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.inventory_2_outlined, color: opsPrimary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${locker['name'] ?? 'Tủ'} · ${locker['code'] ?? 'N/A'}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      color: opsDark,
+                    ),
+                  ),
+                ),
+                StatusChip(status),
+              ],
+            ),
+            if (address != null && address.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.location_on_outlined,
+                    size: 15,
+                    color: opsMutedText,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      address,
+                      style: const TextStyle(fontSize: 12, color: opsMutedText),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _MiniPill(
+                  icon: Icons.event_available_outlined,
+                  text: 'Đã giữ chỗ: $reserved',
+                  color: statusColor('RESERVED'),
+                ),
+                _MiniPill(
+                  icon: Icons.inventory_outlined,
+                  text: 'Có đồ: $occupied',
+                  color: statusColor('OCCUPIED'),
+                ),
+                _MiniPill(
+                  icon: Icons.grid_view_outlined,
+                  text:
+                      'STANDARD ${_countCells(cells, 'STANDARD', field: 'cellType')}',
+                ),
+                _MiniPill(
+                  icon: Icons.luggage_outlined,
+                  text: 'XL ${_countCells(cells, 'XL', field: 'cellType')}',
+                ),
+                _MiniPill(
+                  icon: Icons.flight_takeoff,
+                  text:
+                      'DRONE ${_countCells(cells, 'DRONE', field: 'cellType')}',
+                  color: const Color(0xFF7C3AED),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Kiểm tra trực quan từng ô rồi chỉ báo hỏng khi xác nhận lỗi vật lý tại tủ.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: hasLocation ? () => _openDirections(locker) : null,
+                  icon: const Icon(Icons.map_outlined, size: 16),
+                  label: const Text('Chỉ đường'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _layoutSummary() {
+    final total = _layout?['totalCells'] ?? 0;
+    final available = _layout?['availableCells'] ?? 0;
+    final fault = _layout?['faultCells'] ?? 0;
+    return Row(
+      children: [
+        Expanded(
+          child: _MetricCard(
+            label: 'Tổng ô',
+            value: '$total',
+            color: const Color(0xFF2563EB),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _MetricCard(
+            label: 'Sẵn sàng',
+            value: '$available',
+            color: const Color(0xFF16A34A),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _MetricCard(
+            label: 'Ô lỗi',
+            value: '$fault',
+            color: const Color(0xFFDC2626),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _statusLegend() {
+    const items = <String>['AVAILABLE', 'RESERVED', 'OCCUPIED', 'FAULT'];
+    return Wrap(
+      spacing: 10,
+      runSpacing: 6,
+      children: [
+        for (final s in items)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: statusColor(s),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                statusLabel(s),
+                style: const TextStyle(fontSize: 11, color: opsMutedText),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  Widget _cellTile(Map<String, dynamic> cell) {
+    final color = statusColor(cell['status'] as String?);
+    final type = cell['cellType'] as String? ?? 'STANDARD';
+    return GestureDetector(
+      onTap: () => _faultDialog(cell),
+      child: Container(
+        margin: const EdgeInsets.all(3),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.5)),
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '#${cell['boxNumber']}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                    fontSize: 13,
+                  ),
+                ),
+                if (type == 'DRONE')
+                  const Padding(
+                    padding: EdgeInsets.only(left: 2),
+                    child: Icon(Icons.flight, size: 12),
+                  ),
+                if (type == 'XL')
+                  const Padding(
+                    padding: EdgeInsets.only(left: 2),
+                    child: Icon(Icons.luggage, size: 12),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              statusLabel(cell['status'] as String?),
+              style: TextStyle(fontSize: 10, color: color),
+            ),
+            Text(
+              _cellTypeLabel(type),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 9, color: opsMutedText),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _faultDialog(Map<String, dynamic> cell) async {
+    final isFault = cell['status'] == 'FAULT';
+    final reasonCtrl = TextEditingController(text: 'Hỏng khóa');
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          isFault
+              ? 'Ô #${cell['boxNumber']} đã sửa xong?'
+              : 'Báo hỏng ô #${cell['boxNumber']}?',
+        ),
+        content: isFault
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Trạng thái hiện tại: ${statusLabel(cell['status'] as String?)}',
+                  ),
+                  const SizedBox(height: 8),
+                  Text('Lý do trước đó: ${cell['faultReason'] ?? '-'}'),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Chỉ mở lại ô sau khi đã sửa vật lý, kiểm tra khóa/cảm biến và đảm bảo ô sẵn sàng phục vụ.',
+                    style: TextStyle(fontSize: 12, color: opsMutedText),
+                  ),
+                ],
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Ô ${_cellTypeLabel(cell['cellType'] as String?)} · ${statusLabel(cell['status'] as String?)}',
+                    style: const TextStyle(fontSize: 12, color: opsMutedText),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: reasonCtrl,
+                    decoration: const InputDecoration(labelText: 'Lý do hỏng'),
+                    minLines: 1,
+                    maxLines: 3,
+                  ),
+                ],
+              ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isFault
+                  ? const Color(0xFF16A34A)
+                  : const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+            ),
+            child: Text(isFault ? 'Mở lại ô' : 'Báo hỏng'),
+          ),
+        ],
+      ),
+    );
+    final reason = reasonCtrl.text.trim();
+    reasonCtrl.dispose();
+    if (confirmed != true) return;
+    if (!isFault && reason.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Vui lòng nhập lý do hỏng.')),
+        );
+      }
+      return;
+    }
+    final boxId = _asInt(cell['id']);
+    if (boxId == null) return;
+    try {
+      if (isFault) {
+        await _service.clearFault(boxId);
+      } else {
+        await _service.reportFault(boxId, reason);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isFault ? 'Ô đã hoạt động lại' : 'Đã báo hỏng ô'),
+          ),
+        );
+      }
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(LockerOpsService.errorMessage(e))),
+        );
+      }
+    }
   }
 
   Widget _buildQueue() {
@@ -503,6 +1019,39 @@ double? _asDouble(dynamic value) {
   if (value is num) return value.toDouble();
   return double.tryParse('$value');
 }
+
+int? _asInt(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse('$value');
+}
+
+List<Map<String, dynamic>> _sortCellsByColumn(
+  List<Map<String, dynamic>> cells,
+) {
+  final sorted = [...cells];
+  sorted.sort(
+    (a, b) =>
+        (_asInt(a['colIndex']) ?? 0).compareTo(_asInt(b['colIndex']) ?? 0),
+  );
+  return sorted;
+}
+
+int _countCells(
+  List<Map<String, dynamic>> cells,
+  String expected, {
+  String field = 'status',
+}) => cells
+    .where((cell) => cell[field]?.toString().toUpperCase() == expected)
+    .length;
+
+String _cellTypeLabel(String? type) => switch (type) {
+  'DRONE' => 'Drone',
+  'XL' => 'XL',
+  'STANDARD' => 'Chuẩn',
+  null => 'Chuẩn',
+  _ => type,
+};
 
 class _MetricCard extends StatelessWidget {
   const _MetricCard({
