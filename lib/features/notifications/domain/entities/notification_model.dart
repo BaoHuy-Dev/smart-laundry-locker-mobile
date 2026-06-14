@@ -13,9 +13,11 @@ class NotificationDataPayload {
 
   factory NotificationDataPayload.fromJson(Map<String, dynamic> json) {
     return NotificationDataPayload(
-      actionType: json['actionType'] as String,
-      referenceId: json['referenceId'] as String?,
-      url: json['url'] as String?,
+      actionType:
+          (json['actionType'] ?? json['type'] ?? json['referenceType'] ?? '')
+              .toString(),
+      referenceId: json['referenceId']?.toString(),
+      url: json['url']?.toString(),
       additionalContext: json['additionalContext'] as Map<String, dynamic>?,
     );
   }
@@ -56,23 +58,29 @@ class NotificationModel {
   }
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) {
-    // API might return 'content' instead of 'body'
-    final bodyContent = (json['body'] ?? json['content'] ?? '') as String;
+    final bodyContent =
+        (json['body'] ?? json['content'] ?? json['message'] ?? '').toString();
 
-    // API might not return updatedAt, fallback to createdAt
-    final createdAtStr =
-        (json['createdAt'] ?? DateTime.now().toIso8601String()) as String;
-    final updatedAtStr = (json['updatedAt'] ?? createdAtStr) as String;
+    final createdAtStr = (json['createdAt'] ?? DateTime.now().toIso8601String())
+        .toString();
+    final updatedAtStr = (json['updatedAt'] ?? json['readAt'] ?? createdAtStr)
+        .toString();
+    final payload = json['dataPayload'] is Map<String, dynamic>
+        ? json['dataPayload'] as Map<String, dynamic>
+        : <String, dynamic>{
+            if (json['type'] != null) 'type': json['type'],
+            if (json['referenceId'] != null) 'referenceId': json['referenceId'],
+            if (json['referenceType'] != null)
+              'referenceType': json['referenceType'],
+          };
 
     return NotificationModel(
-      id: (json['id'] ?? json['notificationId'] ?? '') as String,
-      userId: json['userId'] as String?,
-      title: (json['title'] ?? 'Thông báo') as String,
+      id: (json['id'] ?? json['notificationId'] ?? '').toString(),
+      userId: json['userId']?.toString(),
+      title: (json['title'] ?? 'Thông báo').toString(),
       body: bodyContent,
-      dataPayload: json['dataPayload'] != null
-          ? NotificationDataPayload.fromJson(
-              json['dataPayload'] as Map<String, dynamic>,
-            )
+      dataPayload: payload.isNotEmpty
+          ? NotificationDataPayload.fromJson(payload)
           : null,
       isRead: json['isRead'] as bool? ?? false,
       createdAt: DateTime.parse(createdAtStr).toLocal(),
@@ -86,6 +94,42 @@ class NotificationListResponse {
   final NotificationMeta meta;
 
   const NotificationListResponse({required this.items, required this.meta});
+
+  factory NotificationListResponse.fromApiPayload(
+    dynamic payload, {
+    required int page,
+    required int limit,
+  }) {
+    if (payload is List) {
+      final items = payload
+          .whereType<Map<String, dynamic>>()
+          .map(NotificationModel.fromJson)
+          .toList();
+      return NotificationListResponse(
+        items: items,
+        meta: NotificationMeta(
+          itemCount: items.length,
+          totalItems: items.length,
+          itemsPerPage: limit,
+          totalPages: 1,
+          currentPage: page,
+        ),
+      );
+    }
+    if (payload is Map<String, dynamic>) {
+      return NotificationListResponse.fromJson(payload);
+    }
+    return NotificationListResponse(
+      items: const [],
+      meta: NotificationMeta(
+        itemCount: 0,
+        totalItems: 0,
+        itemsPerPage: limit,
+        totalPages: 1,
+        currentPage: page,
+      ),
+    );
+  }
 
   factory NotificationListResponse.fromJson(Map<String, dynamic> json) {
     final hasMeta = json.containsKey('meta') && json['meta'] != null;
