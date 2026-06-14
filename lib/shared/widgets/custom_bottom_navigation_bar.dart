@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 
 /// Builder function for custom icons
 typedef IconBuilder = Widget Function(Color color, double size);

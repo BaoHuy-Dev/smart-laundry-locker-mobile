@@ -4,11 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
+import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:smart_laundry_locker/features/stores/domain/entities/store.dart';
-import 'package:smart_laundry_locker/features/stores/infrastructure/services/favorite_stores_service.dart';
 import 'package:smart_laundry_locker/features/stores/infrastructure/services/store_service.dart';
 import 'package:smart_laundry_locker/features/stores/presentation/widgets/store_card.dart';
-import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 
 /// Customer-facing list of stores. Supports text search and "near me"
 /// sorting by distance. Mirrors the legacy RN `user/stores` screen.
@@ -21,12 +20,10 @@ class StoresPage extends StatefulWidget {
 
 class _StoresPageState extends State<StoresPage> {
   final StoreService _service = StoreService(ApiClient());
-  final FavoriteStoresService _favService = FavoriteStoresService();
   final TextEditingController _searchCtrl = TextEditingController();
 
   List<Store> _all = const [];
   List<Store> _visible = const [];
-  Set<int> _favoriteIds = <int>{};
   bool _loading = true;
   bool _nearbyLoading = false;
   String? _error;
@@ -35,7 +32,6 @@ class _StoresPageState extends State<StoresPage> {
   void initState() {
     super.initState();
     _load();
-    _loadFavorites();
   }
 
   @override
@@ -67,24 +63,6 @@ class _StoresPageState extends State<StoresPage> {
         _loading = false;
       });
     }
-  }
-
-  Future<void> _loadFavorites() async {
-    final ids = await _favService.getFavoriteIds();
-    if (!mounted) return;
-    setState(() => _favoriteIds = ids);
-  }
-
-  Future<void> _toggleFavorite(Store store) async {
-    final nowFav = await _favService.toggle(store.id);
-    if (!mounted) return;
-    setState(() {
-      if (nowFav) {
-        _favoriteIds.add(store.id);
-      } else {
-        _favoriteIds.remove(store.id);
-      }
-    });
   }
 
   void _applyFilter() {
@@ -149,21 +127,14 @@ class _StoresPageState extends State<StoresPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7FAFC),
+      backgroundColor: AISLShadcnTheme.navySurface,
+      appBar: AppBar(
+        title: const Text('Cửa hàng'),
+        backgroundColor: AISLShadcnTheme.navyPrimary,
+        foregroundColor: Colors.white,
+      ),
       body: Column(
         children: [
-          BrandHeroHeader(
-            title: 'Cửa hàng',
-            subtitle: 'Tìm cửa hàng & tủ gần bạn',
-            onBack: () => context.pop(),
-            trailing: BrandCircleIconButton(
-              icon: Icons.favorite_border,
-              onTap: () async {
-                await context.push(AppRouter.favorites);
-                if (mounted) _loadFavorites();
-              },
-            ),
-          ),
           _buildSearchBar(),
           Expanded(child: _buildBody()),
         ],
@@ -173,7 +144,7 @@ class _StoresPageState extends State<StoresPage> {
 
   Widget _buildSearchBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Row(
         children: [
           Expanded(
@@ -188,29 +159,25 @@ class _StoresPageState extends State<StoresPage> {
                 fillColor: Colors.white,
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: AislBrand.chipBorder),
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: AislBrand.chipBorder),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: AislBrand.blue),
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Material(
-            color: AislBrand.navy,
-            borderRadius: BorderRadius.circular(16),
+            color: AISLShadcnTheme.navyPrimary,
+            borderRadius: BorderRadius.circular(14),
             child: InkWell(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
               onTap: _nearbyLoading ? null : _useMyLocation,
               child: Padding(
-                padding: const EdgeInsets.all(13),
+                padding: const EdgeInsets.all(12),
                 child: _nearbyLoading
                     ? const SizedBox(
                         width: 20,
@@ -235,14 +202,13 @@ class _StoresPageState extends State<StoresPage> {
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: AislBrand.navy));
+      return const Center(child: CircularProgressIndicator());
     }
     if (_error != null) {
       return _ErrorState(message: _error!, onRetry: _load);
     }
     if (_visible.isEmpty) {
       return RefreshIndicator(
-        color: AislBrand.navy,
         onRefresh: _load,
         child: ListView(
           children: const [
@@ -258,18 +224,15 @@ class _StoresPageState extends State<StoresPage> {
       );
     }
     return RefreshIndicator(
-      color: AislBrand.navy,
       onRefresh: _load,
       child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         itemCount: _visible.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 14),
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (context, index) {
           final store = _visible[index];
           return StoreCard(
             store: store,
-            isFavorite: _favoriteIds.contains(store.id),
-            onToggleFavorite: () => _toggleFavorite(store),
             onTap: () => context.push(AppRouter.storeDetail, extra: store),
           );
         },
@@ -306,7 +269,6 @@ class _ErrorState extends StatelessWidget {
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: onRetry,
-              style: FilledButton.styleFrom(backgroundColor: AislBrand.navy),
               icon: const Icon(LucideIcons.refreshCw, size: 16),
               label: const Text('Thử lại'),
             ),

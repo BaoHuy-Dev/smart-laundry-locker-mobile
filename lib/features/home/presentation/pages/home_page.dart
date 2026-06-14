@@ -758,28 +758,23 @@ class _HomePageState extends State<HomePage>
                                   ),
                                 ),
                               ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        GestureDetector(
-                          onTap: () => _toggleFavorite(store),
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.95),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              isFavorite
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              size: 20,
-                              color: isFavorite
-                                  ? const Color(0xFFE91E63)
-                                  : AislBrand.navy,
-                            ),
-                          ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 18),
+                        _buildCourierQuickActionsRow(context),
+                        const SizedBox(height: 100),
+                      ] else ...[
+                        _buildMainActions(context),
+                        const SizedBox(height: 16),
+                        _buildStoresEntry(context),
+                        const SizedBox(height: 24),
+                        const SizedBox(height: 40),
+                        _buildWelcomeSection(context),
+                        const SizedBox(height: 24),
+                        Consumer<HomeProvider>(
+                          builder: (context, provider, _) =>
+                              _buildBlogSection(context, provider),
                         ),
                       ],
                     ),
@@ -1076,6 +1071,30 @@ class _HomePageState extends State<HomePage>
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: Text(
+                  'Đăng ký trở thành Đối tác để đặt quảng cáo tại đây!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () {
+                  // Optionally link to partner registration form
+                },
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.white54),
+                  foregroundColor: Colors.white,
+                ),
+                icon: const Icon(LucideIcons.users, size: 16),
+                label: const Text('Đăng ký ngay'),
+              ),
             ],
           ),
         ),
@@ -1139,6 +1158,153 @@ class _HomePageState extends State<HomePage>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBlogSection(BuildContext context, HomeProvider provider) {
+    if (provider.blogs.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Text(
+            'Tin tức & Cẩm nang',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: Colors.black87,
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 260,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            itemCount: provider.blogs.length,
+            separatorBuilder: (context, index) => const SizedBox(width: 16),
+            itemBuilder: (context, index) {
+              final blog = provider.blogs[index];
+              return InkWell(
+                onTap: () {
+                  // Show detail dialog or navigate
+                  SmartDialog.show(
+                    builder: (ctx) => AlertDialog(
+                      title: Text(blog.title),
+                      content: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (blog.imageUrl != null)
+                              Image.network(blog.imageUrl!),
+                            const SizedBox(height: 12),
+                            Text(blog.content),
+                          ],
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => SmartDialog.dismiss(),
+                          child: const Text('Đóng'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                child: Container(
+                  width: 280,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(16),
+                        ),
+                        child: blog.imageUrl != null
+                            ? Image.network(
+                                blog.imageUrl!,
+                                height: 140,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Container(
+                                      height: 140,
+                                      color: Colors.grey[200],
+                                      child: const Icon(
+                                        LucideIcons.image,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                              )
+                            : Container(
+                                height: 140,
+                                color: Colors.grey[200],
+                                child: const Icon(
+                                  LucideIcons.newspaper,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              DateFormat('dd/MM/yyyy').format(blog.createdAt),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              blog.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            if (blog.subTitle != null &&
+                                blog.subTitle!.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                blog.subTitle!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -1241,6 +1407,226 @@ class _HomePageState extends State<HomePage>
     );
   }
 
+  Widget _buildMainActions(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'Dịch vụ tiện ích',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildExpressCard(
+                  'Thuê tủ',
+                  'An toàn',
+                  LucideIcons.key,
+                  const Color(0xFFF0F7FF),
+                  Colors.blue.shade500,
+                  () => context.push(AppRouter.rentLocker),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildExpressCard(
+                  'Lấy hàng',
+                  'Tiện lợi',
+                  LucideIcons.packageOpen,
+                  const Color(0xFFFFF8F0),
+                  const Color(0xFF5F8FB8),
+                  () => context.push(AppRouter.lockerOtp),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildExpressCard(
+                  'Gửi hàng',
+                  'Nhanh chóng',
+                  LucideIcons.send,
+                  const Color(0xFFF3FAF4),
+                  Colors.green.shade500,
+                  () => context.push(AppRouter.sendParcel),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildExpressCard(
+                  'Ủy quyền',
+                  'Mở tủ',
+                  LucideIcons.lockOpen,
+                  const Color(0xFFEFF6FF),
+                  Colors.blue.shade600,
+                  () => context.push(AppRouter.authorizedOpening),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildExpressCard(
+                  'Giat do',
+                  'Tao don',
+                  LucideIcons.washingMachine,
+                  const Color(0xFFF4F7FF),
+                  AISLShadcnTheme.navyPrimary,
+                  () => context.push(AppRouter.userLaundryOrder),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildExpressCard(
+                  'Đơn tủ',
+                  'Theo dõi',
+                  LucideIcons.package,
+                  const Color(0xFFFFF4F6),
+                  Colors.pink.shade500,
+                  () => context.push(AppRouter.myLockerOrders),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStoresEntry(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => context.push(AppRouter.stores),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AISLShadcnTheme.navyPrimary,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  LucideIcons.store,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Khám phá cửa hàng',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Tìm cửa hàng & tủ gần bạn',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Colors.white70),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpressCard(
+    String title,
+    String subtitle,
+    IconData icon,
+    Color bgColor,
+    Color iconColor,
+    VoidCallback onTap,
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 130, // Adjusted for 3 columns
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.6),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: iconColor.withValues(alpha: 0.2),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: Icon(icon, color: iconColor, size: 28),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: Colors.black87,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 9,
+                color: Colors.grey.shade600,
+                height: 1.1,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildCourierCompletedCard(
     int completedToday, {
     bool isLoading = false,
@@ -1310,24 +1696,34 @@ class _HomePageState extends State<HomePage>
     BuildContext context, {
     bool isOnline = false,
   }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: () => isOnline
-            ? _handleStopWorking(context)
-            : _handleStartWorking(context),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 16,
-                offset: const Offset(0, 10),
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: () =>
+          isOnline ? _handleStopWorking(context) : _handleStartWorking(context),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 16,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: isOnline
+                    ? const Color(0xFF16A34A).withValues(alpha: 0.10)
+                    : AISLShadcnTheme.navyPrimary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(14),
               ),
             ],
           ),
@@ -1416,42 +1812,39 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildCourierViewMapCard(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: () => context.push(AppRouter.courierMap),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 16,
-                offset: const Offset(0, 10),
-              ),
-            ],
-            border: Border.all(
-              color: AISLShadcnTheme.navyPrimary.withValues(alpha: 0.1),
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: () => context.push(AppRouter.courierMap),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 16,
+              offset: const Offset(0, 10),
             ),
+          ],
+          border: Border.all(
+            color: AISLShadcnTheme.navyPrimary.withValues(alpha: 0.1),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AISLShadcnTheme.navyPrimary.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(
-                  LucideIcons.map,
-                  color: AISLShadcnTheme.navyPrimary,
-                  size: 22,
-                ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AISLShadcnTheme.navyPrimary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                LucideIcons.map,
+                color: AISLShadcnTheme.navyPrimary,
+                size: 22,
               ),
               const SizedBox(width: 14),
               const Expanded(
@@ -1547,6 +1940,7 @@ class _HomePageState extends State<HomePage>
       locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
     );
 
+    // Sync to backend immediately
     if (!context.mounted) return;
     context.read<CourierDispatchProvider>().goOnlineWithLocation(
       position.latitude,
