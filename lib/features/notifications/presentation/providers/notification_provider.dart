@@ -1,15 +1,19 @@
 import 'package:smart_laundry_locker/features/notifications/domain/entities/notification_model.dart';
+import 'package:smart_laundry_locker/features/notifications/infrastructure/services/realtime_notification_service.dart';
 import 'package:smart_laundry_locker/features/notifications/infrastructure/repositories/notification_repository.dart';
 import 'package:smart_laundry_locker/core/services/firebase_messaging_service.dart';
+import 'package:smart_laundry_locker/core/services/token_service.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 
 class NotificationProvider extends ChangeNotifier {
   final NotificationRepository _repository;
   StreamSubscription? _messageSubscription;
+  StreamSubscription? _realtimeSubscription;
 
   NotificationProvider(this._repository) {
     _initMessageListener();
+    _initRealtimeListener();
   }
 
   void _initMessageListener() {
@@ -22,9 +26,36 @@ class NotificationProvider extends ChangeNotifier {
         });
   }
 
+  void _initRealtimeListener() {
+    TokenService.authState.addListener(_handleAuthStateChanged);
+    _handleAuthStateChanged();
+    _realtimeSubscription = RealtimeNotificationService.instance.notifications
+        .listen((notification) {
+          final exists = _notifications.any((n) => n.id == notification.id);
+          if (!exists) {
+            _notifications.insert(0, notification);
+          }
+          if (!notification.isRead) {
+            _unreadCount = exists ? _unreadCount : _unreadCount + 1;
+          }
+          notifyListeners();
+        });
+  }
+
+  void _handleAuthStateChanged() {
+    if (TokenService.authState.value) {
+      unawaited(RealtimeNotificationService.instance.connect());
+    } else {
+      RealtimeNotificationService.instance.disconnect();
+    }
+  }
+
   @override
   void dispose() {
+    TokenService.authState.removeListener(_handleAuthStateChanged);
     _messageSubscription?.cancel();
+    _realtimeSubscription?.cancel();
+    RealtimeNotificationService.instance.disconnect();
     super.dispose();
   }
 
