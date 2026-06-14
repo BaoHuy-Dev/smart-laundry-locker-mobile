@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:smart_laundry_locker/core/utils/currency_formatter.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -758,24 +759,9 @@ class _HomePageState extends State<HomePage>
                                   ),
                                 ),
                               ],
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 18),
-                        _buildCourierQuickActionsRow(context),
-                        const SizedBox(height: 100),
-                      ] else ...[
-                        _buildMainActions(context),
-                        const SizedBox(height: 16),
-                        _buildStoresEntry(context),
-                        const SizedBox(height: 24),
-                        const SizedBox(height: 40),
-                        _buildWelcomeSection(context),
-                        const SizedBox(height: 24),
-                        Consumer<HomeProvider>(
-                          builder: (context, provider, _) =>
-                              _buildBlogSection(context, provider),
-                        ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1716,19 +1702,6 @@ class _HomePageState extends State<HomePage>
         ),
         child: Row(
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: isOnline
-                    ? const Color(0xFF16A34A).withValues(alpha: 0.10)
-                    : AISLShadcnTheme.navyPrimary.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
               Container(
                 width: 44,
                 height: 44,
@@ -1807,7 +1780,6 @@ class _HomePageState extends State<HomePage>
             ],
           ),
         ),
-      ),
     );
   }
 
@@ -1846,7 +1818,8 @@ class _HomePageState extends State<HomePage>
                 color: AISLShadcnTheme.navyPrimary,
                 size: 22,
               ),
-              const SizedBox(width: 14),
+            ),
+            const SizedBox(width: 14),
               const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1876,7 +1849,6 @@ class _HomePageState extends State<HomePage>
             ],
           ),
         ),
-      ),
     );
   }
 
