@@ -20,9 +20,29 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Future<Map<String, dynamic>> register(RegisterRequestModel request) async {
+    // Backend AuthController expects: {email, phoneNumber, firstName, lastName,
+    // roles:Set<String>, password}. The form collects a single fullName + role,
+    // so split the name and wrap the role into a roles array.
+    final fullName = (request.fullName ?? '').trim();
+    final parts = fullName.isEmpty
+        ? <String>[]
+        : fullName.split(RegExp(r'\s+'));
+    final String lastName = parts.length > 1 ? parts.removeLast() : '';
+    final String firstName = parts.isEmpty ? fullName : parts.join(' ');
+
+    final body = <String, dynamic>{
+      if (request.email != null && request.email!.isNotEmpty)
+        'email': request.email,
+      'phoneNumber': request.phoneNumber,
+      'firstName': firstName,
+      'lastName': lastName,
+      'roles': <String>[request.role],
+      'password': request.password,
+    };
+
     final response = await _apiClient.post<Map<String, dynamic>>(
-      '$_basePath/register',
-      data: request.toJson(),
+      '/api/auth/register',
+      data: body,
     );
 
     return _extractData(response);

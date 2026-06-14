@@ -72,13 +72,17 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
 
   void _onRegisterStateChanged() {
     if (_registerProvider.isSuccess && !_hasNavigated) {
-      _hasNavigated = true;
+      // Backend issues the account immediately on register (no separate email
+      // OTP gate in this environment). Instead of pushing the legacy OTP screen,
+      // move the user to the Login tab with their email prefilled.
       if (mounted) {
-        Navigator.of(context).pop(true);
-        context.push(
-          AppRouter.otp,
-          extra: {'email': _registerEmailController.text.trim()},
-        );
+        final email = _registerEmailController.text.trim();
+        SmartDialog.showToast('Đăng ký thành công! Vui lòng đăng nhập.');
+        setState(() {
+          _isLoginTab = true;
+          _loginEmailController.text = email;
+        });
+        _registerProvider.reset();
       }
     }
   }

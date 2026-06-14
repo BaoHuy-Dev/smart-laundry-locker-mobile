@@ -101,19 +101,27 @@ class ProfileProvider extends ChangeNotifier {
   }
 
   Future<bool> _getFaceRegistrationStatus(String userId) async {
-    final result = await _apiClient.get<dynamic>('/auth/ai/registered/$userId');
-    final data = result.data;
-    if (data is Map<String, dynamic>) {
-      final isReg = data['isRegistered'];
-      if (isReg is bool) return isReg;
+    // Face-recognition is a legacy feature with no backend in the current
+    // microservices stack. Never let its failure abort profile loading.
+    try {
+      final result = await _apiClient.get<dynamic>(
+        '/api/auth/ai/registered/$userId',
+      );
+      final data = result.data;
+      if (data is Map<String, dynamic>) {
+        final isReg = data['isRegistered'];
+        if (isReg is bool) return isReg;
 
-      final inner = data['data'];
-      if (inner is Map<String, dynamic>) {
-        final innerReg = inner['isRegistered'];
-        if (innerReg is bool) return innerReg;
+        final inner = data['data'];
+        if (inner is Map<String, dynamic>) {
+          final innerReg = inner['isRegistered'];
+          if (innerReg is bool) return innerReg;
+        }
       }
+      return false;
+    } catch (_) {
+      return false;
     }
-    return false;
   }
 
   Future<void> updateProfile({String? fullName, String? phoneNumber}) async {
