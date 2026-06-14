@@ -6,10 +6,18 @@ import 'package:smart_laundry_locker/features/stores/domain/entities/store.dart'
 
 /// Compact card used in the stores list and on the home preview row.
 class StoreCard extends StatelessWidget {
-  const StoreCard({required this.store, required this.onTap, super.key});
+  const StoreCard({
+    required this.store,
+    required this.onTap,
+    this.isFavorite,
+    this.onToggleFavorite,
+    super.key,
+  });
 
   final Store store;
   final VoidCallback onTap;
+  final bool? isFavorite;
+  final VoidCallback? onToggleFavorite;
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +93,19 @@ class StoreCard extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: Colors.grey),
+            if (isFavorite != null)
+              IconButton(
+                icon: Icon(
+                  isFavorite! ? Icons.favorite : Icons.favorite_border,
+                  color: isFavorite! ? Colors.red : Colors.grey,
+                  size: 22,
+                ),
+                onPressed: onToggleFavorite,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              )
+            else
+              const Icon(Icons.chevron_right, color: Colors.grey),
           ],
         ),
       ),
