@@ -4,7 +4,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:smart_laundry_locker/features/courier_dispatch/presentation/widgets/incoming_order_sheet.dart';
 import 'package:smart_laundry_locker/core/services/app_messenger_service.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'dart:async';
@@ -152,8 +151,8 @@ class FirebaseMessagingService {
           : 'ANDROID';
 
       final response = await apiClient.post(
-        '/users/device',
-        data: {'deviceId': deviceId, 'fcmToken': token, 'platform': platform},
+        '/api/notifications/fcm-tokens',
+        data: {'token': token, 'deviceType': platform, 'deviceId': deviceId},
       );
       debugPrint(
         "FCM Token successfully registered with backend: ${response.statusCode}",
