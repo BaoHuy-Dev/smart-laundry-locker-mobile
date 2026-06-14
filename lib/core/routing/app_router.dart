@@ -10,8 +10,6 @@ import 'package:smart_laundry_locker/features/locker/presentation/pages/locker_m
 import 'package:smart_laundry_locker/features/locker/presentation/pages/locker_action_page.dart';
 import 'package:smart_laundry_locker/features/locker/presentation/pages/locker_otp_page.dart';
 import 'package:smart_laundry_locker/features/delegations/presentation/pages/authorized_opening_page.dart';
-import 'package:smart_laundry_locker/features/orders/presentation/pages/order_page.dart';
-import 'package:smart_laundry_locker/features/orders/presentation/providers/order_injection.dart';
 import 'package:smart_laundry_locker/features/delegations/presentation/pages/my_delegations_page.dart';
 import 'package:smart_laundry_locker/features/delegations/presentation/providers/delegation_injection.dart';
 import 'package:smart_laundry_locker/features/maintenance/presentation/pages/create_report_page.dart';
@@ -194,11 +192,11 @@ class AppRouter {
             builder: (context, state) => const LockerPage(),
           ),
           GoRoute(
+            // Bottom-nav "Đơn hàng" shows the customer's real locker orders
+            // (locker_ops). The legacy OrderPage hit the old /orders/me API and
+            // is no longer wired to the current backend.
             path: orders,
-            builder: (context, state) => ChangeNotifierProvider(
-              create: (_) => OrderInjection.provideOrderProvider(ApiClient()),
-              child: const OrderPage(),
-            ),
+            builder: (context, state) => const MyLockerOrdersPage(),
           ),
           GoRoute(
             path: profile,
