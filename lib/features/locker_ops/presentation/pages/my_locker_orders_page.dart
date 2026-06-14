@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/utils/locker_maps.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/ops_widgets.dart';
+import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 
 /// All locker orders of the signed-in customer, with the full action set gated
 /// to the backend state machine: confirm drop, pickup/complete, delegate,
@@ -304,16 +306,17 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AISLShadcnTheme.navySurface,
-      appBar: AppBar(
-        title: const Text('Đơn tủ của tôi'),
-        backgroundColor: AISLShadcnTheme.navyPrimary,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(onPressed: _load, icon: const Icon(LucideIcons.refreshCw)),
-        ],
-      ),
       body: Column(
         children: [
+          BrandHeroHeader(
+            title: 'Đơn tủ của tôi',
+            subtitle: 'Theo dõi & thao tác đơn tủ',
+            onBack: context.canPop() ? () => context.pop() : null,
+            trailing: BrandCircleIconButton(
+              icon: LucideIcons.refreshCw,
+              onTap: _load,
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Row(
@@ -342,7 +345,7 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
                 : RefreshIndicator(
                     onRefresh: _load,
                     child: ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                       itemCount: _visible.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 10),
                       itemBuilder: (ctx, i) {

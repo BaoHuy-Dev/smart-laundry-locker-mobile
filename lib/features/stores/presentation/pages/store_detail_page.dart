@@ -5,9 +5,10 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
-import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:smart_laundry_locker/features/stores/domain/entities/store.dart';
+import 'package:smart_laundry_locker/features/stores/infrastructure/services/favorite_stores_service.dart';
 import 'package:smart_laundry_locker/features/stores/infrastructure/services/store_service.dart';
+import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Store detail screen: store info + customer ratings.
@@ -26,10 +27,12 @@ class StoreDetailPage extends StatefulWidget {
 
 class _StoreDetailPageState extends State<StoreDetailPage> {
   final StoreService _service = StoreService(ApiClient());
+  final FavoriteStoresService _favService = FavoriteStoresService();
 
   Store? _store;
   List<StoreRating> _ratings = const [];
   bool _loading = true;
+  bool _isFavorite = false;
   String? _error;
 
   @override
@@ -52,10 +55,12 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
       } catch (_) {
         // Ratings are best-effort; store detail still renders without them.
       }
+      final isFav = await _favService.isFavorite(store.id);
       if (!mounted) return;
       setState(() {
         _store = store;
         _ratings = ratings;
+        _isFavorite = isFav;
         _loading = false;
       });
     } catch (e) {
@@ -67,11 +72,18 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
     }
   }
 
+  Future<void> _toggleFavorite() async {
+    final store = _store;
+    if (store == null) return;
+    final nowFav = await _favService.toggle(store.id);
+    if (!mounted) return;
+    setState(() => _isFavorite = nowFav);
+  }
+
   Future<void> _openDirections() async {
     final store = _store;
     if (store == null) return;
     if (store.hasLocation) {
-      // In-app directions map (route drawn from current location).
       context.push(
         AppRouter.directions,
         extra: {
@@ -83,7 +95,6 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
       );
       return;
     }
-    // No coordinates: fall back to an address search in the maps app.
     if ((store.address ?? '').isEmpty) {
       _toast('Cửa hàng chưa có vị trí.');
       return;
@@ -109,17 +120,42 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AISLShadcnTheme.navySurface,
-      appBar: AppBar(
-        title: const Text('Chi tiết cửa hàng'),
-        backgroundColor: AISLShadcnTheme.navyPrimary,
-        foregroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF7FAFC),
+      body: Stack(
+        children: [
+          if (_loading)
+            const Center(child: CircularProgressIndicator(color: AislBrand.navy))
+          else if (_error != null)
+            _buildError()
+          else
+            _buildContent(_store!),
+          // Floating top actions (back + favourite) over the hero image.
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Row(
+                children: [
+                  BrandCircleIconButton(
+                    icon: Icons.arrow_back,
+                    onTap: () => context.pop(),
+                  ),
+                  const Spacer(),
+                  if (_store != null)
+                    BrandCircleIconButton(
+                      icon: _isFavorite
+                          ? Icons.favorite
+                          : Icons.favorite_border,
+                      iconColor: _isFavorite
+                          ? const Color(0xFFE91E63)
+                          : AislBrand.navy,
+                      onTap: _toggleFavorite,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-          ? _buildError()
-          : _buildContent(_store!),
     );
   }
 
@@ -136,7 +172,11 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
           const SizedBox(height: 12),
           Text(_error!, style: const TextStyle(color: Colors.black54)),
           const SizedBox(height: 16),
-          FilledButton(onPressed: _load, child: const Text('Thử lại')),
+          FilledButton(
+            onPressed: _load,
+            style: FilledButton.styleFrom(backgroundColor: AislBrand.navy),
+            child: const Text('Thử lại'),
+          ),
         ],
       ),
     );
@@ -165,14 +205,13 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
 
   Widget _buildHeaderImage(Store store) {
     return SizedBox(
-      height: 220,
+      height: 240,
       width: double.infinity,
       child: (store.image != null && store.image!.isNotEmpty)
           ? CachedNetworkImage(
               imageUrl: store.image!,
               fit: BoxFit.cover,
-              placeholder: (context, url) =>
-                  const ColoredBox(color: Color(0xFFEFF4F8)),
+              placeholder: (context, url) => const _HeaderFallback(),
               errorWidget: (context, url, error) => const _HeaderFallback(),
             )
           : const _HeaderFallback(),
@@ -185,12 +224,12 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -205,7 +244,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF1A202C),
+                    color: AislBrand.textTitle,
                   ),
                 ),
               ),
@@ -255,7 +294,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
               style: const TextStyle(
                 fontSize: 14,
                 height: 1.5,
-                color: Color(0xFF475569),
+                color: AislBrand.textBody,
               ),
             ),
           ],
@@ -266,7 +305,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                 child: FilledButton.icon(
                   onPressed: _openDirections,
                   style: FilledButton.styleFrom(
-                    backgroundColor: AISLShadcnTheme.navyPrimary,
+                    backgroundColor: AislBrand.navy,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   icon: const Icon(LucideIcons.map, size: 18),
@@ -278,7 +317,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                 child: OutlinedButton.icon(
                   onPressed: () => context.go(AppRouter.lockers),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AISLShadcnTheme.navyPrimary,
+                    foregroundColor: AislBrand.navy,
                     side: const BorderSide(color: Color(0xFFCBD5E1)),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
@@ -299,8 +338,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AislBrand.chipBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -334,9 +373,15 @@ class _HeaderFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFFE7F0F8),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: AislBrand.softHeaderGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
       alignment: Alignment.center,
-      child: const Icon(LucideIcons.store, size: 56, color: Color(0xFF94A3B8)),
+      child: const Icon(LucideIcons.store, size: 64, color: AislBrand.navy),
     );
   }
 }
@@ -393,7 +438,7 @@ class _InfoRow extends StatelessWidget {
               color: const Color(0xFFEBF2FA),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, size: 18, color: AISLShadcnTheme.navyPrimary),
+            child: Icon(icon, size: 18, color: AislBrand.navy),
           ),
           const SizedBox(width: 12),
           Expanded(

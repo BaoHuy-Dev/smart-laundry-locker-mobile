@@ -1,61 +1,117 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:smart_laundry_locker/features/stores/domain/entities/store.dart';
+import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 
-/// Compact card used in the stores list and on the home preview row.
+/// Image-banner store card (ported from the legacy RN customer app): a photo
+/// header with a status badge + favourite heart, then the store name/address.
 class StoreCard extends StatelessWidget {
-  const StoreCard({required this.store, required this.onTap, super.key});
+  const StoreCard({
+    required this.store,
+    required this.onTap,
+    this.isFavorite = false,
+    this.onToggleFavorite,
+    super.key,
+  });
 
   final Store store;
   final VoidCallback onTap;
+  final bool isFavorite;
+  final VoidCallback? onToggleFavorite;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      behavior: HitTestBehavior.opaque,
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AislBrand.cardBorder),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-        padding: const EdgeInsets.all(10),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _StoreThumb(image: store.image),
-            const SizedBox(width: 12),
-            Expanded(
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(18),
+                  ),
+                  child: SizedBox(
+                    height: 140,
+                    width: double.infinity,
+                    child: (store.image != null && store.image!.isNotEmpty)
+                        ? CachedNetworkImage(
+                            imageUrl: store.image!,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => const _Banner(),
+                            errorWidget: (_, __, ___) => const _Banner(),
+                          )
+                        : const _Banner(),
+                  ),
+                ),
+                Positioned(
+                  bottom: 10,
+                  left: 10,
+                  child: BrandStatusBadge(
+                    label: store.isActive ? 'Mở cửa' : 'Đóng',
+                    dotColor: store.isActive
+                        ? AislBrand.statusGreen
+                        : Colors.grey,
+                    textColor: store.isActive
+                        ? AislBrand.statusGreenText
+                        : Colors.grey.shade700,
+                  ),
+                ),
+                if (onToggleFavorite != null)
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: BrandCircleIconButton(
+                      icon: isFavorite ? Icons.favorite : Icons.favorite_border,
+                      iconColor: isFavorite
+                          ? const Color(0xFFE91E63)
+                          : AislBrand.navy,
+                      background: Colors.white.withValues(alpha: 0.92),
+                      size: 34,
+                      iconSize: 18,
+                      onTap: onToggleFavorite!,
+                    ),
+                  ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          store.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ),
-                      _StatusChip(active: store.isActive),
-                    ],
+                  Text(
+                    store.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      color: AislBrand.textTitle,
+                    ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
                       const Icon(
                         LucideIcons.mapPin,
-                        size: 13,
-                        color: Colors.grey,
+                        size: 14,
+                        color: AislBrand.textMuted,
                       ),
                       const SizedBox(width: 4),
                       Expanded(
@@ -64,28 +120,27 @@ class StoreCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
+                            fontSize: 13,
+                            color: AislBrand.textMuted,
                           ),
                         ),
                       ),
+                      if (store.distanceKm != null) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          '${store.distanceKm!.toStringAsFixed(1)} km',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AislBrand.blue,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
-                  if (store.distanceKm != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Cách bạn ${store.distanceKm!.toStringAsFixed(1)} km',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: AISLShadcnTheme.navyAccent,
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: Colors.grey),
           ],
         ),
       ),
@@ -93,67 +148,21 @@ class StoreCard extends StatelessWidget {
   }
 }
 
-class _StoreThumb extends StatelessWidget {
-  const _StoreThumb({this.image});
-
-  final String? image;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
-        width: 64,
-        height: 64,
-        child: (image != null && image!.isNotEmpty)
-            ? CachedNetworkImage(
-                imageUrl: image!,
-                fit: BoxFit.cover,
-                placeholder: (context, url) =>
-                    const ColoredBox(color: Color(0xFFEFF4F8)),
-                errorWidget: (context, url, error) => const _ThumbFallback(),
-              )
-            : const _ThumbFallback(),
-      ),
-    );
-  }
-}
-
-class _ThumbFallback extends StatelessWidget {
-  const _ThumbFallback();
+class _Banner extends StatelessWidget {
+  const _Banner();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFFEFF4F8),
-      alignment: Alignment.center,
-      child: const Icon(LucideIcons.store, color: Color(0xFF94A3B8)),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.active});
-
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = active ? const Color(0xFF16A34A) : Colors.grey;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        active ? 'Mở cửa' : 'Đóng',
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: color,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: AislBrand.softHeaderGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
       ),
+      alignment: Alignment.center,
+      child: const Icon(LucideIcons.store, size: 52, color: AislBrand.navy),
     );
   }
 }

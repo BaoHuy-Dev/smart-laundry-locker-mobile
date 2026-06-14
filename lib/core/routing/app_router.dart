@@ -56,6 +56,7 @@ import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/my_l
 import 'package:smart_laundry_locker/features/stores/domain/entities/store.dart';
 import 'package:smart_laundry_locker/features/stores/presentation/pages/stores_page.dart';
 import 'package:smart_laundry_locker/features/stores/presentation/pages/store_detail_page.dart';
+import 'package:smart_laundry_locker/features/stores/presentation/pages/favorites_page.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -101,6 +102,7 @@ class AppRouter {
   static const String myLockerOrders = '/locker/my-orders';
   static const String stores = '/stores';
   static const String storeDetail = '/stores/detail';
+  static const String favorites = '/stores/favorites';
   static const String directions = '/directions';
 
   static final GlobalKey<NavigatorState> navigatorKey =
@@ -440,6 +442,11 @@ class AppRouter {
         path: stores,
         name: 'stores',
         builder: (context, state) => const StoresPage(),
+      ),
+      GoRoute(
+        path: favorites,
+        name: 'favorites',
+        builder: (context, state) => const FavoritesPage(),
       ),
       GoRoute(
         path: storeDetail,
