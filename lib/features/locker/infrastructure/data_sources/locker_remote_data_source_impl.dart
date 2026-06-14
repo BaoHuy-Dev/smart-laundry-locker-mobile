@@ -62,8 +62,11 @@ class LockerRemoteDataSourceImpl implements LockerRemoteDataSource {
         'id': (item['id'] ?? '').toString(),
         'name': lockerName,
         'address': addr,
-        'latitude': (item['latitude'] as num?)?.toDouble() ?? 0.0,
-        'longitude': (item['longitude'] as num?)?.toDouble() ?? 0.0,
+        // Missing coordinates -> NaN so LockerLocation.hasValidCoordinate is
+        // false and the detail page shows a friendly "no map" message instead
+        // of dropping a pin at (0,0). The list itself only uses name/address.
+        'latitude': (item['latitude'] as num?)?.toDouble() ?? double.nan,
+        'longitude': (item['longitude'] as num?)?.toDouble() ?? double.nan,
         'isActive': status == 'ACTIVE',
       });
     }
