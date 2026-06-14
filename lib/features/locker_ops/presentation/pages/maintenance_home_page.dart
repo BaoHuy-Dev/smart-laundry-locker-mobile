@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
 import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/utils/locker_maps.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/ops_widgets.dart';
 
 /// Home for the MAINTENANCE role: live fault cells and the work queue
@@ -75,6 +76,19 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
     }
   }
 
+  Future<void> _openDirections(Map<String, dynamic> item) async {
+    final opened = await openLockerDirections(
+      latitude: _asDouble(item['lockerLatitude']),
+      longitude: _asDouble(item['lockerLongitude']),
+      address: item['lockerAddress']?.toString(),
+    );
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tủ này chưa có vị trí để chỉ đường.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final openCount = _reports.where((r) => r['status'] != 'RESOLVED').length;
@@ -117,6 +131,8 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
       child: ListView(
         padding: const EdgeInsets.all(12),
         children: [
+          _buildShiftSummary(),
+          const SizedBox(height: 12),
           if (_faults.isNotEmpty) ...[
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
@@ -132,28 +148,79 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
                   borderRadius: BorderRadius.circular(14),
                   side: const BorderSide(color: Color(0xFFFECACA)),
                 ),
-                child: ListTile(
-                  leading: const Icon(
-                    Icons.warning_amber,
-                    color: Color(0xFFDC2626),
-                  ),
-                  title: Text(
-                    '${f['lockerName'] ?? 'Tủ ${f['lockerId']}'} · Ô #${f['boxNumber']} (${f['cellType']})',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                  subtitle: Text(
-                    f['faultReason'] as String? ?? 'Không rõ lý do',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  trailing: TextButton(
-                    onPressed: () => _run(
-                      () => _service.clearFault(f['boxId'] as int),
-                      'Ô đã hoạt động lại',
-                    ),
-                    child: const Text('Đã sửa'),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.warning_amber,
+                            color: Color(0xFFDC2626),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${f['lockerName'] ?? 'Tủ ${f['lockerId']}'} · Ô #${f['boxNumber']} (${f['cellType']})',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                          StatusChip('FAULT'),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        f['faultReason'] as String? ?? 'Không rõ lý do',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      if ((f['lockerAddress'] ?? '').toString().isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on_outlined,
+                                size: 15,
+                                color: opsMutedText,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  f['lockerAddress'].toString(),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: opsMutedText,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          TextButton.icon(
+                            onPressed: () => _openDirections(f),
+                            icon: const Icon(Icons.map_outlined, size: 16),
+                            label: const Text('Chỉ đường'),
+                          ),
+                          TextButton(
+                            onPressed: () => _run(
+                              () => _service.clearFault(f['boxId'] as int),
+                              'Ô đã hoạt động lại',
+                            ),
+                            child: const Text('Đã sửa'),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -171,7 +238,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
               padding: EdgeInsets.all(24),
               child: Center(
                 child: Text(
-                  'Không có phiếu nào 🎉',
+                  'Không có phiếu nào',
                   style: TextStyle(color: Colors.grey),
                 ),
               ),
@@ -179,6 +246,68 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
           for (final r in _reports) _reportCard(r),
         ],
       ),
+    );
+  }
+
+  Widget _buildShiftSummary() {
+    final open = _reports.where((r) => r['status'] == 'OPEN').length;
+    final inProgress = _reports
+        .where((r) => r['status'] == 'IN_PROGRESS')
+        .length;
+    final mineActive = _myReports
+        .where((r) => r['status'] != 'RESOLVED')
+        .length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Tổng quan ca trực',
+          style: TextStyle(fontWeight: FontWeight.w800, color: opsDark),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _MetricCard(
+                label: 'Ô lỗi',
+                value: '${_faults.length}',
+                color: const Color(0xFFDC2626),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _MetricCard(
+                label: 'Phiếu mới',
+                value: '$open',
+                color: const Color(0xFFEA580C),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _MetricCard(
+                label: 'Đang xử lý',
+                value: '$inProgress',
+                color: const Color(0xFFD97706),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _MetricCard(
+                label: 'Của tôi',
+                value: '$mineActive',
+                color: const Color(0xFF2563EB),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        const OpsBanner(
+          text:
+              'Quy trình chuẩn: kiểm tra vị trí tủ, nhận phiếu, tới đúng ô, xác nhận sửa vật lý rồi hoàn tất để clear fault.',
+          icon: Icons.engineering,
+          tone: OpsBannerTone.info,
+        ),
+      ],
     );
   }
 
@@ -218,6 +347,10 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
   Widget _reportCard(Map<String, dynamic> r) {
     final status = r['status'] as String? ?? '';
     final assignedToMe = '${r['assignedToUserId'] ?? ''}' == (_myUserId ?? '');
+    final lockerLabel = r['lockerName'] ?? 'Tủ ${r['lockerId']}';
+    final boxLabel = r['boxNumber'] ?? r['boxId'];
+    final createdAt = _parseDate(r['createdAt']);
+    final ageLabel = createdAt == null ? null : _ageLabel(createdAt);
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 8),
@@ -246,15 +379,68 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
             ),
             const SizedBox(height: 4),
             Text(
-              '${r['description'] ?? ''}\nTủ ${r['lockerId']}'
-              '${r['boxId'] != null ? ' · ô ${r['boxId']}' : ''}'
-              '${r['assignedToUserId'] != null ? ' · KTV #${r['assignedToUserId']}${assignedToMe ? ' (bạn)' : ''}' : ''}',
+              '${r['description'] ?? ''}',
               style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
             const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
               children: [
+                _MiniPill(
+                  icon: Icons.inventory_2_outlined,
+                  text:
+                      '$lockerLabel${boxLabel != null ? ' · ô $boxLabel' : ''}',
+                ),
+                if ((r['cellType'] ?? '').toString().isNotEmpty)
+                  _MiniPill(
+                    icon: Icons.grid_view_outlined,
+                    text: r['cellType'].toString(),
+                  ),
+                if (ageLabel != null)
+                  _MiniPill(
+                    icon: Icons.schedule,
+                    text: ageLabel,
+                    color: _slaColor(createdAt!),
+                  ),
+                if (r['assignedToUserId'] != null)
+                  _MiniPill(
+                    icon: Icons.engineering_outlined,
+                    text:
+                        'KTV #${r['assignedToUserId']}${assignedToMe ? ' (bạn)' : ''}',
+                  ),
+              ],
+            ),
+            if ((r['lockerAddress'] ?? '').toString().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.location_on_outlined,
+                    size: 15,
+                    color: opsMutedText,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      r['lockerAddress'].toString(),
+                      style: const TextStyle(fontSize: 12, color: opsMutedText),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 8),
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                TextButton.icon(
+                  onPressed: () => _openDirections(r),
+                  icon: const Icon(Icons.map_outlined, size: 16),
+                  label: const Text('Chỉ đường'),
+                ),
                 if (status == 'OPEN')
                   TextButton.icon(
                     onPressed: () => _run(
@@ -285,9 +471,122 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
     );
   }
 
+  DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    return DateTime.tryParse('$value')?.toLocal();
+  }
+
+  String _ageLabel(DateTime createdAt) {
+    final age = DateTime.now().difference(createdAt);
+    if (age.inDays > 0) return 'Mở ${age.inDays} ngày';
+    if (age.inHours > 0) return 'Mở ${age.inHours} giờ';
+    if (age.inMinutes > 0) return 'Mở ${age.inMinutes} phút';
+    return 'Vừa mở';
+  }
+
+  Color _slaColor(DateTime createdAt) {
+    final age = DateTime.now().difference(createdAt);
+    if (age.inHours >= 4) return const Color(0xFFDC2626);
+    if (age.inHours >= 1) return const Color(0xFFD97706);
+    return opsPrimary;
+  }
+
   @override
   void dispose() {
     _tabs.dispose();
     super.dispose();
+  }
+}
+
+double? _asDouble(dynamic value) {
+  if (value is double) return value;
+  if (value is num) return value.toDouble();
+  return double.tryParse('$value');
+}
+
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 11,
+              color: opsMutedText,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniPill extends StatelessWidget {
+  const _MiniPill({
+    required this.icon,
+    required this.text,
+    this.color = opsPrimary,
+  });
+
+  final IconData icon;
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

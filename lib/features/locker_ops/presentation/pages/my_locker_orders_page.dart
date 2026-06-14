@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/utils/locker_maps.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/ops_widgets.dart';
 
 /// All locker orders of the signed-in customer, with the full action set gated
@@ -134,7 +135,9 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: const Text('Gia hạn thuê'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -199,7 +202,9 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
             child: const Text('Hủy'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Gửi báo lỗi'),
           ),
@@ -211,6 +216,25 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
         () => _service.reportFault(boxId, reasonCtrl.text.trim()),
         'Đã gửi báo lỗi — đội bảo trì sẽ xử lý',
       );
+    }
+  }
+
+  Future<void> _openLockerDirections(Map<String, dynamic> order) async {
+    final lockerId = _asInt(order['lockerId']);
+    if (lockerId == null) {
+      _snack('Đơn chưa có thông tin tủ.');
+      return;
+    }
+    try {
+      final locker = await _service.locker(lockerId);
+      final opened = await openLockerDirections(
+        latitude: _asDouble(locker['latitude']),
+        longitude: _asDouble(locker['longitude']),
+        address: locker['address']?.toString(),
+      );
+      if (!opened) _snack('Tủ chưa có vị trí để chỉ đường.');
+    } catch (e) {
+      _snack(LockerOpsService.errorMessage(e));
     }
   }
 
@@ -269,6 +293,7 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
               Navigator.pop(ctx);
               await _runAction(() => _service.cancelOrder(id), 'Đã hủy đơn');
             },
+            onDirections: () => _openLockerDirections(order),
           ),
         ),
       ),
@@ -355,6 +380,18 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
   }
 }
 
+int? _asInt(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse('$value');
+}
+
+double? _asDouble(dynamic value) {
+  if (value is double) return value;
+  if (value is num) return value.toDouble();
+  return double.tryParse('$value');
+}
+
 /// Compact order row card.
 class _OrderCard extends StatelessWidget {
   const _OrderCard({required this.order, required this.onTap});
@@ -367,9 +404,8 @@ class _OrderCard extends StatelessWidget {
     final status = order['status'] as String?;
     final boxId = order['sendBoxId'] ?? order['receiveBoxId'];
     final deadline = order['pickupDeadline'];
-    final overdue = isOverdue(deadline) &&
-        status != 'COMPLETED' &&
-        status != 'CANCELED';
+    final overdue =
+        isOverdue(deadline) && status != 'COMPLETED' && status != 'CANCELED';
     final color = statusColor(status);
 
     return OpsCard(
@@ -418,7 +454,11 @@ class _OrderCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(LucideIcons.grid3x3, size: 13, color: opsMutedText),
+                    const Icon(
+                      LucideIcons.grid3x3,
+                      size: 13,
+                      color: opsMutedText,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       'Tủ ${order['lockerId'] ?? '-'} · ô ${boxId ?? '-'}',
@@ -440,7 +480,9 @@ class _OrderCard extends StatelessWidget {
                         fmtRemaining(deadline),
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight: overdue ? FontWeight.w700 : FontWeight.w500,
+                          fontWeight: overdue
+                              ? FontWeight.w700
+                              : FontWeight.w500,
                           color: overdue
                               ? const Color(0xFFDC2626)
                               : opsMutedText,
@@ -458,7 +500,11 @@ class _OrderCard extends StatelessWidget {
             children: [
               StatusChip(status),
               const SizedBox(height: 8),
-              const Icon(LucideIcons.chevronRight, size: 18, color: Color(0xFFCBD5E1)),
+              const Icon(
+                LucideIcons.chevronRight,
+                size: 18,
+                color: Color(0xFFCBD5E1),
+              ),
             ],
           ),
         ],
@@ -477,6 +523,7 @@ class _DetailSheet extends StatelessWidget {
     required this.onExtend,
     required this.onReport,
     required this.onCancel,
+    required this.onDirections,
   });
 
   final Map<String, dynamic> order;
@@ -487,6 +534,7 @@ class _DetailSheet extends StatelessWidget {
   final void Function(int orderId) onExtend;
   final void Function(int boxId) onReport;
   final void Function(int orderId) onCancel;
+  final VoidCallback onDirections;
 
   @override
   Widget build(BuildContext context) {
@@ -497,11 +545,11 @@ class _DetailSheet extends StatelessWidget {
     final isLaundry = type == 'LAUNDRY';
     final boxId = (order['sendBoxId'] ?? order['receiveBoxId']) as int?;
     final deadline = order['pickupDeadline'];
-    final overdue = isOverdue(deadline) &&
-        status != 'COMPLETED' &&
-        status != 'CANCELED';
+    final overdue =
+        isOverdue(deadline) && status != 'COMPLETED' && status != 'CANCELED';
     final extraFee = order['extraFee'];
-    final hasExtra = extraFee != null &&
+    final hasExtra =
+        extraFee != null &&
         (extraFee is num ? extraFee > 0 : num.tryParse('$extraFee') != null);
 
     final actions = <Widget>[
@@ -538,9 +586,7 @@ class _DetailSheet extends StatelessWidget {
           icon: LucideIcons.userPlus,
           onTap: () => onDelegate(id),
         ),
-      if (boxId != null &&
-          status != 'COMPLETED' &&
-          status != 'CANCELED')
+      if (boxId != null && status != 'COMPLETED' && status != 'CANCELED')
         _SheetAction(
           label: 'Báo ô lỗi',
           icon: LucideIcons.triangleAlert,
@@ -553,6 +599,11 @@ class _DetailSheet extends StatelessWidget {
           danger: true,
           onTap: () => onCancel(id),
         ),
+      _SheetAction(
+        label: 'Chỉ đường tới tủ',
+        icon: LucideIcons.map,
+        onTap: onDirections,
+      ),
     ];
 
     return Column(
@@ -567,8 +618,11 @@ class _DetailSheet extends StatelessWidget {
                 color: statusColor(status).withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(typeIcon(order['type'] as String?),
-                  color: statusColor(status), size: 22),
+              child: Icon(
+                typeIcon(order['type'] as String?),
+                color: statusColor(status),
+                size: 22,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -627,8 +681,7 @@ class _DetailSheet extends StatelessWidget {
                 OpsInfoRow(
                   icon: LucideIcons.clock,
                   label: 'Hạn',
-                  value:
-                      '${fmtDateTime(deadline)} · ${fmtRemaining(deadline)}',
+                  value: '${fmtDateTime(deadline)} · ${fmtRemaining(deadline)}',
                   valueColor: overdue ? const Color(0xFFDC2626) : null,
                 ),
               if (hasExtra)

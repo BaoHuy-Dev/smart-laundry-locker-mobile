@@ -40,6 +40,9 @@ class LockerOpsService {
   // ---- Catalogue ----
   Future<List<Map<String, dynamic>>> lockers() => _list('/api/lockers');
 
+  Future<Map<String, dynamic>> locker(int lockerId) =>
+      _map('GET', '/api/lockers/$lockerId');
+
   Future<Map<String, dynamic>> layout(int lockerId) =>
       _map('GET', '/api/lockers/$lockerId/layout');
 
