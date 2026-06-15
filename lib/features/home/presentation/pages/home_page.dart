@@ -20,29 +20,26 @@ import 'package:smart_laundry_locker/features/courier_dispatch/presentation/prov
 import 'package:smart_laundry_locker/features/courier_dispatch/presentation/providers/courier_dispatch_injection.dart';
 import 'package:smart_laundry_locker/features/home/presentation/providers/home_provider.dart';
 import 'package:smart_laundry_locker/features/profile/presentation/providers/profile_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' hide Consumer;
+import 'package:smart_laundry_locker/features/locker/domain/entities/locker_location.dart';
+import 'package:smart_laundry_locker/features/locker/presentation/providers/locker_provider.dart';
+import 'package:smart_laundry_locker/features/locker/presentation/providers/locker_providers.dart';
 import 'package:smart_laundry_locker/features/stores/domain/entities/store.dart';
-import 'package:smart_laundry_locker/features/stores/infrastructure/services/store_service.dart';
-import 'package:smart_laundry_locker/features/stores/infrastructure/services/favorite_stores_service.dart';
+import 'package:smart_laundry_locker/features/stores/presentation/pages/store_lockers_page.dart';
 import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 
-class HomePage extends StatefulWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage>
+class _HomePageState extends ConsumerState<HomePage>
     with SingleTickerProviderStateMixin {
   late final CourierOrdersProvider _courierOrdersProvider;
 
   // Customer-home (RN-style) state.
-  final StoreService _storeService = StoreService(ApiClient());
-  final FavoriteStoresService _favService = FavoriteStoresService();
-  List<Store> _stores = const [];
-  bool _loadingStores = true;
-  String? _storeError;
-  Set<int> _favoriteIds = <int>{};
 
   int _currentBannerIndex = 0;
   Timer? _bannerTimer;
@@ -66,8 +63,7 @@ class _HomePageState extends State<HomePage>
       if (profile.profile == null && !profile.isLoading) {
         profile.loadProfile();
       }
-      _loadStores();
-      _loadFavorites();
+      ref.read(lockerNotifierProvider).getLocations();
     });
   }
 
@@ -84,50 +80,13 @@ class _HomePageState extends State<HomePage>
     });
   }
 
-  Future<void> _loadStores() async {
-    setState(() {
-      _loadingStores = true;
-      _storeError = null;
-    });
-    try {
-      final stores = await _storeService.getStores();
-      if (!mounted) return;
-      setState(() {
-        _stores = stores;
-        _loadingStores = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _storeError = 'Không thể tải danh sách cửa hàng';
-        _loadingStores = false;
-      });
-    }
-  }
-
-  Future<void> _loadFavorites() async {
-    final ids = await _favService.getFavoriteIds();
-    if (!mounted) return;
-    setState(() => _favoriteIds = ids);
-  }
-
-  Future<void> _toggleFavorite(Store store) async {
-    final nowFav = await _favService.toggle(store.id);
-    if (!mounted) return;
-    setState(() {
-      if (nowFav) {
-        _favoriteIds.add(store.id);
-      } else {
-        _favoriteIds.remove(store.id);
-      }
-    });
-  }
-
   Future<void> _onRefresh() async {
     final profile = context.read<ProfileProvider>();
     context.read<NotificationProvider>().loadUnreadCount();
-    await Future.wait<void>([profile.loadProfile(), _loadStores()]);
-    await _loadFavorites();
+    await Future.wait<void>([
+      profile.loadProfile(),
+      ref.read(lockerNotifierProvider).getLocations(refresh: true),
+    ]);
   }
 
   @override
@@ -447,7 +406,10 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildStoreSection(BuildContext context) {
-    if (_loadingStores) {
+    final LockerProvider lockerProvider = ref.watch(lockerNotifierProvider);
+    final LockerState state = lockerProvider.state;
+
+    if (state.isLoading && state.locations.isEmpty) {
       return _storeStateCard(
         const SizedBox(
           height: 120,
@@ -457,16 +419,16 @@ class _HomePageState extends State<HomePage>
         ),
       );
     }
-    if (_storeError != null) {
+    if (state.error != null && state.locations.isEmpty) {
       return _storeStateCard(
         _storeMessage(
           LucideIcons.triangleAlert,
-          _storeError!,
+          state.error!,
           const Color(0xFFE53E3E),
         ),
       );
     }
-    if (_stores.isEmpty) {
+    if (state.locations.isEmpty) {
       return _storeStateCard(
         _storeMessage(
           LucideIcons.store,
@@ -475,7 +437,7 @@ class _HomePageState extends State<HomePage>
         ),
       );
     }
-    return _buildStoreFeatureCard(context, _stores.first);
+    return _buildLockerFeatureCard(context, state.locations.first);
   }
 
   Widget _storeStateCard(Widget child) {
@@ -516,12 +478,78 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildStoreFeatureCard(BuildContext context, Store store) {
-    final isFavorite = _favoriteIds.contains(store.id);
+  static const _gradients = [
+    [Color(0xFF003D5B), Color(0xFF0077B6)],
+    [Color(0xFF0077B6), Color(0xFF00B4D8)],
+    [Color(0xFF059669), Color(0xFF10B981)],
+    [Color(0xFF7C3AED), Color(0xFF8B5CF6)],
+    [Color(0xFFD97706), Color(0xFFF59E0B)],
+    [Color(0xFF0F172A), Color(0xFF334155)],
+  ];
+
+  List<Color> _gradientForLocation(String id) {
+    final hash = id.codeUnits.fold(0, (a, b) => a + b);
+    return _gradients[hash % _gradients.length];
+  }
+
+  String _initialsForName(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    final n = parts.first;
+    return n.length >= 2 ? n.substring(0, 2).toUpperCase() : n.toUpperCase();
+  }
+
+  Widget _gradientThumbnail(List<Color> colors, String initials) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: colors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            initials,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 32,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 2,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Icon(LucideIcons.lockKeyhole, color: Colors.white54, size: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLockerFeatureCard(BuildContext context, LockerLocation location) {
+    final colors = _gradientForLocation(location.id);
+    final initials = _initialsForName(location.name);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: GestureDetector(
-        onTap: () => context.push(AppRouter.storeDetail, extra: store),
+        onTap: () => Navigator.push<void>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => StoreLockerGridPage(
+              store: Store(
+                id: int.tryParse(location.id) ?? 0,
+                name: location.name,
+                address: location.address,
+                latitude: location.latitude,
+                longitude: location.longitude,
+                active: location.isActive,
+              ),
+            ),
+          ),
+        ),
         behavior: HitTestBehavior.opaque,
         child: Container(
           decoration: BoxDecoration(
@@ -548,66 +576,30 @@ class _HomePageState extends State<HomePage>
                     child: SizedBox(
                       height: 180,
                       width: double.infinity,
-                      child: (store.image != null && store.image!.isNotEmpty)
+                      child: (location.imageUrl != null &&
+                              location.imageUrl!.isNotEmpty)
                           ? CachedNetworkImage(
-                              imageUrl: store.image!,
+                              imageUrl: location.imageUrl!,
                               fit: BoxFit.cover,
-                              placeholder: (_, __) => _mapPlaceholder(),
-                              errorWidget: (_, __, ___) => _mapPlaceholder(),
+                              placeholder: (_, __) =>
+                                  _gradientThumbnail(colors, initials),
+                              errorWidget: (_, __, ___) =>
+                                  _gradientThumbnail(colors, initials),
                             )
-                          : _mapPlaceholder(),
+                          : _gradientThumbnail(colors, initials),
                     ),
                   ),
                   Positioned(
                     top: 14,
                     left: 14,
                     child: BrandStatusBadge(
-                      label: store.isActive ? 'Hoạt động' : 'Đóng cửa',
-                      dotColor: store.isActive
+                      label: location.isActive ? 'Hoạt động' : 'Đóng cửa',
+                      dotColor: location.isActive
                           ? AislBrand.statusGreen
                           : Colors.grey,
-                      textColor: store.isActive
+                      textColor: location.isActive
                           ? AislBrand.statusGreenText
                           : Colors.grey.shade700,
-                    ),
-                  ),
-                  Positioned(
-                    top: 14,
-                    right: 14,
-                    child: Row(
-                      children: [
-                        if (store.distanceKm != null) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.95),
-                              borderRadius: BorderRadius.circular(100),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  LucideIcons.mapPin,
-                                  size: 12,
-                                  color: AislBrand.navy,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${store.distanceKm!.toStringAsFixed(1)} km',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: AislBrand.navy,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
                     ),
                   ),
                 ],
@@ -618,7 +610,7 @@ class _HomePageState extends State<HomePage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      store.name,
+                      location.name,
                       style: const TextStyle(
                         fontSize: 19,
                         fontWeight: FontWeight.w800,
@@ -627,63 +619,21 @@ class _HomePageState extends State<HomePage>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      store.address ?? 'Chưa có địa chỉ',
+                      location.address.isNotEmpty
+                          ? location.address
+                          : 'Chưa có địa chỉ',
                       style: const TextStyle(
                         fontSize: 14,
                         color: AislBrand.textMuted,
                         height: 1.4,
                       ),
                     ),
-                    if (store.contactPhone != null &&
-                        store.contactPhone!.isNotEmpty) ...[
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          const Icon(
-                            LucideIcons.phone,
-                            size: 14,
-                            color: AislBrand.textBody,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            store.contactPhone!,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: AislBrand.textBody,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
                   ],
                 ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _mapPlaceholder() {
-    return Container(
-      color: const Color(0xFFF7FAFC),
-      alignment: Alignment.center,
-      child: const Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(LucideIcons.map, size: 40, color: Color(0xFFA0AEC0)),
-          SizedBox(height: 8),
-          Text(
-            'Bản đồ',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFFA0AEC0),
-            ),
-          ),
-        ],
       ),
     );
   }
