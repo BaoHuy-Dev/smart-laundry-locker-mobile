@@ -193,6 +193,14 @@ class LockerOpsService {
     body: {'note': note},
   );
 
+  /// Lịch bảo trì phòng ngừa (mỗi mục kèm cờ `due`).
+  Future<List<Map<String, dynamic>>> maintenanceSchedules() =>
+      _list('/api/maintenance/schedules');
+
+  /// KTV đánh dấu đã kiểm tra xong 1 lịch → dời mốc đến hạn kế tiếp.
+  Future<Map<String, dynamic>> completeSchedule(int scheduleId) =>
+      _map('POST', '/api/maintenance/schedules/$scheduleId/complete');
+
   /// Human-readable message from an [ApiResponse] error payload.
   static String errorMessage(Object error) {
     if (error is DioException) {

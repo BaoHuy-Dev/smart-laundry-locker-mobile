@@ -17,11 +17,12 @@ class MaintenanceHomePage extends StatefulWidget {
 class _MaintenanceHomePageState extends State<MaintenanceHomePage>
     with SingleTickerProviderStateMixin {
   final _service = LockerOpsService();
-  late final TabController _tabs = TabController(length: 3, vsync: this);
+  late final TabController _tabs = TabController(length: 4, vsync: this);
 
   List<Map<String, dynamic>> _faults = [];
   List<Map<String, dynamic>> _reports = [];
   List<Map<String, dynamic>> _myReports = [];
+  List<Map<String, dynamic>> _schedules = [];
   bool _loading = true;
   String? _myUserId;
 
@@ -65,6 +66,11 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
         _myReports = mine;
         _lockers = lockers;
       });
+      // Lịch bảo trì định kỳ — endpoint mới (V6); không để vỡ trang nếu BE chưa deploy.
+      try {
+        final schedules = await _service.maintenanceSchedules();
+        if (mounted) setState(() => _schedules = schedules);
+      } catch (_) {}
       final validSelected = lockers.any(
         (locker) => _asInt(locker['id']) == _selectedLockerId,
       );
@@ -169,6 +175,10 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
               text:
                   'Việc của tôi (${_myReports.where((r) => r['status'] == 'IN_PROGRESS').length})',
             ),
+            Tab(
+              text:
+                  'Định kỳ (${_schedules.where((s) => s['due'] == true).length})',
+            ),
           ],
         ),
       ),
@@ -176,7 +186,12 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
           ? const Center(child: CircularProgressIndicator())
           : TabBarView(
               controller: _tabs,
-              children: [_buildInspect(), _buildQueue(), _buildMine()],
+              children: [
+                _buildInspect(),
+                _buildQueue(),
+                _buildMine(),
+                _buildSchedules(),
+              ],
             ),
     );
   }
@@ -1044,6 +1059,156 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
         ],
       ),
     );
+  }
+
+  // ---- Tab 4: bảo trì định kỳ (preventive) ----
+  Widget _buildSchedules() {
+    final due = _schedules.where((s) => s['due'] == true).toList();
+    final upcoming = _schedules.where((s) => s['due'] != true).toList();
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: opsPrimary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.event_repeat, size: 18, color: opsPrimary),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Lịch kiểm tra định kỳ do quản trị tạo. Khi đến hạn, hãy kiểm '
+                    'tra tủ rồi bấm "Đã kiểm tra" để dời sang mốc kế tiếp.',
+                    style: TextStyle(fontSize: 12, color: opsDark),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_schedules.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(
+                child: Text(
+                  'Chưa có lịch bảo trì định kỳ nào.',
+                  style: TextStyle(color: opsMutedText),
+                ),
+              ),
+            ),
+          if (due.isNotEmpty) ...[
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'Đến hạn',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFDC2626),
+                ),
+              ),
+            ),
+            for (final s in due) _scheduleCard(s, due: true),
+          ],
+          if (upcoming.isNotEmpty) ...[
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('Sắp tới', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            for (final s in upcoming) _scheduleCard(s, due: false),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _scheduleCard(Map<String, dynamic> s, {required bool due}) {
+    final lockerLabel = s['lockerName'] ?? 'Tủ ${s['lockerId']}';
+    final nextDue = _fmtDate(s['nextDueAt']);
+    final lastDone = _fmtDate(s['lastDoneAt']);
+    final id = _asInt(s['id']);
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+          color: due ? const Color(0xFFDC2626) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${s['title'] ?? ''}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                if (due)
+                  const _MiniPill(
+                    icon: Icons.warning_amber_rounded,
+                    text: 'Đến hạn',
+                    color: Color(0xFFDC2626),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                _MiniPill(icon: Icons.inventory_2_outlined, text: '$lockerLabel'),
+                _MiniPill(
+                  icon: Icons.repeat,
+                  text: 'Mỗi ${s['intervalDays']} ngày',
+                ),
+                if (nextDue != null)
+                  _MiniPill(icon: Icons.event, text: 'Hạn: $nextDue'),
+                if (lastDone != null)
+                  _MiniPill(icon: Icons.history, text: 'Lần trước: $lastDone'),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ElevatedButton.icon(
+                onPressed: id == null
+                    ? null
+                    : () => _run(
+                        () => _service.completeSchedule(id),
+                        'Đã ghi nhận kiểm tra — dời lịch kế tiếp',
+                      ),
+                icon: const Icon(Icons.check, size: 16),
+                label: const Text('Đã kiểm tra'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF16A34A),
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String? _fmtDate(dynamic value) {
+    final d = _parseDate(value);
+    if (d == null) return null;
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(d.day)}/${two(d.month)}/${d.year}';
   }
 
   Widget _reportCard(Map<String, dynamic> r) {
