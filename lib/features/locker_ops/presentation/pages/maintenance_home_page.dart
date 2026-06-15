@@ -459,7 +459,14 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
   }
 
   Widget _statusLegend() {
-    const items = <String>['AVAILABLE', 'RESERVED', 'OCCUPIED', 'FAULT'];
+    const items = <String>[
+      'AVAILABLE',
+      'RESERVED',
+      'OCCUPIED',
+      'FAULT',
+      'OUT_OF_SERVICE',
+      'CLEANING',
+    ];
     return Wrap(
       spacing: 10,
       runSpacing: 6,
@@ -491,7 +498,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
     final color = statusColor(cell['status'] as String?);
     final type = cell['cellType'] as String? ?? 'STANDARD';
     return GestureDetector(
-      onTap: () => _faultDialog(cell),
+      onTap: () => _cellActions(cell),
       child: Container(
         margin: const EdgeInsets.all(3),
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
@@ -542,94 +549,154 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
     );
   }
 
-  Future<void> _faultDialog(Map<String, dynamic> cell) async {
-    final isFault = cell['status'] == 'FAULT';
-    final reasonCtrl = TextEditingController(text: 'Hỏng khóa');
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          isFault
-              ? 'Ô #${cell['boxNumber']} đã sửa xong?'
-              : 'Báo hỏng ô #${cell['boxNumber']}?',
-        ),
-        content: isFault
-            ? Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Trạng thái hiện tại: ${statusLabel(cell['status'] as String?)}',
-                  ),
-                  const SizedBox(height: 8),
-                  Text('Lý do trước đó: ${cell['faultReason'] ?? '-'}'),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Chỉ mở lại ô sau khi đã sửa vật lý, kiểm tra khóa/cảm biến và đảm bảo ô sẵn sàng phục vụ.',
-                    style: TextStyle(fontSize: 12, color: opsMutedText),
-                  ),
-                ],
-              )
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Ô ${_cellTypeLabel(cell['cellType'] as String?)} · ${statusLabel(cell['status'] as String?)}',
-                    style: const TextStyle(fontSize: 12, color: opsMutedText),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: reasonCtrl,
-                    decoration: const InputDecoration(labelText: 'Lý do hỏng'),
-                    minLines: 1,
-                    maxLines: 3,
-                  ),
-                ],
-              ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isFault
-                  ? const Color(0xFF16A34A)
-                  : const Color(0xFFDC2626),
-              foregroundColor: Colors.white,
-            ),
-            child: Text(isFault ? 'Mở lại ô' : 'Báo hỏng'),
-          ),
-        ],
-      ),
-    );
-    final reason = reasonCtrl.text.trim();
-    reasonCtrl.dispose();
-    if (confirmed != true) return;
-    if (!isFault && reason.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Vui lòng nhập lý do hỏng.')),
-        );
-      }
-      return;
-    }
+  /// Bottom sheet hành động cho 1 ô, tuỳ theo trạng thái hiện tại của ô.
+  Future<void> _cellActions(Map<String, dynamic> cell) async {
     final boxId = _asInt(cell['id']);
     if (boxId == null) return;
-    try {
-      if (isFault) {
-        await _service.clearFault(boxId);
-      } else {
-        await _service.reportFault(boxId, reason);
-      }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isFault ? 'Ô đã hoạt động lại' : 'Đã báo hỏng ô'),
+    final status = cell['status'] as String? ?? 'AVAILABLE';
+    final color = statusColor(status);
+    final reason = cell['faultReason'] as String?;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) {
+        Widget tile(IconData icon, String label, Color c, VoidCallback onTap) {
+          return ListTile(
+            leading: Icon(icon, color: c),
+            title: Text(
+              label,
+              style: TextStyle(color: c, fontWeight: FontWeight.w600),
+            ),
+            onTap: () {
+              Navigator.pop(sheetCtx);
+              onTap();
+            },
+          );
+        }
+
+        final actions = <Widget>[];
+        switch (status) {
+          case 'FAULT':
+            actions.add(tile(
+              Icons.check_circle,
+              'Đã sửa xong — mở lại ô',
+              const Color(0xFF16A34A),
+              () => _runCellAction(
+                () => _service.clearFault(boxId),
+                'Ô đã hoạt động lại',
+              ),
+            ));
+            break;
+          case 'OUT_OF_SERVICE':
+          case 'CLEANING':
+            actions.add(tile(
+              Icons.restart_alt,
+              status == 'CLEANING' ? 'Hoàn tất vệ sinh' : 'Khôi phục ô',
+              const Color(0xFF16A34A),
+              () => _runCellAction(
+                () => _service.returnToService(boxId),
+                'Ô đã hoạt động lại',
+              ),
+            ));
+            break;
+          case 'OCCUPIED':
+          case 'RESERVED':
+            actions.add(tile(
+              Icons.report_problem,
+              'Báo hỏng ô',
+              const Color(0xFFDC2626),
+              () => _reportFaultFlow(cell),
+            ));
+            break;
+          default: // AVAILABLE và các trạng thái khác
+            actions.add(tile(
+              Icons.report_problem,
+              'Báo hỏng ô',
+              const Color(0xFFDC2626),
+              () => _reportFaultFlow(cell),
+            ));
+            actions.add(tile(
+              Icons.do_not_disturb_on,
+              'Ngưng dùng ô',
+              const Color(0xFF6B7280),
+              () => _outOfServiceFlow(cell),
+            ));
+            actions.add(tile(
+              Icons.cleaning_services,
+              'Đánh dấu đang vệ sinh',
+              const Color(0xFF0891B2),
+              () => _runCellAction(
+                () => _service.cleaning(boxId),
+                'Ô đang vệ sinh',
+              ),
+            ));
+        }
+
+        return SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '#${cell['boxNumber']}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                title: Text(
+                  'Ô #${cell['boxNumber']} · ${_cellTypeLabel(cell['cellType'] as String?)}',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: Text(
+                  'Trạng thái: ${statusLabel(status)}'
+                  '${(reason != null && reason.isNotEmpty) ? ' · $reason' : ''}',
+                ),
+              ),
+              const Divider(height: 1),
+              ...actions,
+              const SizedBox(height: 8),
+            ],
           ),
         );
+      },
+    );
+  }
+
+  /// Chạy 1 thao tác đổi trạng thái ô + báo kết quả + reload danh sách.
+  Future<void> _runCellAction(
+    Future<dynamic> Function() action,
+    String successMsg,
+  ) async {
+    try {
+      await action();
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(successMsg)));
       }
       await _load();
     } catch (e) {
@@ -639,6 +706,105 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
         );
       }
     }
+  }
+
+  /// Dialog nhập lý do rồi báo hỏng ô.
+  Future<void> _reportFaultFlow(Map<String, dynamic> cell) async {
+    final boxId = _asInt(cell['id']);
+    if (boxId == null) return;
+    final reasonCtrl = TextEditingController(text: 'Hỏng khóa');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Báo hỏng ô #${cell['boxNumber']}'),
+        content: TextField(
+          controller: reasonCtrl,
+          decoration: const InputDecoration(labelText: 'Lý do hỏng'),
+          minLines: 1,
+          maxLines: 3,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Báo hỏng'),
+          ),
+        ],
+      ),
+    );
+    final reason = reasonCtrl.text.trim();
+    reasonCtrl.dispose();
+    if (ok != true) return;
+    if (reason.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Vui lòng nhập lý do hỏng.')),
+        );
+      }
+      return;
+    }
+    await _runCellAction(
+      () => _service.reportFault(boxId, reason),
+      'Đã báo hỏng ô',
+    );
+  }
+
+  /// Dialog xác nhận (lý do tuỳ chọn) rồi ngưng dùng ô.
+  Future<void> _outOfServiceFlow(Map<String, dynamic> cell) async {
+    final boxId = _asInt(cell['id']);
+    if (boxId == null) return;
+    final reasonCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Ngưng dùng ô #${cell['boxNumber']}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Ô sẽ bị loại khỏi phân phối cho khách tới khi được khôi phục.',
+              style: TextStyle(fontSize: 12, color: opsMutedText),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: reasonCtrl,
+              decoration: const InputDecoration(labelText: 'Lý do (tùy chọn)'),
+              minLines: 1,
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6B7280),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Ngưng dùng'),
+          ),
+        ],
+      ),
+    );
+    final reason = reasonCtrl.text.trim();
+    reasonCtrl.dispose();
+    if (ok != true) return;
+    await _runCellAction(
+      () => _service.outOfService(boxId, reason: reason.isEmpty ? null : reason),
+      'Đã ngưng dùng ô',
+    );
   }
 
   Widget _buildQueue() {
