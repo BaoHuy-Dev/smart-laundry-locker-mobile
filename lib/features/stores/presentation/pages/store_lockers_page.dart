@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:smart_laundry_locker/core/routing/app_router.dart';
 import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/rent_locker_page.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/send_parcel_page.dart';
 import 'package:smart_laundry_locker/features/stores/domain/entities/store.dart';
 import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 
@@ -63,7 +63,7 @@ class _StoreLockerGridPageState extends State<StoreLockerGridPage> {
           BrandHeroHeader(
             title: 'Tủ locker',
             subtitle: widget.store.name,
-            onBack: () => context.pop(),
+            onBack: () => Navigator.pop(context),
           ),
           if (!_loading && _error == null && _lockers.isNotEmpty)
             _SummaryBanner(count: _lockers.length),
@@ -404,22 +404,26 @@ class _LockerCardState extends State<_LockerCard> {
         storeName: widget.storeName,
         onRent: () {
           Navigator.pop(ctx);
-          ctx.push(
-            AppRouter.rentLocker,
-            extra: {
-              'initialLockerId': _lockerId,
-              'locationName': widget.storeName,
-            },
+          Navigator.push<void>(
+            ctx,
+            MaterialPageRoute(
+              builder: (_) => RentLockerPage(
+                initialLockerId: _lockerId,
+                locationName: widget.storeName,
+              ),
+            ),
           );
         },
         onSend: () {
           Navigator.pop(ctx);
-          ctx.push(
-            AppRouter.sendParcel,
-            extra: {
-              'initialLockerId': _lockerId,
-              'locationName': widget.storeName,
-            },
+          Navigator.push<void>(
+            ctx,
+            MaterialPageRoute(
+              builder: (_) => SendParcelPage(
+                initialLockerId: _lockerId,
+                locationName: widget.storeName,
+              ),
+            ),
           );
         },
       ),

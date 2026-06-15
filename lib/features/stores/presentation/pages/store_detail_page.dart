@@ -8,6 +8,7 @@ import 'package:smart_laundry_locker/core/routing/app_router.dart';
 import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:smart_laundry_locker/features/stores/domain/entities/store.dart';
 import 'package:smart_laundry_locker/features/stores/infrastructure/services/store_service.dart';
+import 'package:smart_laundry_locker/features/stores/presentation/pages/store_lockers_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Store detail screen: store info + customer ratings.
@@ -276,8 +277,12 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () =>
-                      context.push(AppRouter.storeLockers, extra: store),
+                  onPressed: () => Navigator.push<void>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => StoreLockerGridPage(store: store),
+                    ),
+                  ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AISLShadcnTheme.navyPrimary,
                     side: const BorderSide(color: Color(0xFFCBD5E1)),
