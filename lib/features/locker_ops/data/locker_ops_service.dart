@@ -145,6 +145,22 @@ class LockerOpsService {
   Future<Map<String, dynamic>> clearFault(int boxId) =>
       _map('POST', '/api/maintenance/boxes/$boxId/clear-fault');
 
+  /// Ngưng dùng ô có chủ đích (bảo trì/đóng). Ô bị loại khỏi mọi reserve.
+  Future<Map<String, dynamic>> outOfService(int boxId, {String? reason}) =>
+      _map(
+        'POST',
+        '/api/maintenance/boxes/$boxId/out-of-service',
+        body: reason == null ? null : {'reason': reason},
+      );
+
+  /// Đưa ô vào trạng thái đang vệ sinh/khử khuẩn.
+  Future<Map<String, dynamic>> cleaning(int boxId) =>
+      _map('POST', '/api/maintenance/boxes/$boxId/cleaning');
+
+  /// Khôi phục ô từ OUT_OF_SERVICE/CLEANING về AVAILABLE.
+  Future<Map<String, dynamic>> returnToService(int boxId) =>
+      _map('POST', '/api/maintenance/boxes/$boxId/return-to-service');
+
   /// Human-readable message from an [ApiResponse] error payload.
   static String errorMessage(Object error) {
     if (error is DioException) {
