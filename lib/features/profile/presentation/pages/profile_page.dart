@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:smart_laundry_locker/core/constants/app_strings.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
 import 'package:smart_laundry_locker/features/notifications/presentation/providers/notification_provider.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
@@ -23,7 +22,7 @@ import 'package:smart_laundry_locker/features/profile/presentation/widgets/profi
 import 'package:smart_laundry_locker/features/profile/presentation/widgets/profile_menu_item.dart';
 import 'package:smart_laundry_locker/features/staff_application/presentation/providers/staff_application_injection.dart';
 import 'package:smart_laundry_locker/features/staff_application/presentation/providers/staff_application_provider.dart';
-import 'package:smart_laundry_locker/shared/shared.dart';
+import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:provider/provider.dart';
@@ -257,16 +256,14 @@ class _ProfilePageState extends State<ProfilePage>
     // Show loading
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: Colors.white,
-        body: CustomScrollView(
-          slivers: [
-            CustomSliverAppBar(
-              title: AppStrings.profile,
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.black87,
-              automaticallyImplyLeading: false,
+        backgroundColor: const Color(0xFFF2F4F7),
+        body: const Column(
+          children: [
+            BrandHeroHeader(
+              title: 'Hồ sơ',
+              subtitle: 'Quản lý tài khoản của bạn',
             ),
-            const SliverFillRemaining(
+            Expanded(
               child: Center(child: CircularProgressIndicator()),
             ),
           ],
@@ -286,93 +283,66 @@ class _ProfilePageState extends State<ProfilePage>
     }
 
     return Scaffold(
-      backgroundColor: Colors.white,
-
+      backgroundColor: const Color(0xFFF2F4F7),
       body: MultiProvider(
         providers: [
           ChangeNotifierProvider.value(value: _delegationProvider),
           ChangeNotifierProvider.value(value: _staffApplicationProvider),
         ],
-        child: RefreshIndicator(
-          onRefresh: () async {
-            await _loadUserProfile(forceRefresh: true);
-          },
-          color: Colors.blue,
-          backgroundColor: Colors.white,
-          displacement: MediaQuery.of(context).padding.top + 40,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              CustomSliverAppBar(
-                title: AppStrings.profile,
-                backgroundColor: Colors.white,
-                foregroundColor: Colors.black87,
-                automaticallyImplyLeading: false,
-                actions: _isLoggedIn
-                    ? [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                          child: IconButton(
-                            icon: const Icon(LucideIcons.pencil, size: 16),
-                            onPressed: _handleEditProfile,
-                            color: Colors.black87,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                        ),
-                      ]
-                    : null,
+        child: Column(
+          children: [
+            BrandHeroHeader(
+              title: 'Hồ sơ',
+              subtitle: 'Quản lý tài khoản của bạn',
+              trailing: BrandCircleIconButton(
+                icon: LucideIcons.pencil,
+                onTap: _handleEditProfile,
+                iconSize: 16,
               ),
+            ),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  await _loadUserProfile(forceRefresh: true);
+                },
+                color: AISLShadcnTheme.navyPrimary,
+                backgroundColor: Colors.white,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 16),
 
-              // Profile content
-              SliverToBoxAdapter(
-                child: Column(
-                  children: [
-                    const SizedBox(height: 16),
+                      if (_userData != null)
+                        ProfileHeader(
+                          user: _userData!,
+                          avatarVersion: 0,
+                          localAvatarFile: localAvatarFile,
+                          isAvatarSyncing: isAvatarSyncing,
+                          showSaveAvatarButton: localAvatarFile != null,
+                          onEditAvatar: handleAvatarSelection,
+                          onSaveAvatar: uploadAvatarImage,
+                          onCancelAvatar: cancelAvatarSelection,
+                        ),
 
-                    // Profile header
-                    if (_isLoggedIn && _userData != null)
-                      ProfileHeader(
-                        user: _userData!,
-                        avatarVersion: 0,
-                        localAvatarFile: localAvatarFile,
-                        isAvatarSyncing: isAvatarSyncing,
-                        showSaveAvatarButton: localAvatarFile != null,
-                        onEditAvatar: handleAvatarSelection,
-                        onSaveAvatar: uploadAvatarImage,
-                        onCancelAvatar: cancelAvatarSelection,
-                      ),
+                      const SizedBox(height: 24),
 
-                    const SizedBox(height: 24),
-
-                    // Menu items
-                    _buildMenuSection(),
-                    // Add some bottom padding
-                    const SizedBox(height: 100),
-                  ],
+                      _buildMenuSection(),
+                      const SizedBox(height: 100),
+                    ],
+                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildMenuSection() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
+    return Column(
+      children: [
           // Account section
           _buildMenuGroup(
             title: 'Tài khoản',
@@ -690,7 +660,6 @@ class _ProfilePageState extends State<ProfilePage>
 
           const SizedBox(height: 8),
         ],
-      ),
     );
   }
 
