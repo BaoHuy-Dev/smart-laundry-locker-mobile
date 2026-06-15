@@ -807,6 +807,26 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
     );
   }
 
+  /// Mở nhật ký xử lý (work-log) của 1 phiếu để xem + thêm ghi chú tiến trình.
+  Future<void> _reportLogSheet(Map<String, dynamic> report) async {
+    final reportId = _asInt(report['id']);
+    if (reportId == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _RepairLogSheet(
+        reportId: reportId,
+        service: _service,
+        title: '#${report['id']} · ${report['title'] ?? ''}',
+      ),
+    );
+    if (mounted) await _load();
+  }
+
   Widget _buildQueue() {
     return RefreshIndicator(
       onRefresh: _load,
@@ -1123,6 +1143,11 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
                   icon: const Icon(Icons.map_outlined, size: 16),
                   label: const Text('Chỉ đường'),
                 ),
+                TextButton.icon(
+                  onPressed: () => _reportLogSheet(r),
+                  icon: const Icon(Icons.history_edu_outlined, size: 16),
+                  label: const Text('Nhật ký'),
+                ),
                 if (status == 'OPEN')
                   TextButton.icon(
                     onPressed: () => _run(
@@ -1177,6 +1202,208 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
   void dispose() {
     _tabs.dispose();
     super.dispose();
+  }
+}
+
+/// Bottom sheet xem + thêm nhật ký xử lý (work-log) cho một phiếu bảo trì.
+class _RepairLogSheet extends StatefulWidget {
+  const _RepairLogSheet({
+    required this.reportId,
+    required this.service,
+    required this.title,
+  });
+
+  final int reportId;
+  final LockerOpsService service;
+  final String title;
+
+  @override
+  State<_RepairLogSheet> createState() => _RepairLogSheetState();
+}
+
+class _RepairLogSheetState extends State<_RepairLogSheet> {
+  final _noteCtrl = TextEditingController();
+  List<Map<String, dynamic>> _logs = const [];
+  bool _loading = true;
+  bool _sending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final logs = await widget.service.reportLogs(widget.reportId);
+      if (!mounted) return;
+      setState(() {
+        _logs = logs;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _add() async {
+    final note = _noteCtrl.text.trim();
+    if (note.isEmpty) return;
+    setState(() => _sending = true);
+    try {
+      await widget.service.addReportLog(widget.reportId, note);
+      _noteCtrl.clear();
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(LockerOpsService.errorMessage(e))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  String _fmt(dynamic value) {
+    final d = DateTime.tryParse('$value')?.toLocal();
+    if (d == null) return '';
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(d.hour)}:${two(d.minute)} ${two(d.day)}/${two(d.month)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.history_edu_outlined,
+                    size: 18,
+                    color: opsMutedText,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Nhật ký xử lý · ${widget.title}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Flexible(
+              child: _loading
+                  ? const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : _logs.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'Chưa có ghi chú nào. Thêm bước xử lý đầu tiên bên dưới.',
+                        style: TextStyle(color: opsMutedText),
+                      ),
+                    )
+                  : ListView.separated(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 8,
+                      ),
+                      itemCount: _logs.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (_, i) {
+                        final log = _logs[i];
+                        return Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('${log['note'] ?? ''}'),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${_fmt(log['createdAt'])}'
+                                '${log['actorUserId'] != null ? ' · KTV #${log['actorUserId']}' : ''}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: opsMutedText,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _noteCtrl,
+                      minLines: 1,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        hintText: 'Thêm bước xử lý / ghi chú...',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    onPressed: _sending ? null : _add,
+                    icon: _sending
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.send),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
