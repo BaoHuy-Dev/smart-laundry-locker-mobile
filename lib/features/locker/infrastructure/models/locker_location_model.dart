@@ -17,6 +17,9 @@ class LockerLocationModel {
   @JsonKey(name: 'isActive', defaultValue: true)
   final bool isActive;
 
+  @JsonKey(name: 'imageUrl')
+  final String? imageUrl;
+
   @JsonKey(name: 'createdAt')
   final DateTime? createdAt;
 
@@ -31,6 +34,7 @@ class LockerLocationModel {
     required this.longitude,
     this.description,
     this.isActive = true,
+    this.imageUrl,
     this.createdAt,
     this.updatedAt,
   });
@@ -52,6 +56,7 @@ class LockerLocationModel {
       longitude: longitude,
       description: description,
       isActive: isActive,
+      imageUrl: imageUrl,
       createdAt: createdAt,
       updatedAt: updatedAt,
     );
@@ -67,6 +72,7 @@ class LockerLocationModel {
       longitude: entity.longitude,
       description: entity.description,
       isActive: entity.isActive,
+      imageUrl: entity.imageUrl,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
     );

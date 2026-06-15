@@ -15,6 +15,7 @@ LockerLocationModel _$LockerLocationModelFromJson(Map<String, dynamic> json) =>
       longitude: (json['longitude'] as num).toDouble(),
       description: json['description'] as String?,
       isActive: json['isActive'] as bool? ?? true,
+      imageUrl: json['imageUrl'] as String?,
       createdAt: json['createdAt'] == null
           ? null
           : DateTime.parse(json['createdAt'] as String),
@@ -33,6 +34,7 @@ Map<String, dynamic> _$LockerLocationModelToJson(
   'longitude': instance.longitude,
   'description': instance.description,
   'isActive': instance.isActive,
+  'imageUrl': instance.imageUrl,
   'createdAt': instance.createdAt?.toIso8601String(),
   'updatedAt': instance.updatedAt?.toIso8601String(),
 };
