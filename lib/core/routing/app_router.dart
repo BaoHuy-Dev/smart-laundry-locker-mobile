@@ -56,6 +56,7 @@ import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/my_l
 import 'package:smart_laundry_locker/features/stores/domain/entities/store.dart';
 import 'package:smart_laundry_locker/features/stores/presentation/pages/stores_page.dart';
 import 'package:smart_laundry_locker/features/stores/presentation/pages/store_detail_page.dart';
+import 'package:smart_laundry_locker/features/stores/presentation/pages/store_lockers_page.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -101,6 +102,7 @@ class AppRouter {
   static const String myLockerOrders = '/locker/my-orders';
   static const String stores = '/stores';
   static const String storeDetail = '/stores/detail';
+  static const String storeLockers = '/stores/lockers';
   static const String directions = '/directions';
 
   static final GlobalKey<NavigatorState> navigatorKey =
@@ -179,7 +181,15 @@ class AppRouter {
       GoRoute(
         path: userLaundryOrder,
         name: 'user_laundry_order',
-        builder: (context, state) => const UserLaundryOrderPage(),
+        builder: (context, state) {
+          final map = state.extra is Map<String, dynamic>
+              ? state.extra as Map<String, dynamic>
+              : null;
+          return UserLaundryOrderPage(
+            initialLockerId: map?['initialLockerId'] as int?,
+            locationName: map?['locationName'] as String?,
+          );
+        },
       ),
       ShellRoute(
         builder: (context, state, child) {
@@ -419,12 +429,28 @@ class AppRouter {
       GoRoute(
         path: sendParcel,
         name: 'send_parcel',
-        builder: (context, state) => const SendParcelPage(),
+        builder: (context, state) {
+          final map = state.extra is Map<String, dynamic>
+              ? state.extra as Map<String, dynamic>
+              : null;
+          return SendParcelPage(
+            initialLockerId: map?['initialLockerId'] as int?,
+            locationName: map?['locationName'] as String?,
+          );
+        },
       ),
       GoRoute(
         path: rentLocker,
         name: 'rent_locker',
-        builder: (context, state) => const RentLockerPage(),
+        builder: (context, state) {
+          final map = state.extra is Map<String, dynamic>
+              ? state.extra as Map<String, dynamic>
+              : null;
+          return RentLockerPage(
+            initialLockerId: map?['initialLockerId'] as int?,
+            locationName: map?['locationName'] as String?,
+          );
+        },
       ),
       GoRoute(
         path: myLockerOrders,
@@ -456,6 +482,14 @@ class AppRouter {
             return StoreDetailPage(storeId: id);
           }
           return const StoresPage();
+        },
+      ),
+      GoRoute(
+        path: storeLockers,
+        name: 'store_lockers',
+        builder: (context, state) {
+          final store = state.extra as Store;
+          return StoreLockerGridPage(store: store);
         },
       ),
       GoRoute(

@@ -40,6 +40,9 @@ class LockerOpsService {
   // ---- Catalogue ----
   Future<List<Map<String, dynamic>>> lockers() => _list('/api/lockers');
 
+  Future<List<Map<String, dynamic>>> lockersByStore(int storeId) =>
+      _list('/api/lockers', query: {'storeId': storeId});
+
   Future<Map<String, dynamic>> locker(int lockerId) =>
       _map('GET', '/api/lockers/$lockerId');
 
@@ -55,6 +58,7 @@ class LockerOpsService {
     required String receiverPhone,
     String? receiverName,
     String? note,
+    String? promotionCode,
   }) => _map(
     'POST',
     '/api/orders/send',
@@ -63,6 +67,9 @@ class LockerOpsService {
       'receiverPhone': receiverPhone,
       'receiverName': receiverName,
       'note': note,
+      // Forward-compatible: backend ignores unknown fields today; will apply
+      // once the send DTO accepts a promotion code.
+      if (promotionCode != null) 'promotionCode': promotionCode,
     },
   );
 
@@ -71,6 +78,7 @@ class LockerOpsService {
     required String cellType,
     required int hours,
     String? note,
+    String? promotionCode,
   }) => _map(
     'POST',
     '/api/orders/rental',
@@ -79,8 +87,22 @@ class LockerOpsService {
       'cellType': cellType,
       'hours': hours,
       'note': note,
+      if (promotionCode != null) 'promotionCode': promotionCode,
     },
   );
+
+  // ---- Promotions / loyalty / payments ----
+  /// Validate a promo code. Returns `{code, valid, promotion:{...}}`.
+  Future<Map<String, dynamic>> validatePromotion(String code) =>
+      _map('GET', '/api/promotions/validate/$code');
+
+  /// Current user's loyalty account: `{id, userId, points, stamps, tier}`.
+  Future<Map<String, dynamic>> loyaltyPoints() =>
+      _map('GET', '/api/loyalty/points');
+
+  /// Payments recorded for an order (latest first by convention).
+  Future<List<Map<String, dynamic>>> paymentsByOrder(int orderId) =>
+      _list('/api/payments/order/$orderId');
 
   Future<Map<String, dynamic>> confirmDrop(int orderId) =>
       _map('PUT', '/api/orders/$orderId/confirm');

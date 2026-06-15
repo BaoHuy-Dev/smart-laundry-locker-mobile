@@ -11,6 +11,7 @@ class LockerLocation {
   final double longitude;
   final String? description;
   final bool isActive;
+  final String? imageUrl;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -22,6 +23,7 @@ class LockerLocation {
     required this.longitude,
     this.description,
     this.isActive = true,
+    this.imageUrl,
     this.createdAt,
     this.updatedAt,
   });
@@ -60,6 +62,7 @@ class LockerLocation {
     double? longitude,
     String? description,
     bool? isActive,
+    String? imageUrl,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -71,6 +74,7 @@ class LockerLocation {
       longitude: longitude ?? this.longitude,
       description: description ?? this.description,
       isActive: isActive ?? this.isActive,
+      imageUrl: imageUrl ?? this.imageUrl,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

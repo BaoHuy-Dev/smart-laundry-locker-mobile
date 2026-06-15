@@ -546,3 +546,42 @@ class AccessCredentials extends StatelessWidget {
     );
   }
 }
+
+/// Compact chip shown at the top of an order form when the flow was opened
+/// from a specific locker location ("Đặt dịch vụ" sheet) so the user sees
+/// which place they are ordering at.
+class LocationHint extends StatelessWidget {
+  const LocationHint({super.key, required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: opsPrimary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: opsPrimary.withValues(alpha: 0.20)),
+      ),
+      child: Row(
+        children: [
+          const Icon(LucideIcons.mapPin, size: 16, color: opsPrimary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Tại: $name',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: opsDark,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

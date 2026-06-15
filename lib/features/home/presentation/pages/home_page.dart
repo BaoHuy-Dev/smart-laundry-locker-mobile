@@ -178,14 +178,12 @@ class _HomePageState extends State<HomePage>
             const SizedBox(height: 24),
             _buildWelcomeCard(context),
             const SizedBox(height: 28),
-            _buildServicesSection(context),
-            const SizedBox(height: 28),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: BrandSectionHeader(
                 icon: LucideIcons.store,
                 title: 'Các nơi đặt locker',
-                onSeeAll: () => context.push(AppRouter.stores),
+                onSeeAll: () => context.go(AppRouter.lockers),
               ),
             ),
             const SizedBox(height: 16),
@@ -443,159 +441,6 @@ class _HomePageState extends State<HomePage>
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildServicesSection(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Dịch vụ tiện ích',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AislBrand.textTitle,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _actionCard(
-                  'Thuê tủ',
-                  'An toàn',
-                  LucideIcons.key,
-                  const Color(0xFFF0F7FF),
-                  AislBrand.blue,
-                  () => context.push(AppRouter.rentLocker),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _actionCard(
-                  'Gửi hàng',
-                  'Nhanh chóng',
-                  LucideIcons.send,
-                  const Color(0xFFF3FAF4),
-                  const Color(0xFF16A34A),
-                  () => context.push(AppRouter.sendParcel),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _actionCard(
-                  'Lấy hàng',
-                  'Tiện lợi',
-                  LucideIcons.packageOpen,
-                  const Color(0xFFFFF8F0),
-                  const Color(0xFFEA8A1E),
-                  () => context.push(AppRouter.lockerOtp),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _actionCard(
-                  'Đơn tủ',
-                  'Theo dõi',
-                  LucideIcons.package,
-                  const Color(0xFFFFF4F6),
-                  const Color(0xFFE91E63),
-                  () => context.push(AppRouter.myLockerOrders),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _actionCard(
-                  'Ủy quyền',
-                  'Mở tủ hộ',
-                  LucideIcons.lockOpen,
-                  const Color(0xFFEFF6FF),
-                  AislBrand.navy,
-                  () => context.push(AppRouter.authorizedOpening),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _actionCard(
-                  'Giặt đồ',
-                  'Tạo đơn',
-                  LucideIcons.washingMachine,
-                  const Color(0xFFF4F7FF),
-                  AislBrand.blue,
-                  () => context.push(AppRouter.userLaundryOrder),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _actionCard(
-    String title,
-    String subtitle,
-    IconData icon,
-    Color bgColor,
-    Color iconColor,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        height: 122,
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.75),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: iconColor.withValues(alpha: 0.2),
-                    blurRadius: 8,
-                    spreadRadius: 1,
-                  ),
-                ],
-              ),
-              child: Icon(icon, color: iconColor, size: 26),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: AislBrand.textTitle,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
         ),
       ),
     );

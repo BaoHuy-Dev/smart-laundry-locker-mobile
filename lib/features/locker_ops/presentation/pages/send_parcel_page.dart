@@ -7,13 +7,30 @@ import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/locker_picker.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/ops_widgets.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/order_extras.dart';
 
 /// SEND flow (gửi hàng C2C qua tủ).
 /// Stage 1: tạo đơn + nhận PIN bỏ hàng. Stage 2: xác nhận đã bỏ hàng → PIN
 /// nhận hàng được sinh mới và gửi cho người nhận (đúng luồng PIN 2 giai đoạn
 /// của backend `order-service`).
 class SendParcelPage extends StatefulWidget {
-  const SendParcelPage({super.key});
+  const SendParcelPage({
+    super.key,
+    this.initialLockerId,
+    this.initialLockerName,
+    this.locationName,
+  });
+
+  /// Pre-selected locker (cabinet) id — set when opened from the cell grid.
+  /// When non-null the locker picker is hidden and the API load is skipped.
+  final int? initialLockerId;
+
+  /// Display name of the cabinet (e.g. "Tu demo capstone 3x3 + vali").
+  /// Shown in the read-only locker card when [initialLockerId] is set.
+  final String? initialLockerName;
+
+  /// Display name of the store/location (shown as a location hint row).
+  final String? locationName;
 
   @override
   State<SendParcelPage> createState() => _SendParcelPageState();
@@ -26,16 +43,28 @@ class _SendParcelPageState extends State<SendParcelPage> {
   final _nameCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
 
+  static const _fee = 15000;
+
   List<Map<String, dynamic>> _lockers = [];
   int? _lockerId;
   bool _loadingLockers = true;
   bool _loading = false;
   Map<String, dynamic>? _order;
+  int _discount = 0;
+  String? _promoCode;
+
+  int get _netFee => (_fee - _discount).clamp(0, _fee);
 
   @override
   void initState() {
     super.initState();
-    _loadLockers();
+    if (widget.initialLockerId != null) {
+      // Đến từ lưới ô — tủ đã xác định, bỏ qua gọi API load danh sách tủ.
+      _lockerId = widget.initialLockerId;
+      _loadingLockers = false;
+    } else {
+      _loadLockers();
+    }
   }
 
   @override
@@ -52,7 +81,12 @@ class _SendParcelPageState extends State<SendParcelPage> {
       if (!mounted) return;
       setState(() {
         _lockers = lockers.where((l) => l['status'] == 'ACTIVE').toList();
-        if (_lockers.isNotEmpty) _lockerId = _lockers.first['id'] as int?;
+        final preset = widget.initialLockerId;
+        if (preset != null && _lockers.any((l) => l['id'] == preset)) {
+          _lockerId = preset;
+        } else if (_lockers.isNotEmpty) {
+          _lockerId = _lockers.first['id'] as int?;
+        }
         _loadingLockers = false;
       });
     } catch (e) {
@@ -75,6 +109,7 @@ class _SendParcelPageState extends State<SendParcelPage> {
         receiverName:
             _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
         note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+        promotionCode: _promoCode,
       );
       if (!mounted) return;
       setState(() => _order = order);
@@ -138,13 +173,20 @@ class _SendParcelPageState extends State<SendParcelPage> {
                 'hệ thống sinh PIN mới gửi người nhận để họ tới lấy.',
             icon: LucideIcons.packagePlus,
           ),
+          if (widget.locationName != null) ...[
+            const SizedBox(height: 12),
+            LocationHint(name: widget.locationName!),
+          ],
           const SizedBox(height: 20),
           const OpsSectionLabel('Chọn tủ', icon: LucideIcons.warehouse),
-          LockerPickerField(
-            lockers: _lockers,
-            selectedId: _lockerId,
-            onSelected: (l) => setState(() => _lockerId = l['id'] as int?),
-          ),
+          if (widget.initialLockerId != null)
+            _lockedLockerCard()
+          else
+            LockerPickerField(
+              lockers: _lockers,
+              selectedId: _lockerId,
+              onSelected: (l) => setState(() => _lockerId = l['id'] as int?),
+            ),
           const SizedBox(height: 20),
           const OpsSectionLabel('Người nhận', icon: LucideIcons.userRound),
           _field(
@@ -171,6 +213,17 @@ class _SendParcelPageState extends State<SendParcelPage> {
             icon: LucideIcons.pencil,
             maxLines: 2,
           ),
+          const SizedBox(height: 20),
+          const OpsSectionLabel('Mã giảm giá', icon: LucideIcons.ticket),
+          PromoCodeField(
+            orderTotal: _fee,
+            onChanged: (discount, code) => setState(() {
+              _discount = discount;
+              _promoCode = code;
+            }),
+          ),
+          const SizedBox(height: 10),
+          const LoyaltyPointsHint(),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -178,8 +231,19 @@ class _SendParcelPageState extends State<SendParcelPage> {
               const SizedBox(width: 6),
               const Text('Phí gửi', style: TextStyle(color: opsMutedText)),
               const Spacer(),
+              if (_discount > 0) ...[
+                Text(
+                  fmtPrice(_fee),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: opsMutedText,
+                    decoration: TextDecoration.lineThrough,
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
               Text(
-                fmtPrice(15000),
+                fmtPrice(_netFee),
                 style: const TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 16,
@@ -196,6 +260,56 @@ class _SendParcelPageState extends State<SendParcelPage> {
             onPressed: _create,
           ),
         ].animate(interval: 40.ms).fadeIn(duration: 250.ms).slideY(begin: 0.06),
+      ),
+    );
+  }
+
+  Widget _lockedLockerCard() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: opsBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: opsPrimary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(LucideIcons.warehouse, color: opsPrimary, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.initialLockerName ?? widget.locationName ?? 'Tủ đã chọn',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14.5,
+                    color: opsDark,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (widget.locationName != null)
+                  Text(
+                    widget.locationName!,
+                    style: const TextStyle(fontSize: 12, color: opsMutedText),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
+          ),
+          const Icon(LucideIcons.lockKeyhole, size: 18, color: opsMutedText),
+        ],
       ),
     );
   }
@@ -231,6 +345,13 @@ class _SendParcelPageState extends State<SendParcelPage> {
                 ],
               ),
               const Divider(height: 24, color: opsBorder),
+              if (order['id'] is int) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: PaymentStatusChip(orderId: order['id'] as int),
+                ),
+                const SizedBox(height: 14),
+              ],
               if (!isDropped) ...[
                 _ResultHeadline(
                   icon: LucideIcons.packageOpen,

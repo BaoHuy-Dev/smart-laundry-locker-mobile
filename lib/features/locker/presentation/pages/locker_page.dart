@@ -1,6 +1,7 @@
 import 'package:smart_laundry_locker/features/locker/domain/entities/locker_location.dart';
-import 'package:smart_laundry_locker/features/locker/presentation/pages/locker_detail_map_page.dart';
 import 'package:smart_laundry_locker/features/locker/presentation/pages/locker_map_page.dart';
+import 'package:smart_laundry_locker/features/stores/domain/entities/store.dart';
+import 'package:smart_laundry_locker/features/stores/presentation/pages/store_lockers_page.dart';
 import 'package:smart_laundry_locker/features/locker/presentation/providers/locker_provider.dart';
 import 'package:smart_laundry_locker/features/locker/presentation/providers/locker_providers.dart';
 import 'package:smart_laundry_locker/features/locker/presentation/widgets/locker_item.dart';
@@ -8,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/location_services.dart';
 import 'package:smart_laundry_locker/shared/widgets/unauthenticated_placeholder.dart';
 import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 
@@ -72,10 +74,19 @@ class _LockerPageState extends ConsumerState<LockerPage> {
   }
 
   void _navigateToMap(LockerLocation location) {
-    Navigator.push(
+    Navigator.push<void>(
       context,
       MaterialPageRoute(
-        builder: (context) => LockerDetailMapPage(location: location),
+        builder: (_) => StoreLockerGridPage(
+          store: Store(
+            id: int.tryParse(location.id) ?? 0,
+            name: location.name,
+            address: location.address,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            active: location.isActive,
+          ),
+        ),
       ),
     );
   }
@@ -152,6 +163,10 @@ class _LockerPageState extends ConsumerState<LockerPage> {
                     ),
                   ),
                 ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 4, 20, 10),
+                child: LockerUtilitiesRow(),
               ),
               Expanded(child: _buildLocationsList(state)),
             ],

@@ -6,11 +6,33 @@ import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/locker_picker.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/ops_widgets.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/order_extras.dart';
 
 /// RENTAL flow: chọn tủ + loại ô + thời lượng, trả tiền theo giờ, PIN dùng
 /// nhiều lần tới hết hạn thuê (khớp `order-service` createRental/extend/end).
 class RentLockerPage extends StatefulWidget {
-  const RentLockerPage({super.key});
+  const RentLockerPage({
+    super.key,
+    this.initialLockerId,
+    this.initialLockerName,
+    this.locationName,
+    this.initialCellType,
+  });
+
+  /// Pre-selected locker (cabinet) id — set when opened from the cell grid.
+  /// When non-null the locker picker is hidden and the API load is skipped.
+  final int? initialLockerId;
+
+  /// Display name of the cabinet (e.g. "Tu demo capstone 3x3 + vali").
+  /// Shown in the read-only locker card when [initialLockerId] is set.
+  final String? initialLockerName;
+
+  /// Display name of the store/location (shown as a location hint row).
+  final String? locationName;
+
+  /// Pre-selected cell type ('STANDARD' or 'XL') when opened from a specific
+  /// cell in the locker grid. When set, the "Loại ô" selector is hidden.
+  final String? initialCellType;
 
   @override
   State<RentLockerPage> createState() => _RentLockerPageState();
@@ -30,11 +52,20 @@ class _RentLockerPageState extends State<RentLockerPage> {
   bool _loadingLockers = true;
   bool _loading = false;
   Map<String, dynamic>? _order;
+  int _discount = 0;
+  String? _promoCode;
 
   @override
   void initState() {
     super.initState();
-    _loadLockers();
+    if (widget.initialCellType != null) _cellType = widget.initialCellType!;
+    if (widget.initialLockerId != null) {
+      // Đến từ lưới ô — tủ đã xác định, bỏ qua gọi API load danh sách tủ.
+      _lockerId = widget.initialLockerId;
+      _loadingLockers = false;
+    } else {
+      _loadLockers();
+    }
   }
 
   @override
@@ -49,7 +80,12 @@ class _RentLockerPageState extends State<RentLockerPage> {
       if (!mounted) return;
       setState(() {
         _lockers = lockers.where((l) => l['status'] == 'ACTIVE').toList();
-        if (_lockers.isNotEmpty) _lockerId = _lockers.first['id'] as int?;
+        final preset = widget.initialLockerId;
+        if (preset != null && _lockers.any((l) => l['id'] == preset)) {
+          _lockerId = preset;
+        } else if (_lockers.isNotEmpty) {
+          _lockerId = _lockers.first['id'] as int?;
+        }
         _loadingLockers = false;
       });
     } catch (e) {
@@ -61,6 +97,8 @@ class _RentLockerPageState extends State<RentLockerPage> {
 
   int get _price => (_rates[_cellType] ?? 5000) * _hours.round();
 
+  int get _netPrice => (_price - _discount).clamp(0, _price);
+
   Future<void> _create() async {
     if (_lockerId == null) return;
     setState(() => _loading = true);
@@ -70,6 +108,7 @@ class _RentLockerPageState extends State<RentLockerPage> {
         cellType: _cellType,
         hours: _hours.round(),
         note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+        promotionCode: _promoCode,
       );
       if (!mounted) return;
       setState(() => _order = order);
@@ -128,34 +167,44 @@ class _RentLockerPageState extends State<RentLockerPage> {
               'lần trong suốt kỳ thuê.',
           icon: LucideIcons.lockKeyhole,
         ),
+        if (widget.locationName != null) ...[
+          const SizedBox(height: 12),
+          LocationHint(name: widget.locationName!),
+        ],
         const SizedBox(height: 20),
         const OpsSectionLabel('Chọn tủ', icon: LucideIcons.warehouse),
-        LockerPickerField(
-          lockers: _lockers,
-          selectedId: _lockerId,
-          onSelected: (l) => setState(() => _lockerId = l['id'] as int?),
-        ),
+        if (widget.initialLockerId != null)
+          _lockedLockerCard()
+        else
+          LockerPickerField(
+            lockers: _lockers,
+            selectedId: _lockerId,
+            onSelected: (l) => setState(() => _lockerId = l['id'] as int?),
+          ),
         const SizedBox(height: 20),
         const OpsSectionLabel('Loại ô', icon: LucideIcons.boxes),
-        Row(
-          children: [
-            _cellCard(
-              value: 'STANDARD',
-              icon: LucideIcons.box,
-              title: 'Ô thường',
-              size: '45 × 30 × 50 cm',
-              rate: '5.000đ/giờ',
-            ),
-            const SizedBox(width: 12),
-            _cellCard(
-              value: 'XL',
-              icon: LucideIcons.luggage,
-              title: 'Ô vali (XL)',
-              size: '30 × 80 × 40 cm',
-              rate: '10.000đ/giờ',
-            ),
-          ],
-        ),
+        if (widget.initialCellType != null)
+          _lockedCellTypeCard(_cellType)
+        else
+          Row(
+            children: [
+              _cellCard(
+                value: 'STANDARD',
+                icon: LucideIcons.box,
+                title: 'Ô thường',
+                size: '45 × 30 × 50 cm',
+                rate: '5.000đ/giờ',
+              ),
+              const SizedBox(width: 12),
+              _cellCard(
+                value: 'XL',
+                icon: LucideIcons.luggage,
+                title: 'Ô vali (XL)',
+                size: '30 × 80 × 40 cm',
+                rate: '10.000đ/giờ',
+              ),
+            ],
+          ),
         const SizedBox(height: 20),
         const OpsSectionLabel('Thời gian thuê', icon: LucideIcons.timer),
         Wrap(
@@ -210,6 +259,17 @@ class _RentLockerPageState extends State<RentLockerPage> {
           ),
         ),
         const SizedBox(height: 16),
+        const OpsSectionLabel('Mã giảm giá', icon: LucideIcons.ticket),
+        PromoCodeField(
+          orderTotal: _price,
+          onChanged: (discount, code) => setState(() {
+            _discount = discount;
+            _promoCode = code;
+          }),
+        ),
+        const SizedBox(height: 10),
+        const LoyaltyPointsHint(),
+        const SizedBox(height: 16),
         _priceCard(),
         const SizedBox(height: 20),
         OpsPrimaryButton(
@@ -246,16 +306,39 @@ class _RentLockerPageState extends State<RentLockerPage> {
                 '${typeLabel('RENTAL')} · ${_hours.round()} giờ',
                 style: const TextStyle(color: Colors.white, fontSize: 12),
               ),
+              if (_discount > 0)
+                Text(
+                  'Giảm: -${fmtPrice(_discount)}',
+                  style: const TextStyle(
+                    color: Color(0xFF86EFAC),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
             ],
           ),
           const Spacer(),
-          Text(
-            fmtPrice(_price),
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-              fontSize: 22,
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (_discount > 0)
+                Text(
+                  fmtPrice(_price),
+                  style: const TextStyle(
+                    color: Colors.white60,
+                    fontSize: 13,
+                    decoration: TextDecoration.lineThrough,
+                  ),
+                ),
+              Text(
+                fmtPrice(_netPrice),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 22,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -338,6 +421,101 @@ class _RentLockerPageState extends State<RentLockerPage> {
     );
   }
 
+  Widget _lockedLockerCard() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: opsBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: opsPrimary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(LucideIcons.warehouse, color: opsPrimary, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.initialLockerName ?? widget.locationName ?? 'Tủ đã chọn',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14.5,
+                    color: opsDark,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (widget.locationName != null)
+                  Text(
+                    widget.locationName!,
+                    style: const TextStyle(fontSize: 12, color: opsMutedText),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
+          ),
+          const Icon(LucideIcons.lockKeyhole, size: 18, color: opsMutedText),
+        ],
+      ),
+    );
+  }
+
+  Widget _lockedCellTypeCard(String cellType) {
+    final isXl = cellType == 'XL';
+    final icon = isXl ? LucideIcons.luggage : LucideIcons.box;
+    final title = isXl ? 'Ô vali (XL)' : 'Ô thường';
+    final size = isXl ? '30 × 80 × 40 cm' : '45 × 30 × 50 cm';
+    final rate = isXl ? '10.000đ/giờ' : '5.000đ/giờ';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: opsPrimary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: opsPrimary, width: 1.8),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: opsPrimary, size: 22),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: opsDark,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(size, style: const TextStyle(fontSize: 11, color: opsMutedText)),
+                const SizedBox(height: 2),
+                Text(
+                  rate,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: opsDark),
+                ),
+              ],
+            ),
+          ),
+          const Icon(LucideIcons.lockKeyhole, size: 16, color: opsMutedText),
+        ],
+      ),
+    );
+  }
+
   Widget _buildResult() {
     final order = _order!;
     final status = order['status'] as String?;
@@ -364,6 +542,13 @@ class _RentLockerPageState extends State<RentLockerPage> {
                 ],
               ),
               const Divider(height: 24, color: opsBorder),
+              if (order['id'] is int) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: PaymentStatusChip(orderId: order['id'] as int),
+                ),
+                const SizedBox(height: 14),
+              ],
               _ResultHeadline(
                 icon: started ? LucideIcons.lockKeyhole : LucideIcons.packageOpen,
                 title: started ? 'Kỳ thuê đang chạy' : 'Đã giữ ô — bỏ đồ vào',

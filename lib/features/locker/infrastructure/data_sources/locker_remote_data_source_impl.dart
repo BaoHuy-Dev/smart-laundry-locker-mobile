@@ -34,12 +34,37 @@ class LockerRemoteDataSourceImpl implements LockerRemoteDataSource {
   /// paging/search). We fetch all lockers, map each to the location model with
   /// null-safe defaults, and filter client-side. Shared by the customer /
   /// courier / default location listings so the "Tủ" tab works for any role.
+  ///
+  /// Also fetches GET /api/stores once to resolve store images by storeId so
+  /// each locker card can display the store photo — same images as the home page.
   Future<LocationsResponse> _fetchLockerLocations({String? search}) async {
-    final response = await _apiClient.get<dynamic>('/api/lockers');
-    final raw = response.data;
+    final lockersResp = await _apiClient.get<dynamic>('/api/lockers');
+    final raw = lockersResp.data;
     final List<dynamic> items = raw is Map<String, dynamic>
         ? (raw['data'] as List<dynamic>? ?? const <dynamic>[])
         : (raw is List ? raw : const <dynamic>[]);
+
+    // Build storeId → imageUrl map; ignore failures (images are optional).
+    final Map<String, String> storeImages = {};
+    try {
+      final storesResp = await _apiClient.get<dynamic>('/api/stores');
+      final storeRaw = storesResp.data;
+      if (storeRaw != null) {
+        final List<dynamic> storeItems = storeRaw is Map<String, dynamic>
+            ? (storeRaw['data'] as List<dynamic>? ?? const <dynamic>[])
+            : (storeRaw is List ? storeRaw : const <dynamic>[]);
+        for (final s in storeItems) {
+          if (s is! Map<String, dynamic>) continue;
+          final sid = s['id']?.toString();
+          final img = (s['image'] ?? s['imageUrl']) as String?;
+          if (sid != null && img != null && img.isNotEmpty) {
+            storeImages[sid] = img;
+          }
+        }
+      }
+    } catch (_) {
+      // Store images not critical — list works fine without them.
+    }
 
     final query = (search ?? '').trim().toLowerCase();
 
@@ -50,6 +75,7 @@ class LockerRemoteDataSourceImpl implements LockerRemoteDataSource {
       final lockerName = (item['name'] ?? code).toString();
       final addr = (item['address'] ?? '').toString();
       final status = (item['status'] ?? 'ACTIVE').toString().toUpperCase();
+      final storeId = item['storeId']?.toString();
 
       if (query.isNotEmpty &&
           !lockerName.toLowerCase().contains(query) &&
@@ -68,6 +94,8 @@ class LockerRemoteDataSourceImpl implements LockerRemoteDataSource {
         'latitude': (item['latitude'] as num?)?.toDouble() ?? double.nan,
         'longitude': (item['longitude'] as num?)?.toDouble() ?? double.nan,
         'isActive': status == 'ACTIVE',
+        if (storeId != null && storeImages.containsKey(storeId))
+          'imageUrl': storeImages[storeId],
       });
     }
 
