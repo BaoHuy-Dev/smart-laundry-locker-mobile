@@ -161,6 +161,16 @@ class LockerOpsService {
   Future<Map<String, dynamic>> returnToService(int boxId) =>
       _map('POST', '/api/maintenance/boxes/$boxId/return-to-service');
 
+  /// Nhật ký xử lý của 1 phiếu bảo trì (work-log nhiều bước).
+  Future<List<Map<String, dynamic>>> reportLogs(int reportId) =>
+      _list('/api/maintenance/reports/$reportId/logs');
+
+  Future<Map<String, dynamic>> addReportLog(int reportId, String note) => _map(
+    'POST',
+    '/api/maintenance/reports/$reportId/logs',
+    body: {'note': note},
+  );
+
   /// Human-readable message from an [ApiResponse] error payload.
   static String errorMessage(Object error) {
     if (error is DioException) {
