@@ -392,7 +392,16 @@ class _LockerCardState extends State<_LockerCard> {
     );
   }
 
+  String _cellTypeForBooking(Map<String, dynamic> cell) {
+    final explicit = (cell['cellType'] as String?)?.toUpperCase();
+    if (explicit == 'XL') return 'XL';
+    final size = (cell['size'] as String?)?.toUpperCase() ?? '';
+    if (size == 'LARGE') return 'XL';
+    return 'STANDARD';
+  }
+
   void _showBookingSheet(BuildContext ctx, Map<String, dynamic> cell) {
+    final cellType = _cellTypeForBooking(cell);
     showModalBottomSheet<void>(
       context: ctx,
       isScrollControlled: true,
@@ -409,7 +418,9 @@ class _LockerCardState extends State<_LockerCard> {
             MaterialPageRoute(
               builder: (_) => RentLockerPage(
                 initialLockerId: _lockerId,
+                initialLockerName: _lockerName,
                 locationName: widget.storeName,
+                initialCellType: cellType,
               ),
             ),
           );
@@ -421,6 +432,7 @@ class _LockerCardState extends State<_LockerCard> {
             MaterialPageRoute(
               builder: (_) => SendParcelPage(
                 initialLockerId: _lockerId,
+                initialLockerName: _lockerName,
                 locationName: widget.storeName,
               ),
             ),
@@ -481,7 +493,8 @@ class _CellGrid extends StatelessWidget {
                         child: cell != null
                             ? _CellTile(
                                 cell: cell,
-                                onTap: cell['status'] == 'AVAILABLE'
+                                onTap: cell['status'] == 'AVAILABLE' &&
+                                        cell['cellType'] != 'DRONE'
                                     ? () => onCellTap(cell)
                                     : null,
                               )
@@ -515,6 +528,11 @@ class _GridLegend extends StatelessWidget {
           _LegendDot(color: _CellPalette.reserved, label: 'Đã đặt'),
           _LegendDot(color: _CellPalette.fault, label: 'Lỗi'),
           _LegendDot(color: _CellPalette.cleaning, label: 'Bảo trì'),
+          _LegendDot(
+            color: _CellPalette.drone,
+            label: 'Drone',
+            icon: Icons.flight_rounded,
+          ),
         ],
       ),
     );
@@ -522,23 +540,26 @@ class _GridLegend extends StatelessWidget {
 }
 
 class _LegendDot extends StatelessWidget {
-  const _LegendDot({required this.color, required this.label});
+  const _LegendDot({required this.color, required this.label, this.icon});
   final Color color;
   final String label;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(3),
-          ),
-        ),
+        icon != null
+            ? Icon(icon, color: color, size: 12)
+            : Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
         const SizedBox(width: 4),
         Text(
           label,
@@ -558,6 +579,8 @@ abstract class _CellPalette {
   static const Color fault = Color(0xFFEF4444);
   static const Color cleaning = Color(0xFF60A5FA);
   static const Color outOfService = Color(0xFF9CA3AF);
+  // Ô drone: tím indigo — phân biệt rõ với ô thường dù status AVAILABLE
+  static const Color drone = Color(0xFF6366F1);
 }
 
 class _CellTile extends StatelessWidget {
@@ -566,15 +589,21 @@ class _CellTile extends StatelessWidget {
   final VoidCallback? onTap;
 
   String get _status => (cell['status'] as String?) ?? '';
+  String get _cellType => (cell['cellType'] as String?) ?? 'STANDARD';
+  bool get _isDrone => _cellType == 'DRONE';
+  bool get _isAvailable => _status == 'AVAILABLE';
 
-  Color get _bg => switch (_status) {
-    'AVAILABLE' => _CellPalette.available,
-    'OCCUPIED' || 'IN_USE' => _CellPalette.occupied,
-    'RESERVED' => _CellPalette.reserved,
-    'FAULT' => _CellPalette.fault,
-    'CLEANING' => _CellPalette.cleaning,
-    _ => _CellPalette.outOfService,
-  };
+  Color get _bg {
+    if (_isDrone) return _CellPalette.drone;
+    return switch (_status) {
+      'AVAILABLE' => _CellPalette.available,
+      'OCCUPIED' || 'IN_USE' => _CellPalette.occupied,
+      'RESERVED' => _CellPalette.reserved,
+      'FAULT' => _CellPalette.fault,
+      'CLEANING' => _CellPalette.cleaning,
+      _ => _CellPalette.outOfService,
+    };
+  }
 
   Color get _fg {
     if (_status == 'OCCUPIED' || _status == 'IN_USE') {
@@ -587,12 +616,8 @@ class _CellTile extends StatelessWidget {
     'SMALL' => 'S',
     'MEDIUM' => 'M',
     'LARGE' => 'L',
-    _ => (cell['cellType'] as String? ?? '?')
-        .substring(0, 1)
-        .toUpperCase(),
+    _ => (cell['cellType'] as String? ?? '?').substring(0, 1).toUpperCase(),
   };
-
-  bool get _isAvailable => _status == 'AVAILABLE';
 
   @override
   Widget build(BuildContext context) {
@@ -604,7 +629,7 @@ class _CellTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: _bg,
           borderRadius: BorderRadius.circular(11),
-          boxShadow: _isAvailable
+          boxShadow: (_isAvailable && !_isDrone)
               ? [
                   BoxShadow(
                     color: _CellPalette.available.withValues(alpha: 0.35),
@@ -612,33 +637,66 @@ class _CellTile extends StatelessWidget {
                     offset: const Offset(0, 2),
                   ),
                 ]
-              : null,
+              : _isDrone
+                  ? [
+                      BoxShadow(
+                        color: _CellPalette.drone.withValues(alpha: 0.30),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              _sizeLabel,
-              style: TextStyle(
-                color: _fg,
-                fontWeight: FontWeight.w800,
-                fontSize: 17,
-              ),
-            ),
-            if (_isAvailable) ...[
-              const SizedBox(height: 2),
-              Text(
-                'Trống',
-                style: TextStyle(
-                  color: _fg.withValues(alpha: 0.85),
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ],
-        ),
+        child: _isDrone ? _buildDroneContent() : _buildStandardContent(),
       ),
+    );
+  }
+
+  /// Ô drone — icon máy bay không người lái, không có label "Trống"
+  Widget _buildDroneContent() {
+    return const Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.flight_rounded, color: Colors.white, size: 20),
+        SizedBox(height: 2),
+        Text(
+          'Drone',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 8,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Ô thường — chữ kích cỡ + "Trống" nếu AVAILABLE
+  Widget _buildStandardContent() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          _sizeLabel,
+          style: TextStyle(
+            color: _fg,
+            fontWeight: FontWeight.w800,
+            fontSize: 17,
+          ),
+        ),
+        if (_isAvailable) ...[
+          const SizedBox(height: 2),
+          Text(
+            'Trống',
+            style: TextStyle(
+              color: _fg.withValues(alpha: 0.85),
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

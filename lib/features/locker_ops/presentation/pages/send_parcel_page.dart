@@ -14,12 +14,22 @@ import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/or
 /// nhận hàng được sinh mới và gửi cho người nhận (đúng luồng PIN 2 giai đoạn
 /// của backend `order-service`).
 class SendParcelPage extends StatefulWidget {
-  const SendParcelPage({super.key, this.initialLockerId, this.locationName});
+  const SendParcelPage({
+    super.key,
+    this.initialLockerId,
+    this.initialLockerName,
+    this.locationName,
+  });
 
-  /// Pre-selected locker id when opened from a location's "Đặt dịch vụ" sheet.
+  /// Pre-selected locker (cabinet) id — set when opened from the cell grid.
+  /// When non-null the locker picker is hidden and the API load is skipped.
   final int? initialLockerId;
 
-  /// Display name of the location the user picked (shown as a hint).
+  /// Display name of the cabinet (e.g. "Tu demo capstone 3x3 + vali").
+  /// Shown in the read-only locker card when [initialLockerId] is set.
+  final String? initialLockerName;
+
+  /// Display name of the store/location (shown as a location hint row).
   final String? locationName;
 
   @override
@@ -48,7 +58,13 @@ class _SendParcelPageState extends State<SendParcelPage> {
   @override
   void initState() {
     super.initState();
-    _loadLockers();
+    if (widget.initialLockerId != null) {
+      // Đến từ lưới ô — tủ đã xác định, bỏ qua gọi API load danh sách tủ.
+      _lockerId = widget.initialLockerId;
+      _loadingLockers = false;
+    } else {
+      _loadLockers();
+    }
   }
 
   @override
@@ -163,11 +179,14 @@ class _SendParcelPageState extends State<SendParcelPage> {
           ],
           const SizedBox(height: 20),
           const OpsSectionLabel('Chọn tủ', icon: LucideIcons.warehouse),
-          LockerPickerField(
-            lockers: _lockers,
-            selectedId: _lockerId,
-            onSelected: (l) => setState(() => _lockerId = l['id'] as int?),
-          ),
+          if (widget.initialLockerId != null)
+            _lockedLockerCard()
+          else
+            LockerPickerField(
+              lockers: _lockers,
+              selectedId: _lockerId,
+              onSelected: (l) => setState(() => _lockerId = l['id'] as int?),
+            ),
           const SizedBox(height: 20),
           const OpsSectionLabel('Người nhận', icon: LucideIcons.userRound),
           _field(
@@ -241,6 +260,56 @@ class _SendParcelPageState extends State<SendParcelPage> {
             onPressed: _create,
           ),
         ].animate(interval: 40.ms).fadeIn(duration: 250.ms).slideY(begin: 0.06),
+      ),
+    );
+  }
+
+  Widget _lockedLockerCard() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: opsBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: opsPrimary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(LucideIcons.warehouse, color: opsPrimary, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.initialLockerName ?? widget.locationName ?? 'Tủ đã chọn',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14.5,
+                    color: opsDark,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (widget.locationName != null)
+                  Text(
+                    widget.locationName!,
+                    style: const TextStyle(fontSize: 12, color: opsMutedText),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
+          ),
+          const Icon(LucideIcons.lockKeyhole, size: 18, color: opsMutedText),
+        ],
       ),
     );
   }
