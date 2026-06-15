@@ -1099,11 +1099,19 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
                     icon: Icons.grid_view_outlined,
                     text: r['cellType'].toString(),
                   ),
+                if (r['overdue'] == true)
+                  const _MiniPill(
+                    icon: Icons.warning_amber_rounded,
+                    text: 'Quá hạn SLA',
+                    color: Color(0xFFDC2626),
+                  ),
                 if (ageLabel != null)
                   _MiniPill(
                     icon: Icons.schedule,
                     text: ageLabel,
-                    color: _slaColor(createdAt!),
+                    color: r['overdue'] == true
+                        ? const Color(0xFFDC2626)
+                        : _slaColor(createdAt!),
                   ),
                 if (r['assignedToUserId'] != null)
                   _MiniPill(
