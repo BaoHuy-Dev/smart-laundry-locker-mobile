@@ -134,7 +134,9 @@ class _HomePageState extends ConsumerState<HomePage>
             _buildHeader(context),
             const SizedBox(height: 20),
             _buildChips(context),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+            _buildWalletCard(context),
+            const SizedBox(height: 20),
             _buildWelcomeCard(context),
             const SizedBox(height: 28),
             Padding(
@@ -224,6 +226,99 @@ class _HomePageState extends ConsumerState<HomePage>
               ),
               _buildBell(context),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWalletCard(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Consumer<WalletProvider>(
+        builder: (context, wallet, _) => GestureDetector(
+          onTap: () async {
+            await context.push(AppRouter.topUp);
+            if (context.mounted) wallet.getWalletBalance();
+          },
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color.fromARGB(255, 124, 185, 216), Color.fromARGB(255, 185, 218, 236)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: AislBrand.navy.withValues(alpha: 0.22),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    LucideIcons.wallet,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Số dư ví',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white70,
+                        ),
+                      ),
+                      Text(
+                        CurrencyFormatter.formatVnd(wallet.balance),
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.30),
+                    ),
+                  ),
+                  child: const Text(
+                    'Nạp tiền',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
