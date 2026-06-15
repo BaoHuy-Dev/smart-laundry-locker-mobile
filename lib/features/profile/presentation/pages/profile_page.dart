@@ -265,6 +265,7 @@ class _ProfilePageState extends State<ProfilePage>
               title: AppStrings.profile,
               backgroundColor: Colors.white,
               foregroundColor: Colors.black87,
+              automaticallyImplyLeading: false,
             ),
             const SliverFillRemaining(
               child: Center(child: CircularProgressIndicator()),
@@ -285,6 +286,7 @@ class _ProfilePageState extends State<ProfilePage>
               title: AppStrings.profile,
               backgroundColor: Colors.white,
               foregroundColor: Colors.black87,
+              automaticallyImplyLeading: false,
             ),
             SliverFillRemaining(
               child: Column(
@@ -337,6 +339,7 @@ class _ProfilePageState extends State<ProfilePage>
                 title: AppStrings.profile,
                 backgroundColor: Colors.white,
                 foregroundColor: Colors.black87,
+                automaticallyImplyLeading: false,
                 actions: _isLoggedIn
                     ? [
                         Container(

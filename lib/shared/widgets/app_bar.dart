@@ -21,6 +21,7 @@ class CustomSliverAppBar extends StatelessWidget {
   final bool pinned;
   final bool floating;
   final bool stretch;
+  final bool automaticallyImplyLeading;
 
   const CustomSliverAppBar({
     super.key,
@@ -36,6 +37,7 @@ class CustomSliverAppBar extends StatelessWidget {
     this.pinned = true,
     this.floating = false,
     this.stretch = true,
+    this.automaticallyImplyLeading = true,
   });
 
   @override
@@ -52,7 +54,7 @@ class CustomSliverAppBar extends StatelessWidget {
       // Prevents color change on scroll
       shadowColor: Colors.transparent,
       // Prevents shadow color changes
-      automaticallyImplyLeading: showBackButton || leading != null,
+      automaticallyImplyLeading: automaticallyImplyLeading && (showBackButton || leading != null),
       leading: leading ?? (showBackButton ? _buildBackButton(context) : null),
       actions: actions != null
           ? [...actions!, const SizedBox(width: 10)]

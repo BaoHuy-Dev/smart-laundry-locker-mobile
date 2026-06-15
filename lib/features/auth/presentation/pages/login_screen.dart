@@ -12,13 +12,13 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 /// guides (HANDOFF_CODEX / RUN_RESULT).
 const List<({String label, String email, String password})> _kDemoAccounts = [
   (label: 'Khách hàng', email: 'demo@laundry.test', password: 'secret123'),
-  (label: 'Quản lý', email: 'manager@laundry.test', password: 'Manager@123456'),
+  (label: 'Quản lý', email: 'manager@laundry.test', password: 'secret123'),
   (
     label: 'Bảo trì',
     email: 'maintenance@laundry.test',
-    password: 'Maint@123456',
+    password: 'secret123',
   ),
-  (label: 'Admin', email: 'admin@laundry.test', password: 'Admin@123456'),
+  (label: 'Admin', email: 'admin@laundry.test', password: 'secret123'),
 ];
 
 class LoginScreen extends StatefulWidget {
