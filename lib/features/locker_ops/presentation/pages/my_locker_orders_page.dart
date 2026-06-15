@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
+
 import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/utils/locker_maps.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/ops_widgets.dart';
+import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 
 /// All locker orders of the signed-in customer, with the full action set gated
 /// to the backend state machine: confirm drop, pickup/complete, delegate,
@@ -20,7 +21,7 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
   final _service = LockerOpsService();
   List<Map<String, dynamic>> _orders = [];
   bool _loading = true;
-  String _filter = 'ACTIVE';
+  String _typeFilter = 'ALL';
 
   @override
   void initState() {
@@ -42,13 +43,47 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
   }
 
   List<Map<String, dynamic>> get _visible {
-    const done = {'COMPLETED', 'CANCELED'};
     return _orders.where((o) {
-      final status = o['status'] as String? ?? '';
-      return _filter == 'ACTIVE'
-          ? !done.contains(status)
-          : done.contains(status);
+      final type = (o['type'] as String? ?? '').toUpperCase();
+      return _typeFilter == 'ALL' || type == _typeFilter;
     }).toList();
+  }
+
+  static DateTime? _parseOrderDate(Map<String, dynamic> o) {
+    final raw = o['createdAt'] ?? o['updatedAt'] ?? o['pickupDeadline'];
+    if (raw == null) return null;
+    return DateTime.tryParse('$raw')?.toLocal();
+  }
+
+  static String _dateGroupLabel(DateTime d) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(d.year, d.month, d.day);
+    final diff = today.difference(day).inDays;
+    if (diff == 0) return 'Hôm nay';
+    if (diff == 1) return 'Hôm qua';
+    return '${d.day} tháng ${d.month}, ${d.year}';
+  }
+
+  /// Orders grouped by date label, sorted newest-first within each group.
+  List<MapEntry<String, List<Map<String, dynamic>>>> get _groupedOrders {
+    final sorted = List<Map<String, dynamic>>.from(_visible)
+      ..sort((a, b) {
+        final da = _parseOrderDate(a);
+        final db = _parseOrderDate(b);
+        if (da == null && db == null) return 0;
+        if (da == null) return 1;
+        if (db == null) return -1;
+        return db.compareTo(da);
+      });
+
+    final map = <String, List<Map<String, dynamic>>>{};
+    for (final o in sorted) {
+      final d = _parseOrderDate(o);
+      final key = d == null ? 'Không rõ ngày' : _dateGroupLabel(d);
+      (map[key] ??= []).add(o);
+    }
+    return map.entries.toList();
   }
 
   void _snack(String msg) {
@@ -302,56 +337,145 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
 
   @override
   Widget build(BuildContext context) {
+    final topPad = MediaQuery.of(context).padding.top;
+    final groups = _groupedOrders;
+
+    // Flatten groups into a mixed list of date-headers + order items
+    final items = <_ListItem>[];
+    for (final entry in groups) {
+      items.add(_ListItem.header(entry.key));
+      for (var i = 0; i < entry.value.length; i++) {
+        items.add(_ListItem.order(entry.value[i]));
+      }
+    }
+
     return Scaffold(
-      backgroundColor: AISLShadcnTheme.navySurface,
-      appBar: AppBar(
-        title: const Text('Đơn tủ của tôi'),
-        backgroundColor: AISLShadcnTheme.navyPrimary,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(onPressed: _load, icon: const Icon(LucideIcons.refreshCw)),
-        ],
-      ),
+      backgroundColor: const Color(0xFFF2F3F5),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          // ── Simple Grab-style header ─────────────────────────────────────
+          Container(
+            color: Colors.white,
+            padding: EdgeInsets.fromLTRB(20, topPad + 16, 20, 14),
             child: Row(
               children: [
-                _filterChip('ACTIVE', 'Đang hoạt động'),
-                const SizedBox(width: 8),
-                _filterChip('DONE', 'Đã xong'),
+                const Expanded(
+                  child: Text(
+                    'Hoạt động',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF111827),
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: _load,
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F4F6),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      LucideIcons.refreshCw,
+                      size: 18,
+                      color: Color(0xFF374151),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
+
+          // ── Service type chips ───────────────────────────────────────────
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            child: Row(
+                children: [
+                  _TypeChip(
+                    label: 'Tất cả',
+                    count: _orders.length,
+                    selected: _typeFilter == 'ALL',
+                    onTap: () => setState(() => _typeFilter = 'ALL'),
+                  ),
+                  const SizedBox(width: 8),
+                  _TypeChip(
+                    label: 'Thuê tủ',
+                    selected: _typeFilter == 'RENTAL',
+                    onTap: () => setState(() => _typeFilter = 'RENTAL'),
+                  ),
+                  const SizedBox(width: 8),
+                  _TypeChip(
+                    label: 'Gửi hàng',
+                    selected: _typeFilter == 'SEND',
+                    onTap: () => setState(() => _typeFilter = 'SEND'),
+                  ),
+                  const SizedBox(width: 8),
+                  _TypeChip(
+                    label: 'Giặt ủi',
+                    selected: _typeFilter == 'LAUNDRY',
+                    onTap: () => setState(() => _typeFilter = 'LAUNDRY'),
+                  ),
+                ],
+              ),
+            ),
+
+          const SizedBox(height: 8),
+
+          // ── Grouped list ─────────────────────────────────────────────────
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(
+                    child: CircularProgressIndicator(color: AislBrand.navy),
+                  )
                 : _visible.isEmpty
                 ? OpsEmptyState(
-                    icon: _filter == 'ACTIVE'
-                        ? LucideIcons.packageOpen
-                        : LucideIcons.packageCheck,
-                    title: _filter == 'ACTIVE'
-                        ? 'Chưa có đơn đang hoạt động'
-                        : 'Chưa có đơn đã xong',
-                    subtitle: _filter == 'ACTIVE'
-                        ? 'Tạo đơn Gửi hàng hoặc Thuê tủ từ màn hình chính.'
-                        : null,
+                    icon: LucideIcons.packageOpen,
+                    title: 'Chưa có đơn nào',
+                    subtitle: 'Tạo đơn Gửi hàng hoặc Thuê tủ từ màn hình chính.',
                   )
                 : RefreshIndicator(
+                    color: AislBrand.navy,
                     onRefresh: _load,
-                    child: ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                      itemCount: _visible.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(0, 0, 0, 120),
+                      itemCount: items.length,
                       itemBuilder: (ctx, i) {
-                        return _OrderCard(
-                          order: _visible[i],
-                          onTap: () => _openDetail(_visible[i]),
-                        ).animate().fadeIn(
-                          delay: (i * 35).ms,
-                          duration: 220.ms,
+                        final item = items[i];
+                        if (item.isHeader) {
+                          return Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                            child: Text(
+                              item.header!,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF9CA3AF),
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          );
+                        }
+                        final order = item.order!;
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                          child: _OrderCard(
+                            order: order,
+                            onTap: () => _openDetail(order),
+                          ).animate().fadeIn(
+                            delay: (i * 30).ms,
+                            duration: 200.ms,
+                          ).slideY(
+                            begin: 0.05,
+                            end: 0,
+                            delay: (i * 30).ms,
+                            duration: 200.ms,
+                            curve: Curves.easeOut,
+                          ),
                         );
                       },
                     ),
@@ -361,21 +485,311 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
       ),
     );
   }
+}
 
-  Widget _filterChip(String value, String label) {
-    final selected = _filter == value;
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      showCheckmark: false,
-      backgroundColor: Colors.white,
-      selectedColor: opsPrimary,
-      side: BorderSide(color: selected ? opsPrimary : opsBorder),
-      labelStyle: TextStyle(
-        color: selected ? Colors.white : opsMutedText,
-        fontWeight: FontWeight.w700,
+// ── List item discriminated union ─────────────────────────────────────────────
+
+class _ListItem {
+  const _ListItem._({this.header, this.order});
+  factory _ListItem.header(String h) => _ListItem._(header: h);
+  factory _ListItem.order(Map<String, dynamic> o) => _ListItem._(order: o);
+
+  final String? header;
+  final Map<String, dynamic>? order;
+  bool get isHeader => header != null;
+}
+
+// ── Service type chip ─────────────────────────────────────────────────────────
+
+class _TypeChip extends StatelessWidget {
+  const _TypeChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.count,
+  });
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final int? count;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF111827) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? const Color(0xFF111827) : const Color(0xFFD1D5DB),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : const Color(0xFF374151),
+              ),
+            ),
+            if (count != null && count! > 0) ...[
+              const SizedBox(width: 5),
+              Text(
+                '($count)',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: selected
+                      ? Colors.white.withValues(alpha: 0.7)
+                      : const Color(0xFF9CA3AF),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
-      onSelected: (_) => setState(() => _filter = value),
+    );
+  }
+}
+
+// ── Order card (Grab style) ───────────────────────────────────────────────────
+
+class _OrderCard extends StatelessWidget {
+  const _OrderCard({required this.order, required this.onTap});
+  final Map<String, dynamic> order;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final type = order['type'] as String?;
+    final status = order['status'] as String?;
+    final boxId = order['sendBoxId'] ?? order['receiveBoxId'];
+    final deadline = order['pickupDeadline'];
+    final overdue =
+        isOverdue(deadline) && status != 'COMPLETED' && status != 'CANCELED';
+    final sColor = statusColor(status);
+    final isDone =
+        status == 'COMPLETED' || status == 'CANCELED';
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Left: content
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Service type + time
+                        Row(
+                          children: [
+                            Text(
+                              typeLabel(type),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF6B7280),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            if (deadline != null) ...[
+                              const Text(
+                                '  ·  ',
+                                style: TextStyle(color: Color(0xFF9CA3AF)),
+                              ),
+                              Text(
+                                fmtDateTime(deadline),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF6B7280),
+                                ),
+                              ),
+                            ],
+                            const Spacer(),
+                            // Status label
+                            Text(
+                              statusLabel(status),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: isDone
+                                    ? const Color(0xFF16A34A)
+                                    : overdue
+                                    ? const Color(0xFFDC2626)
+                                    : sColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // Route: Tủ and Ô
+                        _RouteRow(
+                          isOrigin: true,
+                          text: 'Tủ ${order['lockerId'] ?? '-'}',
+                        ),
+                        const SizedBox(height: 8),
+                        _RouteRow(
+                          isOrigin: false,
+                          text: 'Ô ${boxId ?? '-'}',
+                        ),
+                        const SizedBox(height: 14),
+                        // Price + action
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              fmtPrice(order['totalPrice']),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF111827),
+                              ),
+                            ),
+                            const Spacer(),
+                            GestureDetector(
+                              onTap: onTap,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 7,
+                                ),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: const Color(0xFFD1D5DB),
+                                    width: 1.5,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Text(
+                                  'Xem lại',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF374151),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  // Right: service icon
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: sColor.withValues(alpha: 0.10),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(typeIcon(type), color: sColor, size: 26),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            // Overdue banner
+            if (overdue)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                color: const Color(0xFFFEF2F2),
+                child: Row(
+                  children: const [
+                    Icon(
+                      LucideIcons.triangleAlert,
+                      size: 13,
+                      color: Color(0xFFDC2626),
+                    ),
+                    SizedBox(width: 6),
+                    Text(
+                      'Đơn đã quá hạn — có thể phát sinh phí',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFDC2626),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              const SizedBox(height: 0),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RouteRow extends StatelessWidget {
+  const _RouteRow({required this.isOrigin, required this.text});
+  final bool isOrigin;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 16,
+          child: Center(
+            child: isOrigin
+                ? Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFF9CA3AF),
+                        width: 2,
+                      ),
+                    ),
+                  )
+                : Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF374151),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF1F2937),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -390,127 +804,6 @@ double? _asDouble(dynamic value) {
   if (value is double) return value;
   if (value is num) return value.toDouble();
   return double.tryParse('$value');
-}
-
-/// Compact order row card.
-class _OrderCard extends StatelessWidget {
-  const _OrderCard({required this.order, required this.onTap});
-  final Map<String, dynamic> order;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final type = order['type'] as String?;
-    final status = order['status'] as String?;
-    final boxId = order['sendBoxId'] ?? order['receiveBoxId'];
-    final deadline = order['pickupDeadline'];
-    final overdue =
-        isOverdue(deadline) && status != 'COMPLETED' && status != 'CANCELED';
-    final color = statusColor(status);
-
-    return OpsCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(typeIcon(type), color: color, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      typeLabel(type),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14.5,
-                        color: opsDark,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        '${order['orderCode'] ?? ''}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: opsMutedText,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(
-                      LucideIcons.grid3x3,
-                      size: 13,
-                      color: opsMutedText,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Tủ ${order['lockerId'] ?? '-'} · ô ${boxId ?? '-'}',
-                      style: const TextStyle(fontSize: 12, color: opsMutedText),
-                    ),
-                  ],
-                ),
-                if (deadline != null) ...[
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      Icon(
-                        overdue ? LucideIcons.triangleAlert : LucideIcons.clock,
-                        size: 13,
-                        color: overdue ? const Color(0xFFDC2626) : opsMutedText,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        fmtRemaining(deadline),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: overdue
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: overdue
-                              ? const Color(0xFFDC2626)
-                              : opsMutedText,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              StatusChip(status),
-              const SizedBox(height: 8),
-              const Icon(
-                LucideIcons.chevronRight,
-                size: 18,
-                color: Color(0xFFCBD5E1),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _DetailSheet extends StatelessWidget {

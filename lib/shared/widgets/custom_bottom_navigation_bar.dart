@@ -1,12 +1,13 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'user_ui_kit.dart';
 
 /// Builder function for custom icons
 typedef IconBuilder = Widget Function(Color color, double size);
 
-/// Floating navy bottom navigation bar (ported from the legacy React Native
-/// customer app): a rounded navy pill with a raised, gradient QR action in the
-/// center. Active tabs use a soft white highlight + cyan text/icon.
+/// Floating glass bottom navigation bar: frosted-glass pill with no labels,
+/// a raised gradient QR action in the center, and a navy active icon.
 class CustomBottomNavigationBar extends StatelessWidget {
   final int currentIndex;
   final void Function(int) onTap;
@@ -25,31 +26,40 @@ class CustomBottomNavigationBar extends StatelessWidget {
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: Container(
-          height: 64,
-          decoration: BoxDecoration(
-            color: AislBrand.navBar,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(26),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+            child: Container(
+              height: 64,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.30),
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.55),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.10),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: items.asMap().entries.map((entry) {
-              final index = entry.key;
-              final item = entry.value;
-              final isActive = currentIndex == index;
-
-              if (item.isProminent) {
-                return _buildProminent(item, index);
-              }
-              return _buildItem(item, index, isActive);
-            }).toList(),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: items.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final item = entry.value;
+                  final isActive = currentIndex == index;
+                  if (item.isProminent) {
+                    return _buildProminent(item, index);
+                  }
+                  return _buildItem(item, index, isActive);
+                }).toList(),
+              ),
+            ),
           ),
         ),
       ),
@@ -57,7 +67,7 @@ class CustomBottomNavigationBar extends StatelessWidget {
   }
 
   Widget _buildItem(NavigationItem item, int index, bool isActive) {
-    final color = isActive ? Colors.white : AislBrand.navInactive;
+    final color = isActive ? AislBrand.navy : const Color(0xFF9CA3AF);
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -65,33 +75,14 @@ class CustomBottomNavigationBar extends StatelessWidget {
         child: Center(
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(
               color: isActive
-                  ? Colors.white.withValues(alpha: 0.14)
+                  ? Colors.white.withValues(alpha: 0.35)
                   : Colors.transparent,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(16),
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildIcon(isActive ? item.activeIcon : item.icon, color),
-                if (item.label.isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    item.label,
-                    style: TextStyle(
-                      fontSize: 9.5,
-                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                      color: color,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ],
-            ),
+            child: _buildIcon(isActive ? item.activeIcon : item.icon, color),
           ),
         ),
       ),
@@ -104,9 +95,7 @@ class CustomBottomNavigationBar extends StatelessWidget {
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => onTap(index),
-          child: Transform.translate(
-            offset: const Offset(0, -10),
-            child: Container(
+          child: Container(
               width: 54,
               height: 54,
               decoration: BoxDecoration(
@@ -116,23 +105,22 @@ class CustomBottomNavigationBar extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                border: Border.all(color: Colors.white, width: 3),
+                border: Border.all(color: Colors.white, width: 2.5),
                 boxShadow: [
                   BoxShadow(
-                    color: AislBrand.cyan.withValues(alpha: 0.5),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+                    color: AislBrand.cyan.withValues(alpha: 0.45),
+                    blurRadius: 14,
+                    offset: const Offset(0, 5),
                   ),
                 ],
               ),
               child: Center(
-                child: _buildIcon(item.icon, Colors.white, size: 26),
+                child: _buildIcon(item.icon, Colors.white, size: 25),
               ),
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildIcon(dynamic icon, Color color, {double size = 22}) {
@@ -162,6 +150,6 @@ class NavigationItem {
   }) : assert(
          (icon is IconData || icon is IconBuilder) &&
              (activeIcon is IconData || activeIcon is IconBuilder),
-         'icon and activeIcon must be either IconData or IconBuilder',
+         'icon and activeIcon must be either IconData or IconData',
        );
 }
