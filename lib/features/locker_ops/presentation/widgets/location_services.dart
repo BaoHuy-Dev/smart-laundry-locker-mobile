@@ -227,7 +227,7 @@ class LockerUtilitiesRow extends StatelessWidget {
           icon: LucideIcons.package,
           label: 'Đơn tủ',
           color: const Color(0xFFE91E63),
-          onTap: () => context.push(AppRouter.myLockerOrders),
+          onTap: () => context.go(AppRouter.orders),
         ),
         const SizedBox(width: 10),
         _UtilityChip(

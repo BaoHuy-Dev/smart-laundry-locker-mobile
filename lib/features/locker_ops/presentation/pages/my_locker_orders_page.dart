@@ -337,7 +337,6 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
 
   @override
   Widget build(BuildContext context) {
-    final topPad = MediaQuery.of(context).padding.top;
     final groups = _groupedOrders;
 
     // Flatten groups into a mixed list of date-headers + order items
@@ -353,40 +352,13 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
       backgroundColor: const Color(0xFFF2F3F5),
       body: Column(
         children: [
-          // ── Simple Grab-style header ─────────────────────────────────────
-          Container(
-            color: Colors.white,
-            padding: EdgeInsets.fromLTRB(20, topPad + 16, 20, 14),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Hoạt động',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF111827),
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                ),
-                GestureDetector(
-                  onTap: _load,
-                  child: Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF3F4F6),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      LucideIcons.refreshCw,
-                      size: 18,
-                      color: Color(0xFF374151),
-                    ),
-                  ),
-                ),
-              ],
+          BrandHeroHeader(
+            title: 'Đơn tủ',
+            subtitle: 'Quản lý các đơn hàng của bạn',
+            trailing: BrandCircleIconButton(
+              icon: LucideIcons.refreshCw,
+              onTap: _load,
+              iconSize: 18,
             ),
           ),
 
