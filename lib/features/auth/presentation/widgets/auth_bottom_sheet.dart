@@ -1,6 +1,8 @@
 import 'package:smart_laundry_locker/core/constants/app_colors.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
+import 'package:smart_laundry_locker/core/routing/role_routes.dart';
+import 'package:smart_laundry_locker/core/services/token_service.dart';
 import 'package:smart_laundry_locker/features/auth/presentation/providers/auth_injection.dart';
 import 'package:smart_laundry_locker/features/auth/presentation/providers/login_provider.dart';
 import 'package:smart_laundry_locker/features/auth/presentation/providers/register_provider.dart';
@@ -66,7 +68,25 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
   void _onLoginStateChanged() {
     if (_loginProvider.isSuccess && !_hasNavigated) {
       _hasNavigated = true;
-      if (mounted) Navigator.of(context).pop(true);
+      _navigateAfterLogin();
+    }
+  }
+
+  Future<void> _navigateAfterLogin() async {
+    if (!mounted) return;
+    // Đóng bottom sheet trước
+    Navigator.of(context, rootNavigator: true).pop(true);
+    // Lấy roles từ token và navigate đến trang phù hợp
+    try {
+      final roles = await TokenService.getCurrentRoles();
+      if (!mounted) return;
+      // Sử dụng AppRouter.navigatorKey để navigate ngay cả khi context đã dispose
+      final navContext = AppRouter.navigatorKey.currentContext;
+      if (navContext != null && navContext.mounted) {
+        navContext.go(homeForRoles(roles));
+      }
+    } catch (_) {
+      // fallback: không navigate, ProfilePage sẽ tự reload
     }
   }
 
