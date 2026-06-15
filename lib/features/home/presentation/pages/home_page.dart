@@ -183,7 +183,7 @@ class _HomePageState extends State<HomePage>
               child: BrandSectionHeader(
                 icon: LucideIcons.store,
                 title: 'Các nơi đặt locker',
-                onSeeAll: () => context.push(AppRouter.stores),
+                onSeeAll: () => context.go(AppRouter.lockers),
               ),
             ),
             const SizedBox(height: 16),

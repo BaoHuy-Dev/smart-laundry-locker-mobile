@@ -3,6 +3,7 @@ import 'package:smart_laundry_locker/features/locker/infrastructure/models/respo
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/location_services.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 
 /// Modal hiển thị thông tin chi tiết của location
 /// Bao gồm tên, địa chỉ và số lượng locker theo size
@@ -138,7 +139,7 @@ class LockerInfoModal extends StatelessWidget {
                   icon: const Icon(LucideIcons.calendarPlus, size: 18),
                   label: const Text('Đặt dịch vụ'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0A2342),
+                    backgroundColor: AislBrand.navy,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
@@ -182,8 +183,9 @@ class LockerInfoModal extends StatelessWidget {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF8E1),
+        color: const Color(0xFFF0F8FF),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AislBrand.chipBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -192,7 +194,11 @@ class LockerInfoModal extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 8),
             decoration: const BoxDecoration(
-              color: Colors.black,
+              gradient: LinearGradient(
+                colors: AislBrand.brandGradient,
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(12),
                 topRight: Radius.circular(12),
@@ -202,9 +208,9 @@ class LockerInfoModal extends StatelessWidget {
               child: Text(
                 sizeName,
                 style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFFFF9800),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
                 ),
               ),
             ),

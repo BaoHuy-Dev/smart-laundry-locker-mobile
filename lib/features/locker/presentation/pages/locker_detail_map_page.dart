@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/location_services.dart';
+import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 
 class LockerDetailMapPage extends ConsumerStatefulWidget {
   final LockerLocation location;
@@ -63,7 +64,18 @@ class _LockerDetailMapPageState extends ConsumerState<LockerDetailMapPage> {
     // ko render map nếu toạ độ ko hợp lệ
     if (!widget.location.hasValidCoordinate) {
       return Scaffold(
-        appBar: AppBar(title: Text(widget.location.name)),
+        appBar: AppBar(
+          title: Text(
+            widget.location.name,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          backgroundColor: AislBrand.navy,
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -88,7 +100,7 @@ class _LockerDetailMapPageState extends ConsumerState<LockerDetailMapPage> {
                   icon: const Icon(Icons.add_box_outlined, size: 18),
                   label: const Text('Đặt dịch vụ'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0A2342),
+                    backgroundColor: AislBrand.navy,
                     foregroundColor: Colors.white,
                   ),
                 ),
@@ -182,7 +194,15 @@ class _LockerDetailMapPageState extends ConsumerState<LockerDetailMapPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.location.name)),
+      appBar: AppBar(
+        title: Text(
+          widget.location.name,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        ),
+        backgroundColor: AislBrand.navy,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push(
           AppRouter.directions,
@@ -192,9 +212,9 @@ class _LockerDetailMapPageState extends ConsumerState<LockerDetailMapPage> {
             'title': widget.location.name,
           },
         ),
-        backgroundColor: const Color(0xFF0A2342),
+        backgroundColor: AislBrand.navy,
         foregroundColor: Colors.white,
-        icon: const Icon(Icons.directions),
+        icon: const Icon(Icons.directions_rounded),
         label: const Text('Chỉ đường'),
       ),
       body: mapStack,
