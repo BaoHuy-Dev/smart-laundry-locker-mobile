@@ -27,7 +27,6 @@ import 'package:smart_laundry_locker/shared/shared.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:provider/provider.dart';
-import 'package:smart_laundry_locker/shared/widgets/unauthenticated_placeholder.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -275,45 +274,14 @@ class _ProfilePageState extends State<ProfilePage>
       );
     }
 
-    // nếu chưa đăng nhập thì hiện UI đăng nhập
+    // nếu chưa đăng nhập thì chuyển về màn hình đăng nhập
     if (!_isLoggedIn) {
-      final error = _profileProvider.error;
-      return Scaffold(
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.go(AppRouter.onboarding);
+      });
+      return const Scaffold(
         backgroundColor: Colors.white,
-        body: CustomScrollView(
-          slivers: [
-            CustomSliverAppBar(
-              title: AppStrings.profile,
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.black87,
-              automaticallyImplyLeading: false,
-            ),
-            SliverFillRemaining(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (error != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 16,
-                      ),
-                      child: Text(
-                        'Lỗi: $error',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.red.shade700),
-                      ),
-                    ),
-                  const Expanded(
-                    child: UnauthenticatedPlaceholder(
-                      message: 'Bạn cần đăng nhập để xem hồ sơ',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 

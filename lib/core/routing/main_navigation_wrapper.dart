@@ -92,6 +92,7 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBody: true,
       body: widget.child,
       bottomNavigationBar: CustomBottomNavigationBar(
         currentIndex: _calculateSelectedIndex(context),

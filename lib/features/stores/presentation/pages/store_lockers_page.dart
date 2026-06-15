@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:smart_laundry_locker/core/presentation/pages/directions_map_page.dart';
 import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/rent_locker_page.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/send_parcel_page.dart';
@@ -54,6 +56,21 @@ class _StoreLockerGridPageState extends State<StoreLockerGridPage> {
     }
   }
 
+  void _openDirections() {
+    Navigator.of(context, rootNavigator: true).push<void>(
+      MaterialPageRoute(
+        builder: (_) => DirectionsMapPage(
+          destination: LatLng(
+            widget.store.latitude!,
+            widget.store.longitude!,
+          ),
+          title: widget.store.name,
+          subtitle: widget.store.address,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -65,6 +82,11 @@ class _StoreLockerGridPageState extends State<StoreLockerGridPage> {
             subtitle: widget.store.name,
             onBack: () => Navigator.pop(context),
           ),
+          if (widget.store.hasLocation)
+            _AddressBar(
+              address: widget.store.address,
+              onDirections: _openDirections,
+            ),
           if (!_loading && _error == null && _lockers.isNotEmpty)
             _SummaryBanner(count: _lockers.length),
           Expanded(child: _buildBody()),
@@ -98,6 +120,70 @@ class _StoreLockerGridPageState extends State<StoreLockerGridPage> {
           service: _service,
           initiallyExpanded: _lockers.length == 1,
         ),
+      ),
+    );
+  }
+}
+
+// ── Address + directions bar ──────────────────────────────────────────────────
+
+class _AddressBar extends StatelessWidget {
+  const _AddressBar({this.address, required this.onDirections});
+  final String? address;
+  final VoidCallback onDirections;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AislBrand.navy.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          const Icon(LucideIcons.mapPin, color: AislBrand.navy, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              address ?? 'Xem vị trí trên bản đồ',
+              style: const TextStyle(
+                color: AislBrand.navy,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: onDirections,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: AislBrand.navy,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.directions_rounded, color: Colors.white, size: 14),
+                  SizedBox(width: 4),
+                  Text(
+                    'Chỉ đường',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

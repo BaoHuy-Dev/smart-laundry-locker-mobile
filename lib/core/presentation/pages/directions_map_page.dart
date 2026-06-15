@@ -149,14 +149,13 @@ class _DirectionsMapPageState extends State<DirectionsMapPage> {
 
   @override
   Widget build(BuildContext context) {
+    final topPad = MediaQuery.of(context).padding.top;
+    final bottomPad = MediaQuery.of(context).padding.bottom;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Chỉ đường'),
-        backgroundColor: AISLShadcnTheme.navyPrimary,
-        foregroundColor: Colors.white,
-      ),
       body: Stack(
         children: [
+          // ── Map fills full screen ──────────────────────────────────────────
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
@@ -205,39 +204,128 @@ class _DirectionsMapPageState extends State<DirectionsMapPage> {
               ),
             ],
           ),
-          if (_loading)
-            const Align(
-              alignment: Alignment.topCenter,
-              child: Padding(
-                padding: EdgeInsets.all(12),
-                child: Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(10),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+
+          // ── Floating header ────────────────────────────────────────────────
+          Positioned(
+            top: topPad + 10,
+            left: 12,
+            right: 12,
+            child: Row(
+              children: [
+                // Back button
+                _MapFab(
+                  onTap: () => Navigator.maybePop(context),
+                  child: const Icon(
+                    Icons.arrow_back_rounded,
+                    color: AISLShadcnTheme.navyPrimary,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // Title chip
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x22000000),
+                          blurRadius: 10,
+                          offset: Offset(0, 3),
                         ),
-                        SizedBox(width: 10),
-                        Text('Đang tìm đường...'),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          LucideIcons.mapPin,
+                          color: AISLShadcnTheme.navyPrimary,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            widget.title,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AISLShadcnTheme.navyPrimary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ),
+              ],
+            ),
+          ),
+
+          // ── Loading chip ───────────────────────────────────────────────────
+          if (_loading)
+            Positioned(
+              top: topPad + 66,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x1A000000),
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AISLShadcnTheme.navyPrimary,
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Đang tìm đường...',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
-          Align(alignment: Alignment.bottomCenter, child: _buildInfoCard()),
+
+          // ── Bottom info card ───────────────────────────────────────────────
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: _buildInfoCard(bottomPad),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildInfoCard() {
+  Widget _buildInfoCard(double bottomPad) {
     return Container(
-      margin: const EdgeInsets.all(12),
+      margin: EdgeInsets.fromLTRB(12, 12, 12, 12 + bottomPad),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -339,5 +427,34 @@ class _DirectionsMapPageState extends State<DirectionsMapPage> {
       points.add(LatLng(lat / 1e5, lng / 1e5));
     }
     return points;
+  }
+}
+
+class _MapFab extends StatelessWidget {
+  const _MapFab({required this.onTap, required this.child});
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x22000000),
+              blurRadius: 10,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Center(child: child),
+      ),
+    );
   }
 }
