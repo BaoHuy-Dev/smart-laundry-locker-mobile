@@ -228,15 +228,19 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    // Firebase is also auto-initialized natively (google-services plugin), so
+    // calling initializeApp again throws `[core/duplicate-app]` — which used to
+    // swallow the whole block and skip messaging init. Only initialize when no
+    // default app exists yet.
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
     // Initialize Messaging Service
     await FirebaseMessagingService.instance.init();
   } catch (e) {
-    debugPrint(
-      "Firebase init failed (likely missing firebase_options.dart): $e",
-    );
+    debugPrint("Firebase init/messaging failed: $e");
   }
 
   DioClient.instance.init();
