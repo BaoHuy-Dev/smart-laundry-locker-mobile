@@ -1,5 +1,6 @@
 import 'package:smart_laundry_locker/features/locker/domain/entities/locker_location.dart';
 import 'package:smart_laundry_locker/features/locker/infrastructure/models/responses/lockers_response.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/location_services.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -121,6 +122,31 @@ class LockerInfoModal extends StatelessWidget {
                       ),
                     )
                   : Row(children: _buildSizeCards()),
+            ),
+            // CTA: đặt dịch vụ tại địa điểm này (Thuê tủ / Gửi hàng / Giặt đồ)
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                4,
+                horizontalPadding,
+                16,
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => showLocationServicesSheet(context, location),
+                  icon: const Icon(LucideIcons.calendarPlus, size: 18),
+                  label: const Text('Đặt dịch vụ'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0A2342),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
             ),
             SizedBox(height: MediaQuery.of(context).padding.bottom),
           ],

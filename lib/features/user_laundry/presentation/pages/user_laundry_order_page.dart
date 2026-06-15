@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
 import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/ops_widgets.dart'
+    show LocationHint;
 import 'package:smart_laundry_locker/features/user_laundry/infrastructure/models/user_laundry_models.dart';
 import 'package:smart_laundry_locker/features/user_laundry/infrastructure/services/user_laundry_service.dart';
 import 'package:smart_laundry_locker/features/user_laundry/infrastructure/services/user_locker_service.dart';
@@ -12,7 +14,19 @@ import 'package:smart_laundry_locker/features/user_laundry/infrastructure/servic
 import 'package:url_launcher/url_launcher.dart';
 
 class UserLaundryOrderPage extends StatefulWidget {
-  const UserLaundryOrderPage({super.key});
+  const UserLaundryOrderPage({
+    super.key,
+    this.initialLockerId,
+    this.locationName,
+  });
+
+  /// Locker id forwarded from a location's "Đặt dịch vụ" sheet. The laundry
+  /// flow selects store→locker→box on its own, so this is currently used as a
+  /// display hint rather than a hard pre-selection.
+  final int? initialLockerId;
+
+  /// Display name of the location the user picked.
+  final String? locationName;
 
   @override
   State<UserLaundryOrderPage> createState() => _UserLaundryOrderPageState();
@@ -304,6 +318,10 @@ class _UserLaundryOrderPageState extends State<UserLaundryOrderPage> {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
             _buildHeader(),
+            if (widget.locationName != null) ...[
+              const SizedBox(height: 12),
+              LocationHint(name: widget.locationName!),
+            ],
             if (_pageError != null) ...[
               const SizedBox(height: 12),
               _buildMessage(_pageError!, isError: true),

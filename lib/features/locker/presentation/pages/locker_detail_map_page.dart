@@ -8,6 +8,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/location_services.dart';
 
 class LockerDetailMapPage extends ConsumerStatefulWidget {
   final LockerLocation location;
@@ -81,7 +82,18 @@ class _LockerDetailMapPageState extends ConsumerState<LockerDetailMapPage> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
-                ElevatedButton(
+                ElevatedButton.icon(
+                  onPressed: () =>
+                      showLocationServicesSheet(context, widget.location),
+                  icon: const Icon(Icons.add_box_outlined, size: 18),
+                  label: const Text('Đặt dịch vụ'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0A2342),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
                   onPressed: () => Navigator.maybePop(context),
                   child: const Text('Quay lại'),
                 ),
