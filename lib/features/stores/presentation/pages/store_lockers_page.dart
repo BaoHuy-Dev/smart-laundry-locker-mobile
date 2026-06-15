@@ -1,0 +1,1106 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:smart_laundry_locker/core/routing/app_router.dart';
+import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
+import 'package:smart_laundry_locker/features/stores/domain/entities/store.dart';
+import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
+
+/// Hiển thị lưới ô tủ locker tại một cửa hàng cụ thể.
+/// Load danh sách tủ (cabinets) qua GET /api/lockers?storeId=X,
+/// sau đó lazy-load layout từng tủ khi user mở rộng thẻ tủ.
+class StoreLockerGridPage extends StatefulWidget {
+  const StoreLockerGridPage({super.key, required this.store});
+
+  final Store store;
+
+  @override
+  State<StoreLockerGridPage> createState() => _StoreLockerGridPageState();
+}
+
+class _StoreLockerGridPageState extends State<StoreLockerGridPage> {
+  final _service = LockerOpsService();
+  List<Map<String, dynamic>> _lockers = const [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final all = await _service.lockersByStore(widget.store.id);
+      if (!mounted) return;
+      setState(() {
+        _lockers = all.where((l) {
+          final s = (l['status'] as String?)?.toUpperCase();
+          return s == 'ACTIVE' || s == null;
+        }).toList();
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = LockerOpsService.errorMessage(e);
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7FAFC),
+      body: Column(
+        children: [
+          BrandHeroHeader(
+            title: 'Tủ locker',
+            subtitle: widget.store.name,
+            onBack: () => context.pop(),
+          ),
+          if (!_loading && _error == null && _lockers.isNotEmpty)
+            _SummaryBanner(count: _lockers.length),
+          Expanded(child: _buildBody()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AislBrand.navy),
+      );
+    }
+    if (_error != null) {
+      return _ErrorView(message: _error!, onRetry: _load);
+    }
+    if (_lockers.isEmpty) {
+      return const _EmptyView();
+    }
+    return RefreshIndicator(
+      color: AislBrand.navy,
+      onRefresh: _load,
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+        itemCount: _lockers.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (context, i) => _LockerCard(
+          locker: _lockers[i],
+          storeName: widget.store.name,
+          service: _service,
+          initiallyExpanded: _lockers.length == 1,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Summary banner ────────────────────────────────────────────────────────────
+
+class _SummaryBanner extends StatelessWidget {
+  const _SummaryBanner({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: AislBrand.navy.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          const Icon(LucideIcons.server, color: AislBrand.navy, size: 16),
+          const SizedBox(width: 8),
+          Text(
+            '$count tủ locker',
+            style: const TextStyle(
+              color: AislBrand.navy,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: AislBrand.cyan.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text(
+              'Chạm vào tủ để xem ô trống',
+              style: TextStyle(
+                color: AislBrand.blue,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Locker Card ───────────────────────────────────────────────────────────────
+
+class _LockerCard extends StatefulWidget {
+  const _LockerCard({
+    required this.locker,
+    required this.storeName,
+    required this.service,
+    this.initiallyExpanded = false,
+  });
+
+  final Map<String, dynamic> locker;
+  final String storeName;
+  final LockerOpsService service;
+  final bool initiallyExpanded;
+
+  @override
+  State<_LockerCard> createState() => _LockerCardState();
+}
+
+class _LockerCardState extends State<_LockerCard> {
+  bool _expanded = false;
+  Map<String, dynamic>? _layout;
+  bool _loadingLayout = false;
+  String? _layoutError;
+
+  int get _lockerId => (widget.locker['id'] as num?)?.toInt() ?? 0;
+
+  String get _lockerName {
+    final n = widget.locker['name'] as String?;
+    final c = widget.locker['code'] as String?;
+    return (n?.isNotEmpty == true) ? n! : (c ?? 'Tủ');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initiallyExpanded) {
+      _expanded = true;
+      _loadLayout();
+    }
+  }
+
+  Future<void> _loadLayout() async {
+    if (_layout != null || _loadingLayout) return;
+    setState(() {
+      _loadingLayout = true;
+      _layoutError = null;
+    });
+    try {
+      final layout = await widget.service.layout(_lockerId);
+      if (mounted) {
+        setState(() {
+          _layout = layout;
+          _loadingLayout = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _layoutError = LockerOpsService.errorMessage(e);
+          _loadingLayout = false;
+        });
+      }
+    }
+  }
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    if (_expanded) _loadLayout();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cells =
+        (_layout?['cells'] as List?)?.cast<Map<String, dynamic>>() ??
+        const <Map<String, dynamic>>[];
+    final totalCells = (_layout?['totalCells'] as num?)?.toInt() ?? cells.length;
+    final available = cells.where((c) => c['status'] == 'AVAILABLE').length;
+    final isActive =
+        (widget.locker['status'] as String?)?.toUpperCase() == 'ACTIVE';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.07),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _buildHeader(
+            isActive: isActive,
+            available: available,
+            totalCells: totalCells,
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            child: _expanded
+                ? _buildExpandedContent(cells)
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader({
+    required bool isActive,
+    required int available,
+    required int totalCells,
+  }) {
+    return InkWell(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      onTap: _toggle,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            // Cabinet icon
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: AislBrand.brandGradient,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                LucideIcons.server,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Name + badges
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _lockerName,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AislBrand.textTitle,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      if (_layout != null) ...[
+                        _Pill(
+                          label: '$available/$totalCells ô trống',
+                          bg: available > 0
+                              ? AislBrand.cyan.withValues(alpha: 0.15)
+                              : const Color(0xFFE2E8F0),
+                          fg: available > 0 ? AislBrand.blue : Colors.grey,
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      _Pill(
+                        label: isActive ? 'Hoạt động' : 'Ngừng',
+                        bg: isActive
+                            ? const Color(0xFFDEF7EC)
+                            : const Color(0xFFFDE8E8),
+                        fg: isActive
+                            ? const Color(0xFF046C4E)
+                            : const Color(0xFF9B1C1C),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // Chevron
+            AnimatedRotation(
+              turns: _expanded ? 0.5 : 0,
+              duration: const Duration(milliseconds: 300),
+              child: const Icon(
+                LucideIcons.chevronDown,
+                color: AislBrand.navy,
+                size: 20,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpandedContent(List<Map<String, dynamic>> cells) {
+    return Column(
+      children: [
+        const Divider(height: 1, color: Color(0xFFF0F4F8)),
+        if (_loadingLayout)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 28),
+            child: Center(
+              child: CircularProgressIndicator(
+                color: AislBrand.navy,
+                strokeWidth: 2.5,
+              ),
+            ),
+          )
+        else if (_layoutError != null)
+          _LayoutErrorRow(
+            message: _layoutError!,
+            onRetry: () {
+              _layout = null;
+              _loadLayout();
+            },
+          )
+        else if (cells.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 28),
+            child: Center(
+              child: Text(
+                'Không có dữ liệu ô tủ',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+          )
+        else
+          _CellGrid(
+            cells: cells,
+            onCellTap: (cell) => _showBookingSheet(context, cell),
+          ),
+      ],
+    );
+  }
+
+  void _showBookingSheet(BuildContext ctx, Map<String, dynamic> cell) {
+    showModalBottomSheet<void>(
+      context: ctx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _BookingSheet(
+        cell: cell,
+        lockerId: _lockerId,
+        lockerName: _lockerName,
+        storeName: widget.storeName,
+        onRent: () {
+          Navigator.pop(ctx);
+          ctx.push(
+            AppRouter.rentLocker,
+            extra: {
+              'initialLockerId': _lockerId,
+              'locationName': widget.storeName,
+            },
+          );
+        },
+        onSend: () {
+          Navigator.pop(ctx);
+          ctx.push(
+            AppRouter.sendParcel,
+            extra: {
+              'initialLockerId': _lockerId,
+              'locationName': widget.storeName,
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ── Cell Grid ─────────────────────────────────────────────────────────────────
+
+class _CellGrid extends StatelessWidget {
+  const _CellGrid({required this.cells, required this.onCellTap});
+  final List<Map<String, dynamic>> cells;
+  final ValueChanged<Map<String, dynamic>> onCellTap;
+
+  @override
+  Widget build(BuildContext context) {
+    // Compute grid dimensions
+    int maxRow = 0, maxCol = 0;
+    for (final c in cells) {
+      final r = (c['rowIndex'] as num?)?.toInt() ?? 0;
+      final col = (c['colIndex'] as num?)?.toInt() ?? 0;
+      if (r > maxRow) maxRow = r;
+      if (col > maxCol) maxCol = col;
+    }
+    final numRows = maxRow + 1;
+    final numCols = maxCol + 1;
+
+    // Build 2-D grid map
+    final grid = List.generate(
+      numRows,
+      (_) => List<Map<String, dynamic>?>.filled(numCols, null),
+    );
+    for (final c in cells) {
+      final r = (c['rowIndex'] as num?)?.toInt() ?? 0;
+      final col = (c['colIndex'] as num?)?.toInt() ?? 0;
+      if (r < numRows && col < numCols) grid[r][col] = c;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _GridLegend(),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 4, 14, 16),
+          child: Column(
+            children: List.generate(numRows, (row) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 5),
+                child: Row(
+                  children: List.generate(numCols, (col) {
+                    final cell = grid[row][col];
+                    return Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 3),
+                        child: cell != null
+                            ? _CellTile(
+                                cell: cell,
+                                onTap: cell['status'] == 'AVAILABLE'
+                                    ? () => onCellTap(cell)
+                                    : null,
+                              )
+                            : const SizedBox(height: 56),
+                      ),
+                    );
+                  }),
+                ),
+              );
+            }),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GridLegend extends StatelessWidget {
+  const _GridLegend();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 6,
+        children: const [
+          _LegendDot(color: _CellPalette.available, label: 'Trống'),
+          _LegendDot(color: _CellPalette.occupied, label: 'Đang dùng'),
+          _LegendDot(color: _CellPalette.reserved, label: 'Đã đặt'),
+          _LegendDot(color: _CellPalette.fault, label: 'Lỗi'),
+          _LegendDot(color: _CellPalette.cleaning, label: 'Bảo trì'),
+        ],
+      ),
+    );
+  }
+}
+
+class _LegendDot extends StatelessWidget {
+  const _LegendDot({required this.color, required this.label});
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Cell Tile ─────────────────────────────────────────────────────────────────
+
+abstract class _CellPalette {
+  static const Color available = AislBrand.cyan;
+  static const Color occupied = Color(0xFFCBD5E1);
+  static const Color reserved = Color(0xFFFBBF24);
+  static const Color fault = Color(0xFFEF4444);
+  static const Color cleaning = Color(0xFF60A5FA);
+  static const Color outOfService = Color(0xFF9CA3AF);
+}
+
+class _CellTile extends StatelessWidget {
+  const _CellTile({required this.cell, this.onTap});
+  final Map<String, dynamic> cell;
+  final VoidCallback? onTap;
+
+  String get _status => (cell['status'] as String?) ?? '';
+
+  Color get _bg => switch (_status) {
+    'AVAILABLE' => _CellPalette.available,
+    'OCCUPIED' || 'IN_USE' => _CellPalette.occupied,
+    'RESERVED' => _CellPalette.reserved,
+    'FAULT' => _CellPalette.fault,
+    'CLEANING' => _CellPalette.cleaning,
+    _ => _CellPalette.outOfService,
+  };
+
+  Color get _fg {
+    if (_status == 'OCCUPIED' || _status == 'IN_USE') {
+      return const Color(0xFF94A3B8);
+    }
+    return Colors.white;
+  }
+
+  String get _sizeLabel => switch ((cell['size'] as String?) ?? '') {
+    'SMALL' => 'S',
+    'MEDIUM' => 'M',
+    'LARGE' => 'L',
+    _ => (cell['cellType'] as String? ?? '?')
+        .substring(0, 1)
+        .toUpperCase(),
+  };
+
+  bool get _isAvailable => _status == 'AVAILABLE';
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        height: 58,
+        decoration: BoxDecoration(
+          color: _bg,
+          borderRadius: BorderRadius.circular(11),
+          boxShadow: _isAvailable
+              ? [
+                  BoxShadow(
+                    color: _CellPalette.available.withValues(alpha: 0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _sizeLabel,
+              style: TextStyle(
+                color: _fg,
+                fontWeight: FontWeight.w800,
+                fontSize: 17,
+              ),
+            ),
+            if (_isAvailable) ...[
+              const SizedBox(height: 2),
+              Text(
+                'Trống',
+                style: TextStyle(
+                  color: _fg.withValues(alpha: 0.85),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Booking Bottom Sheet ──────────────────────────────────────────────────────
+
+class _BookingSheet extends StatelessWidget {
+  const _BookingSheet({
+    required this.cell,
+    required this.lockerId,
+    required this.lockerName,
+    required this.storeName,
+    required this.onRent,
+    required this.onSend,
+  });
+
+  final Map<String, dynamic> cell;
+  final int lockerId;
+  final String lockerName;
+  final String storeName;
+  final VoidCallback onRent;
+  final VoidCallback onSend;
+
+  String get _sizeVi => switch ((cell['size'] as String?) ?? '') {
+    'SMALL' => 'Nhỏ (S)',
+    'MEDIUM' => 'Vừa (M)',
+    'LARGE' => 'Lớn (L)',
+    _ => (cell['cellType'] as String?) ?? '—',
+  };
+
+  String get _boxLabel {
+    final boxNum = (cell['boxNumber'] as num?)?.toInt();
+    if (boxNum != null) return 'Ô số $boxNum';
+    final r = (cell['rowIndex'] as num?)?.toInt() ?? 0;
+    final c = (cell['colIndex'] as num?)?.toInt() ?? 0;
+    return 'Hàng ${r + 1}, cột ${c + 1}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        12,
+        20,
+        MediaQuery.of(context).viewInsets.bottom + 28,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE2E8F0),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Header row
+          Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: AislBrand.cyan.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(
+                  LucideIcons.boxes,
+                  color: AislBrand.cyan,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Ô tủ trống',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AislBrand.textTitle,
+                      ),
+                    ),
+                    Text(
+                      '$lockerName · $storeName',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AislBrand.textMuted,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Cell info card
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AislBrand.chipBorder),
+            ),
+            child: Row(
+              children: [
+                _SheetInfoTile(
+                  icon: Icons.straighten_rounded,
+                  label: 'Kích cỡ',
+                  value: _sizeVi,
+                ),
+                const _VerticalDivider(),
+                _SheetInfoTile(
+                  icon: Icons.tag_rounded,
+                  label: 'Vị trí',
+                  value: _boxLabel,
+                ),
+                const _VerticalDivider(),
+                _SheetInfoTile(
+                  icon: Icons.check_circle_outline_rounded,
+                  label: 'Trạng thái',
+                  value: 'Trống',
+                  valueColor: AislBrand.cyan,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          const Text(
+            'Bạn muốn làm gì với ô tủ này?',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF374151),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Service buttons
+          Row(
+            children: [
+              Expanded(
+                child: _ServiceButton(
+                  icon: Icons.access_time_rounded,
+                  label: 'Thuê tủ',
+                  sublabel: 'Tính theo giờ',
+                  gradient: const LinearGradient(
+                    colors: [AislBrand.navy, AislBrand.blue],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  onTap: onRent,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _ServiceButton(
+                  icon: Icons.move_to_inbox_rounded,
+                  label: 'Gửi hàng',
+                  sublabel: 'Chuyển C2C',
+                  gradient: const LinearGradient(
+                    colors: [AislBrand.blue, AislBrand.cyan],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  onTap: onSend,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SheetInfoTile extends StatelessWidget {
+  const _SheetInfoTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? valueColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Icon(icon, size: 18, color: AislBrand.navy),
+          const SizedBox(height: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              color: AislBrand.textMuted,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: valueColor ?? AislBrand.textTitle,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VerticalDivider extends StatelessWidget {
+  const _VerticalDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 44,
+      color: AislBrand.chipBorder,
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+    );
+  }
+}
+
+class _ServiceButton extends StatelessWidget {
+  const _ServiceButton({
+    required this.icon,
+    required this.label,
+    required this.sublabel,
+    required this.gradient,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String sublabel;
+  final LinearGradient gradient;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Ink(
+          decoration: BoxDecoration(gradient: gradient),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            child: Column(
+              children: [
+                Icon(icon, color: Colors.white, size: 26),
+                const SizedBox(height: 8),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  sublabel,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.75),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Helper widgets ────────────────────────────────────────────────────────────
+
+class _Pill extends StatelessWidget {
+  const _Pill({required this.label, required this.bg, required this.fg});
+  final String label;
+  final Color bg;
+  final Color fg;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: fg,
+        ),
+      ),
+    );
+  }
+}
+
+class _LayoutErrorRow extends StatelessWidget {
+  const _LayoutErrorRow({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      child: Row(
+        children: [
+          const Icon(
+            LucideIcons.triangleAlert,
+            color: Colors.redAccent,
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+            ),
+          ),
+          TextButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(LucideIcons.refreshCcw, size: 14),
+            label: const Text('Thử lại'),
+            style: TextButton.styleFrom(foregroundColor: AislBrand.navy),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Full-page error / empty states ────────────────────────────────────────────
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEE2E2),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: const Icon(
+                LucideIcons.triangleAlert,
+                color: Color(0xFFEF4444),
+                size: 32,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Không tải được dữ liệu',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AislBrand.textTitle,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              style: const TextStyle(color: AislBrand.textMuted, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(LucideIcons.refreshCcw, size: 16),
+              label: const Text('Thử lại'),
+              style: FilledButton.styleFrom(backgroundColor: AislBrand.navy),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyView extends StatelessWidget {
+  const _EmptyView();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: AislBrand.navy.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                LucideIcons.server,
+                color: AislBrand.navy,
+                size: 36,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Chưa có tủ locker',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: AislBrand.textTitle,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Cửa hàng này chưa có tủ locker đang hoạt động.',
+              style: TextStyle(fontSize: 14, color: AislBrand.textMuted),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

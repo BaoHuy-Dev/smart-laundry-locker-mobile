@@ -276,7 +276,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => context.go(AppRouter.lockers),
+                  onPressed: () =>
+                      context.push(AppRouter.storeLockers, extra: store),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AISLShadcnTheme.navyPrimary,
                     side: const BorderSide(color: Color(0xFFCBD5E1)),
