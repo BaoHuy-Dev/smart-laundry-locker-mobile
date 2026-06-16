@@ -26,40 +26,53 @@ class CustomBottomNavigationBar extends StatelessWidget {
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(26),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-            child: Container(
-              height: 64,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.30),
-                borderRadius: BorderRadius.circular(26),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.55),
-                  width: 1.2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.10),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
+        child: SizedBox(
+          height: 64,
+          child: Stack(
+            children: [
+              // Background layer: blur + decoration (non-interactive)
+              Positioned.fill(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(26),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.30),
+                        borderRadius: BorderRadius.circular(26),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.55),
+                          width: 1.2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.10),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ],
+                ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: items.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final item = entry.value;
-                  final isActive = currentIndex == index;
-                  if (item.isProminent) {
-                    return _buildProminent(item, index);
-                  }
-                  return _buildItem(item, index, isActive);
-                }).toList(),
+              // Interactive layer: buttons on top (receives all touches)
+              Positioned.fill(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: items.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final item = entry.value;
+                    final isActive = currentIndex == index;
+                    if (item.isProminent) {
+                      return _buildProminent(item, index);
+                    }
+                    return _buildItem(item, index, isActive);
+                  }).toList(),
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
