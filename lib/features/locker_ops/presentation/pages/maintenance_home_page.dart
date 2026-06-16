@@ -3,7 +3,9 @@ import 'package:go_router/go_router.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
 import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/utils/locker_maps.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/locker_picker.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/ops_widgets.dart';
+import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 
 /// Home for the MAINTENANCE role: live fault cells and the work queue
 /// (claim a ticket, mark it resolved — the cell goes back into service).
@@ -157,47 +159,60 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
   @override
   Widget build(BuildContext context) {
     final openCount = _reports.where((r) => r['status'] != 'RESOLVED').length;
+    final mineCount =
+        _myReports.where((r) => r['status'] == 'IN_PROGRESS').length;
+    final dueCount = _schedules.where((s) => s['due'] == true).length;
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FA),
-      appBar: AppBar(
-        title: const Text('Đội bảo trì'),
-        backgroundColor: const Color(0xFF7F1D1D),
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
-          IconButton(onPressed: _logout, icon: const Icon(Icons.logout)),
-        ],
-        bottom: TabBar(
-          controller: _tabs,
-          isScrollable: true,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          tabs: [
-            const Tab(text: 'Kiểm tra tủ'),
-            Tab(text: 'Sự cố ($openCount)'),
-            Tab(
-              text:
-                  'Việc của tôi (${_myReports.where((r) => r['status'] == 'IN_PROGRESS').length})',
-            ),
-            Tab(
-              text:
-                  'Định kỳ (${_schedules.where((s) => s['due'] == true).length})',
-            ),
-          ],
-        ),
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabs,
+      body: Column(
+        children: [
+          BrandHeroHeader(
+            title: 'Đội bảo trì',
+            subtitle: openCount > 0
+                ? '$openCount phiếu sự cố đang chờ xử lý'
+                : 'Không có phiếu sự cố nào đang mở',
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _buildInspect(),
-                _buildQueue(),
-                _buildMine(),
-                _buildSchedules(),
+                BrandCircleIconButton(icon: Icons.refresh, onTap: _load),
+                const SizedBox(width: 8),
+                BrandCircleIconButton(icon: Icons.logout, onTap: _logout),
               ],
             ),
+          ),
+          Material(
+            color: Colors.white,
+            child: TabBar(
+              controller: _tabs,
+              isScrollable: true,
+              indicatorColor: opsPrimary,
+              labelColor: opsDark,
+              unselectedLabelColor: opsMutedText,
+              tabs: [
+                const Tab(text: 'Kiểm tra tủ'),
+                Tab(text: 'Sự cố ($openCount)'),
+                Tab(text: 'Việc của tôi ($mineCount)'),
+                Tab(text: 'Định kỳ ($dueCount)'),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(color: AislBrand.navy),
+                  )
+                : TabBarView(
+                    controller: _tabs,
+                    children: [
+                      _buildInspect(),
+                      _buildQueue(),
+                      _buildMine(),
+                      _buildSchedules(),
+                    ],
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -213,55 +228,25 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
     }
     final sortedRows = rows.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
-    final selectedValue =
-        lockerOptions.any((locker) => _asInt(locker['id']) == _selectedLockerId)
-        ? _selectedLockerId
-        : null;
-
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text(
-            'Chọn tủ để kiểm tra',
-            style: TextStyle(fontWeight: FontWeight.w800, color: opsDark),
-          ),
-          const SizedBox(height: 8),
+          const OpsSectionLabel('Chọn tủ để kiểm tra', icon: Icons.warehouse_outlined),
           if (lockerOptions.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(
-                child: Text(
-                  'Chưa có tủ nào',
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ),
+            const OpsEmptyState(
+              icon: Icons.warehouse_outlined,
+              title: 'Chưa có tủ nào',
             )
           else
-            DropdownButtonFormField<int>(
-              initialValue: selectedValue,
-              isExpanded: true,
-              items: [
-                for (final l in lockerOptions)
-                  DropdownMenuItem(
-                    value: _asInt(l['id']),
-                    child: Text(
-                      '${l['name'] ?? l['code'] ?? 'Tủ'} (${l['code'] ?? ''})',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-              ],
-              onChanged: (v) {
-                if (v != null) _selectLocker(v);
+            LockerPickerField(
+              lockers: lockerOptions,
+              selectedId: _selectedLockerId,
+              onSelected: (l) {
+                final id = _asInt(l['id']);
+                if (id != null) _selectLocker(id);
               },
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
             ),
           const SizedBox(height: 12),
           if (selectedLocker != null) ...[
@@ -271,7 +256,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
           if (_layoutLoading)
             const Padding(
               padding: EdgeInsets.all(24),
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: CircularProgressIndicator(color: opsPrimary)),
             )
           else if (_layout != null) ...[
             _layoutSummary(),
@@ -306,26 +291,40 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
                   ],
                 ),
               ),
-            for (final row in sortedRows) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Text(
-                  'Hàng ${row.key}',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-              ),
-              Row(
+            OpsCard(
+              child: Column(
                 children: [
-                  for (final c in _sortCellsByColumn(row.value))
-                    Expanded(child: _cellTile(c)),
+                  for (final row in sortedRows) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Hàng ${row.key}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: opsMutedText,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        for (final c in _sortCellsByColumn(row.value))
+                          Expanded(child: _cellTile(c)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  const OpsBanner(
+                    tone: OpsBannerTone.info,
+                    icon: Icons.touch_app_outlined,
+                    text: 'Chạm vào một ô để báo hỏng, mở khẩn cấp hoặc mở lại ô sau khi sửa.',
+                  ),
                 ],
               ),
-              const SizedBox(height: 8),
-            ],
-            const SizedBox(height: 8),
-            const Text(
-              'Chạm vào một ô để báo hỏng hoặc mở lại ô sau khi sửa.',
-              style: TextStyle(fontSize: 12, color: opsMutedText),
             ),
           ],
         ],
@@ -345,102 +344,94 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
         _asDouble(locker['latitude']) != null ||
         (address != null && address.trim().isNotEmpty);
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: opsBorder),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.inventory_2_outlined, color: opsPrimary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '${locker['name'] ?? 'Tủ'} · ${locker['code'] ?? 'N/A'}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      color: opsDark,
-                    ),
+    return OpsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.inventory_2_outlined, color: opsPrimary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${locker['name'] ?? 'Tủ'} · ${locker['code'] ?? 'N/A'}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    color: opsDark,
                   ),
                 ),
-                StatusChip(status),
-              ],
-            ),
-            if (address != null && address.trim().isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.location_on_outlined,
-                    size: 15,
-                    color: opsMutedText,
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      address,
-                      style: const TextStyle(fontSize: 12, color: opsMutedText),
-                    ),
-                  ),
-                ],
               ),
+              StatusChip(status),
             ],
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _MiniPill(
-                  icon: Icons.event_available_outlined,
-                  text: 'Đã giữ chỗ: $reserved',
-                  color: statusColor('RESERVED'),
-                ),
-                _MiniPill(
-                  icon: Icons.inventory_outlined,
-                  text: 'Có đồ: $occupied',
-                  color: statusColor('OCCUPIED'),
-                ),
-                _MiniPill(
-                  icon: Icons.grid_view_outlined,
-                  text:
-                      'STANDARD ${_countCells(cells, 'STANDARD', field: 'cellType')}',
-                ),
-                _MiniPill(
-                  icon: Icons.luggage_outlined,
-                  text: 'XL ${_countCells(cells, 'XL', field: 'cellType')}',
-                ),
-                _MiniPill(
-                  icon: Icons.flight_takeoff,
-                  text:
-                      'DRONE ${_countCells(cells, 'DRONE', field: 'cellType')}',
-                  color: const Color(0xFF7C3AED),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
+          ),
+          if (address != null && address.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
             Row(
               children: [
+                const Icon(
+                  Icons.location_on_outlined,
+                  size: 15,
+                  color: opsMutedText,
+                ),
+                const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    'Kiểm tra trực quan từng ô rồi chỉ báo hỏng khi xác nhận lỗi vật lý tại tủ.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                    address,
+                    style: const TextStyle(fontSize: 12, color: opsMutedText),
                   ),
-                ),
-                TextButton.icon(
-                  onPressed: hasLocation ? () => _openDirections(locker) : null,
-                  icon: const Icon(Icons.map_outlined, size: 16),
-                  label: const Text('Chỉ đường'),
                 ),
               ],
             ),
           ],
-        ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _MiniPill(
+                icon: Icons.event_available_outlined,
+                text: 'Đã giữ chỗ: $reserved',
+                color: statusColor('RESERVED'),
+              ),
+              _MiniPill(
+                icon: Icons.inventory_outlined,
+                text: 'Có đồ: $occupied',
+                color: statusColor('OCCUPIED'),
+              ),
+              _MiniPill(
+                icon: Icons.grid_view_outlined,
+                text:
+                    'STANDARD ${_countCells(cells, 'STANDARD', field: 'cellType')}',
+              ),
+              _MiniPill(
+                icon: Icons.luggage_outlined,
+                text: 'XL ${_countCells(cells, 'XL', field: 'cellType')}',
+              ),
+              _MiniPill(
+                icon: Icons.flight_takeoff,
+                text:
+                    'DRONE ${_countCells(cells, 'DRONE', field: 'cellType')}',
+                color: const Color(0xFF7C3AED),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Kiểm tra trực quan từng ô rồi chỉ báo hỏng khi xác nhận lỗi vật lý tại tủ.',
+                  style: const TextStyle(fontSize: 12, color: opsMutedText),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: hasLocation ? () => _openDirections(locker) : null,
+                icon: const Icon(Icons.map_outlined, size: 16, color: opsPrimary),
+                label: const Text('Chỉ đường', style: TextStyle(color: opsPrimary)),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -517,53 +508,59 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
   Widget _cellTile(Map<String, dynamic> cell) {
     final color = statusColor(cell['status'] as String?);
     final type = cell['cellType'] as String? ?? 'STANDARD';
-    return GestureDetector(
-      onTap: () => _cellActions(cell),
-      child: Container(
-        margin: const EdgeInsets.all(3),
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.5)),
-        ),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+    return Padding(
+      padding: const EdgeInsets.all(3),
+      child: Material(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => _cellActions(cell),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: color.withValues(alpha: 0.5)),
+            ),
+            child: Column(
               children: [
-                Text(
-                  '#${cell['boxNumber']}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                    fontSize: 13,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '#${cell['boxNumber']}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                        fontSize: 13,
+                      ),
+                    ),
+                    if (type == 'DRONE')
+                      const Padding(
+                        padding: EdgeInsets.only(left: 2),
+                        child: Icon(Icons.flight, size: 12),
+                      ),
+                    if (type == 'XL')
+                      const Padding(
+                        padding: EdgeInsets.only(left: 2),
+                        child: Icon(Icons.luggage, size: 12),
+                      ),
+                  ],
                 ),
-                if (type == 'DRONE')
-                  const Padding(
-                    padding: EdgeInsets.only(left: 2),
-                    child: Icon(Icons.flight, size: 12),
-                  ),
-                if (type == 'XL')
-                  const Padding(
-                    padding: EdgeInsets.only(left: 2),
-                    child: Icon(Icons.luggage, size: 12),
-                  ),
+                const SizedBox(height: 2),
+                Text(
+                  statusLabel(cell['status'] as String?),
+                  style: TextStyle(fontSize: 10, color: color),
+                ),
+                Text(
+                  _cellTypeLabel(type),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 9, color: opsMutedText),
+                ),
               ],
             ),
-            const SizedBox(height: 2),
-            Text(
-              statusLabel(cell['status'] as String?),
-              style: TextStyle(fontSize: 10, color: color),
-            ),
-            Text(
-              _cellTypeLabel(type),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 9, color: opsMutedText),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -579,18 +576,18 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
 
     await showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
+      showDragHandle: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
       builder: (sheetCtx) {
         Widget tile(IconData icon, String label, Color c, VoidCallback onTap) {
-          return ListTile(
-            leading: Icon(icon, color: c),
-            title: Text(
-              label,
-              style: TextStyle(color: c, fontWeight: FontWeight.w600),
-            ),
+          return OpsSheetAction(
+            icon: icon,
+            label: label,
+            color: c,
             onTap: () {
               Navigator.pop(sheetCtx);
               onTap();
@@ -666,49 +663,58 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
 
         return SafeArea(
           top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 44,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              ListTile(
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '#${cell['boxNumber']}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                      fontSize: 12,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Text(
+                        '#${cell['boxNumber']}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: color,
+                          fontSize: 13,
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Ô #${cell['boxNumber']} · ${_cellTypeLabel(cell['cellType'] as String?)}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                              color: opsDark,
+                            ),
+                          ),
+                          Text(
+                            'Trạng thái: ${statusLabel(status)}'
+                            '${(reason != null && reason.isNotEmpty) ? ' · $reason' : ''}',
+                            style: const TextStyle(fontSize: 12, color: opsMutedText),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                title: Text(
-                  'Ô #${cell['boxNumber']} · ${_cellTypeLabel(cell['cellType'] as String?)}',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                subtitle: Text(
-                  'Trạng thái: ${statusLabel(status)}'
-                  '${(reason != null && reason.isNotEmpty) ? ' · $reason' : ''}',
-                ),
-              ),
-              const Divider(height: 1),
-              ...actions,
-              const SizedBox(height: 8),
-            ],
+                const SizedBox(height: 16),
+                ...actions,
+              ],
+            ),
           ),
         );
       },
@@ -721,6 +727,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Mở tủ khẩn cấp'),
         content: const Text(
           'Tủ sẽ được mở qua MQTT mà không cần PIN khách. Hành động này sẽ được ghi lại trong nhật ký hệ thống.',
@@ -734,6 +741,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFEA580C),
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Xác nhận mở'),
@@ -774,6 +782,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text('Báo hỏng ô #${cell['boxNumber']}'),
         content: TextField(
           controller: reasonCtrl,
@@ -790,6 +799,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFDC2626),
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Báo hỏng'),
@@ -822,6 +832,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text('Ngưng dùng ô #${cell['boxNumber']}'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -849,6 +860,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF6B7280),
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Ngưng dùng'),
@@ -892,24 +904,13 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
         padding: const EdgeInsets.all(12),
         children: [
           _buildShiftSummary(),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           if (_faults.isNotEmpty) ...[
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'Ô đang lỗi vật lý',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
+            const OpsSectionLabel('Ô đang lỗi vật lý', icon: Icons.warning_amber_rounded),
             for (final f in _faults)
-              Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  side: const BorderSide(color: Color(0xFFFECACA)),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: OpsCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -926,16 +927,17 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
+                                color: opsDark,
                               ),
                             ),
                           ),
-                          StatusChip('FAULT'),
+                          const StatusChip('FAULT'),
                         ],
                       ),
                       const SizedBox(height: 8),
                       Text(
                         f['faultReason'] as String? ?? 'Không rõ lý do',
-                        style: const TextStyle(fontSize: 12),
+                        style: const TextStyle(fontSize: 12, color: opsMutedText),
                       ),
                       if ((f['lockerAddress'] ?? '').toString().isNotEmpty)
                         Padding(
@@ -968,15 +970,15 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
                         children: [
                           TextButton.icon(
                             onPressed: () => _openDirections(f),
-                            icon: const Icon(Icons.map_outlined, size: 16),
-                            label: const Text('Chỉ đường'),
+                            icon: const Icon(Icons.map_outlined, size: 16, color: opsPrimary),
+                            label: const Text('Chỉ đường', style: TextStyle(color: opsPrimary)),
                           ),
                           TextButton(
                             onPressed: () => _run(
                               () => _service.clearFault(f['boxId'] as int),
                               'Ô đã hoạt động lại',
                             ),
-                            child: const Text('Đã sửa'),
+                            child: const Text('Đã sửa', style: TextStyle(color: Color(0xFF16A34A))),
                           ),
                         ],
                       ),
@@ -984,24 +986,14 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
                   ),
                 ),
               ),
-            const Divider(height: 32),
+            const SizedBox(height: 8),
           ],
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              'Phiếu sự cố',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
+          const OpsSectionLabel('Phiếu sự cố', icon: Icons.assignment_outlined),
           if (_reports.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(
-                child: Text(
-                  'Không có phiếu nào',
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ),
+            const OpsEmptyState(
+              icon: Icons.task_alt_outlined,
+              title: 'Không có phiếu nào',
+              subtitle: 'Mọi sự cố đã được xử lý hết.',
             ),
           for (final r in _reports) _reportCard(r),
         ],
@@ -1020,11 +1012,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Tổng quan ca trực',
-          style: TextStyle(fontWeight: FontWeight.w800, color: opsDark),
-        ),
-        const SizedBox(height: 8),
+        const OpsSectionLabel('Tổng quan ca trực', icon: Icons.dashboard_outlined),
         Row(
           children: [
             Expanded(
@@ -1090,23 +1078,15 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
         padding: const EdgeInsets.all(12),
         children: [
           if (active.isEmpty && done.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(
-                child: Text(
-                  'Bạn chưa nhận việc nào',
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ),
+            const OpsEmptyState(
+              icon: Icons.engineering_outlined,
+              title: 'Bạn chưa nhận việc nào',
+              subtitle: 'Nhận phiếu từ tab "Sự cố" để bắt đầu xử lý.',
             ),
           for (final r in active) _reportCard(r),
           if (done.isNotEmpty) ...[
-            const Divider(height: 32),
-            const Text(
-              'Đã hoàn thành',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
             const SizedBox(height: 8),
+            const OpsSectionLabel('Đã hoàn thành', icon: Icons.check_circle_outline),
             for (final r in done) _reportCard(r),
           ],
         ],
@@ -1123,55 +1103,25 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
       child: ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: opsPrimary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.event_repeat, size: 18, color: opsPrimary),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Lịch kiểm tra định kỳ do quản trị tạo. Khi đến hạn, hãy kiểm '
-                    'tra tủ rồi bấm "Đã kiểm tra" để dời sang mốc kế tiếp.',
-                    style: TextStyle(fontSize: 12, color: opsDark),
-                  ),
-                ),
-              ],
-            ),
+          const OpsBanner(
+            tone: OpsBannerTone.info,
+            icon: Icons.event_repeat,
+            text: 'Lịch kiểm tra định kỳ do quản trị tạo. Khi đến hạn, hãy kiểm '
+                'tra tủ rồi bấm "Đã kiểm tra" để dời sang mốc kế tiếp.',
           ),
           const SizedBox(height: 12),
           if (_schedules.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(
-                child: Text(
-                  'Chưa có lịch bảo trì định kỳ nào.',
-                  style: TextStyle(color: opsMutedText),
-                ),
-              ),
+            const OpsEmptyState(
+              icon: Icons.event_available_outlined,
+              title: 'Chưa có lịch bảo trì định kỳ nào',
             ),
           if (due.isNotEmpty) ...[
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'Đến hạn',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFFDC2626),
-                ),
-              ),
-            ),
+            const OpsSectionLabel('Đến hạn', icon: Icons.warning_amber_rounded),
             for (final s in due) _scheduleCard(s, due: true),
+            const SizedBox(height: 8),
           ],
           if (upcoming.isNotEmpty) ...[
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text('Sắp tới', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
+            const OpsSectionLabel('Sắp tới', icon: Icons.schedule_outlined),
             for (final s in upcoming) _scheduleCard(s, due: false),
           ],
         ],
@@ -1184,17 +1134,9 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
     final nextDue = _fmtDate(s['nextDueAt']);
     final lastDone = _fmtDate(s['lastDoneAt']);
     final id = _asInt(s['id']);
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(
-          color: due ? const Color(0xFFDC2626) : const Color(0xFFE2E8F0),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: OpsCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1206,6 +1148,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
+                      color: opsDark,
                     ),
                   ),
                 ),
@@ -1233,7 +1176,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
                   _MiniPill(icon: Icons.history, text: 'Lần trước: $lastDone'),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Align(
               alignment: Alignment.centerRight,
               child: ElevatedButton.icon(
@@ -1248,6 +1191,9 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF16A34A),
                   foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ),
@@ -1271,15 +1217,9 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
     final boxLabel = r['boxNumber'] ?? r['boxId'];
     final createdAt = _parseDate(r['createdAt']);
     final ageLabel = createdAt == null ? null : _ageLabel(createdAt);
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: OpsCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1291,6 +1231,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
+                      color: opsDark,
                     ),
                   ),
                 ),
@@ -1300,7 +1241,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
             const SizedBox(height: 4),
             Text(
               '${r['description'] ?? ''}',
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              style: const TextStyle(fontSize: 12, color: opsMutedText),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -1377,13 +1318,13 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
               children: [
                 TextButton.icon(
                   onPressed: () => _openDirections(r),
-                  icon: const Icon(Icons.map_outlined, size: 16),
-                  label: const Text('Chỉ đường'),
+                  icon: const Icon(Icons.map_outlined, size: 16, color: opsPrimary),
+                  label: const Text('Chỉ đường', style: TextStyle(color: opsPrimary)),
                 ),
                 TextButton.icon(
                   onPressed: () => _reportLogSheet(r),
-                  icon: const Icon(Icons.history_edu_outlined, size: 16),
-                  label: const Text('Nhật ký'),
+                  icon: const Icon(Icons.history_edu_outlined, size: 16, color: opsPrimary),
+                  label: const Text('Nhật ký', style: TextStyle(color: opsPrimary)),
                 ),
                 if (status == 'OPEN')
                   TextButton.icon(
@@ -1391,8 +1332,8 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
                       () => _service.claimReport(r['id'] as int),
                       'Đã nhận việc',
                     ),
-                    icon: const Icon(Icons.pan_tool_alt, size: 16),
-                    label: const Text('Nhận việc'),
+                    icon: const Icon(Icons.pan_tool_alt, size: 16, color: opsPrimary),
+                    label: const Text('Nhận việc', style: TextStyle(color: opsPrimary)),
                   ),
                 if (status != 'RESOLVED')
                   ElevatedButton.icon(
@@ -1405,6 +1346,9 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF16A34A),
                       foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
               ],
@@ -1563,12 +1507,10 @@ class _RepairLogSheetState extends State<_RepairLogSheet> {
                       child: Center(child: CircularProgressIndicator()),
                     )
                   : _logs.isEmpty
-                  ? const Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text(
-                        'Chưa có ghi chú nào. Thêm bước xử lý đầu tiên bên dưới.',
-                        style: TextStyle(color: opsMutedText),
-                      ),
+                  ? const OpsEmptyState(
+                      icon: Icons.history_edu_outlined,
+                      title: 'Chưa có ghi chú nào',
+                      subtitle: 'Thêm bước xử lý đầu tiên bên dưới.',
                     )
                   : ListView.separated(
                       shrinkWrap: true,
@@ -1584,8 +1526,9 @@ class _RepairLogSheetState extends State<_RepairLogSheet> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
+                            color: opsSurface,
                             borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: opsBorder),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1616,21 +1559,28 @@ class _RepairLogSheetState extends State<_RepairLogSheet> {
                       controller: _noteCtrl,
                       minLines: 1,
                       maxLines: 3,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: 'Thêm bước xử lý / ghi chú...',
-                        border: OutlineInputBorder(),
                         isDense: true,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: opsBorder),
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   IconButton.filled(
                     onPressed: _sending ? null : _add,
+                    style: IconButton.styleFrom(backgroundColor: opsPrimary),
                     icon: _sending
                         ? const SizedBox(
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : const Icon(Icons.send),
                   ),
