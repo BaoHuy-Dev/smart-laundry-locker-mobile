@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import 'package:smart_laundry_locker/core/routing/app_router.dart';
 import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/utils/locker_maps.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/ops_widgets.dart';
@@ -101,6 +103,42 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
       await fn();
       _snack(ok);
       await _load();
+    } catch (e) {
+      _snack(LockerOpsService.errorMessage(e));
+    }
+  }
+
+  /// Mô phỏng mở tủ qua IoT (xem `LockerOpsService.unlock`): chờ tới ~20s nếu
+  /// thiết bị/simulator không phản hồi, nên hiện snackbar "đang mở" trước.
+  Future<void> _unlock(int lockerId, int boxId, String pinCode) async {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        duration: Duration(seconds: 30),
+        content: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(width: 12),
+            Text('Đang mở tủ...'),
+          ],
+        ),
+      ),
+    );
+    try {
+      final result = await _service.unlock(lockerId, boxId, pinCode);
+      final accepted = result['accepted'] == true;
+      _snack(
+        accepted
+            ? 'Đã mở tủ — bạn có thể lấy/bỏ đồ.'
+            : (result['message']?.toString() ?? 'Không mở được tủ, vui lòng thử lại.'),
+      );
     } catch (e) {
       _snack(LockerOpsService.errorMessage(e));
     }
@@ -247,10 +285,24 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
       ),
     );
     if (confirmed == true && reasonCtrl.text.trim().isNotEmpty) {
-      await _runAction(
-        () => _service.reportFault(boxId, reasonCtrl.text.trim()),
-        'Đã gửi báo lỗi — đội bảo trì sẽ xử lý',
-      );
+      try {
+        await _service.reportFault(boxId, reasonCtrl.text.trim());
+        await _load();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: const Text('Đã gửi báo lỗi — đội bảo trì sẽ xử lý'),
+              action: SnackBarAction(
+                label: 'Xem',
+                onPressed: () => context.push(AppRouter.myLockerReports),
+              ),
+            ),
+          );
+      } catch (e) {
+        _snack(LockerOpsService.errorMessage(e));
+      }
     }
   }
 
@@ -291,6 +343,17 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
           child: _DetailSheet(
             order: order,
+            onUnlock: (lockerId, boxId, pinCode) async {
+              Navigator.pop(ctx);
+              await _unlock(lockerId, boxId, pinCode);
+            },
+            onReorder: (id) async {
+              Navigator.pop(ctx);
+              await _runAction(
+                () => _service.reorder(id),
+                'Đã tạo đơn mới — xem trong danh sách',
+              );
+            },
             onConfirmDrop: (id) async {
               Navigator.pop(ctx);
               await _runAction(
@@ -781,6 +844,8 @@ double? _asDouble(dynamic value) {
 class _DetailSheet extends StatelessWidget {
   const _DetailSheet({
     required this.order,
+    required this.onUnlock,
+    required this.onReorder,
     required this.onConfirmDrop,
     required this.onComplete,
     required this.onEndRental,
@@ -792,6 +857,8 @@ class _DetailSheet extends StatelessWidget {
   });
 
   final Map<String, dynamic> order;
+  final void Function(int lockerId, int boxId, String pinCode) onUnlock;
+  final void Function(int orderId) onReorder;
   final void Function(int orderId) onConfirmDrop;
   final void Function(int orderId) onComplete;
   final void Function(int orderId) onEndRental;
@@ -817,7 +884,32 @@ class _DetailSheet extends StatelessWidget {
         extraFee != null &&
         (extraFee is num ? extraFee > 0 : num.tryParse('$extraFee') != null);
 
+    final pinCode = order['pinCode'] as String?;
+    final canUnlock =
+        boxId != null &&
+        pinCode != null &&
+        status != 'COMPLETED' &&
+        status != 'CANCELED';
+
     final actions = <Widget>[
+      if (canUnlock)
+        _SheetAction(
+          label: 'Mở tủ',
+          icon: LucideIcons.lockOpen,
+          primary: true,
+          onTap: () => onUnlock(
+            (order['lockerId'] as num).toInt(),
+            boxId,
+            pinCode,
+          ),
+        ),
+      if (status == 'COMPLETED' || status == 'CANCELED')
+        _SheetAction(
+          label: 'Đặt lại đơn',
+          icon: LucideIcons.repeat,
+          primary: true,
+          onTap: () => onReorder(id),
+        ),
       if (status == 'INITIALIZED')
         _SheetAction(
           label: 'Tôi đã bỏ đồ vào ô',

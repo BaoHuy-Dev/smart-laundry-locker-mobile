@@ -53,6 +53,7 @@ import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/main
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/send_parcel_page.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/rent_locker_page.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/my_locker_orders_page.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/my_reports_page.dart';
 import 'package:smart_laundry_locker/features/stores/domain/entities/store.dart';
 import 'package:smart_laundry_locker/features/stores/presentation/pages/stores_page.dart';
 import 'package:smart_laundry_locker/features/stores/presentation/pages/store_detail_page.dart';
@@ -100,6 +101,7 @@ class AppRouter {
   static const String sendParcel = '/locker/send-parcel';
   static const String rentLocker = '/locker/rent';
   static const String myLockerOrders = '/locker/my-orders';
+  static const String myLockerReports = '/locker/my-reports';
   static const String stores = '/stores';
   static const String storeDetail = '/stores/detail';
   static const String storeLockers = '/stores/lockers';
@@ -456,6 +458,11 @@ class AppRouter {
         path: myLockerOrders,
         name: 'my_locker_orders',
         builder: (context, state) => const MyLockerOrdersPage(),
+      ),
+      GoRoute(
+        path: myLockerReports,
+        name: 'my_locker_reports',
+        builder: (context, state) => const MyReportsPage(),
       ),
       GoRoute(
         path: myVouchers,

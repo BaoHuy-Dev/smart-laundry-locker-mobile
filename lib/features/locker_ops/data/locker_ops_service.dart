@@ -136,6 +136,24 @@ class LockerOpsService {
   Future<Map<String, dynamic>> reportFault(int boxId, String reason) =>
       _map('POST', '/api/boxes/$boxId/fault', body: {'reason': reason});
 
+  /// All fault reports the signed-in customer has filed, newest first.
+  Future<List<Map<String, dynamic>>> myReports() =>
+      _list('/api/lockers/my-reports');
+
+  /// Recreate a COMPLETED/CANCELED order with the same parameters
+  /// (locker, receiver, cell type/hours) and a fresh PIN/QR.
+  Future<Map<String, dynamic>> reorder(int orderId) =>
+      _map('POST', '/api/orders/$orderId/reorder');
+
+  /// Simulated/real cabinet unlock: verifies [pinCode] against [boxId] then
+  /// asks the IoT layer to open the door. See `IotService.unlock` backend-side.
+  Future<Map<String, dynamic>> unlock(int lockerId, int boxId, String pinCode) =>
+      _map(
+        'POST',
+        '/api/iot/unlock',
+        body: {'lockerId': lockerId, 'boxId': boxId, 'pinCode': pinCode},
+      );
+
   // ---- Manager ----
   Future<List<Map<String, dynamic>>> managerStats() =>
       _list('/api/manage/lockers/stats');
