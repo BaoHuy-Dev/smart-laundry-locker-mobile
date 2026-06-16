@@ -893,7 +893,7 @@ class _DetailSheet extends StatelessWidget {
 
     final actions = <Widget>[
       if (canUnlock)
-        _SheetAction(
+        OpsSheetAction(
           label: 'Mở tủ',
           icon: LucideIcons.lockOpen,
           primary: true,
@@ -904,14 +904,14 @@ class _DetailSheet extends StatelessWidget {
           ),
         ),
       if (status == 'COMPLETED' || status == 'CANCELED')
-        _SheetAction(
+        OpsSheetAction(
           label: 'Đặt lại đơn',
           icon: LucideIcons.repeat,
           primary: true,
           onTap: () => onReorder(id),
         ),
       if (status == 'INITIALIZED')
-        _SheetAction(
+        OpsSheetAction(
           label: 'Tôi đã bỏ đồ vào ô',
           icon: LucideIcons.packageCheck,
           primary: true,
@@ -919,44 +919,44 @@ class _DetailSheet extends StatelessWidget {
         ),
       if (status == 'RETURNED' ||
           (status == 'STORING' && !isRental && !isLaundry))
-        _SheetAction(
+        OpsSheetAction(
           label: 'Tôi đã lấy đồ — hoàn tất',
           icon: LucideIcons.circleCheck,
           primary: true,
           onTap: () => onComplete(id),
         ),
       if (isRental && status == 'STORING') ...[
-        _SheetAction(
+        OpsSheetAction(
           label: 'Gia hạn thuê',
           icon: LucideIcons.timer,
           onTap: () => onExtend(id),
         ),
-        _SheetAction(
+        OpsSheetAction(
           label: 'Kết thúc thuê & trả ô',
           icon: LucideIcons.logOut,
           onTap: () => onEndRental(id),
         ),
       ],
       if (status == 'STORING' || status == 'RETURNED')
-        _SheetAction(
+        OpsSheetAction(
           label: 'Ủy quyền người khác lấy hộ',
           icon: LucideIcons.userPlus,
           onTap: () => onDelegate(id),
         ),
       if (boxId != null && status != 'COMPLETED' && status != 'CANCELED')
-        _SheetAction(
+        OpsSheetAction(
           label: 'Báo ô lỗi',
           icon: LucideIcons.triangleAlert,
           onTap: () => onReport(boxId),
         ),
       if (status == 'INITIALIZED')
-        _SheetAction(
+        OpsSheetAction(
           label: 'Hủy đơn',
           icon: LucideIcons.circleX,
           danger: true,
           onTap: () => onCancel(id),
         ),
-      _SheetAction(
+      OpsSheetAction(
         label: 'Chỉ đường tới tủ',
         icon: LucideIcons.map,
         onTap: onDirections,
@@ -1069,60 +1069,6 @@ class _DetailSheet extends StatelessWidget {
         ...actions,
         const SizedBox(height: 8),
       ],
-    );
-  }
-}
-
-class _SheetAction extends StatelessWidget {
-  const _SheetAction({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-    this.primary = false,
-    this.danger = false,
-  });
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-  final bool primary;
-  final bool danger;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = danger ? const Color(0xFFDC2626) : opsPrimary;
-    if (primary) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: OpsPrimaryButton(label: label, icon: icon, onPressed: onTap),
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Material(
-        color: color.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                Icon(icon, size: 18, color: color),
-                const SizedBox(width: 12),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

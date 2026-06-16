@@ -380,6 +380,69 @@ class OpsPrimaryButton extends StatelessWidget {
   }
 }
 
+/// Single action row used inside bottom sheets (order detail actions,
+/// maintenance cell actions, etc). `primary` renders as a full-width CTA via
+/// [OpsPrimaryButton]; otherwise a tinted tappable row.
+class OpsSheetAction extends StatelessWidget {
+  const OpsSheetAction({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    this.primary = false,
+    this.danger = false,
+    this.color,
+    super.key,
+  });
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool primary;
+  final bool danger;
+
+  /// Overrides the default primary/danger color when a row needs its own
+  /// semantic color (e.g. a row of 5 differently-colored maintenance actions).
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = this.color ?? (danger ? const Color(0xFFDC2626) : opsPrimary);
+    if (primary) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: OpsPrimaryButton(label: label, icon: icon, onPressed: onTap),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Icon(icon, size: 18, color: color),
+                const SizedBox(width: 12),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Empty / placeholder state.
 class OpsEmptyState extends StatelessWidget {
   const OpsEmptyState({
