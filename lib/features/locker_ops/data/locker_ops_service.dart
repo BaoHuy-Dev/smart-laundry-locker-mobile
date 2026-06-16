@@ -59,6 +59,7 @@ class LockerOpsService {
     String? receiverName,
     String? note,
     String? promotionCode,
+    String? size,
   }) => _map(
     'POST',
     '/api/orders/send',
@@ -67,6 +68,7 @@ class LockerOpsService {
       'receiverPhone': receiverPhone,
       'receiverName': receiverName,
       'note': note,
+      if (size != null) 'size': size,
       // Forward-compatible: backend ignores unknown fields today; will apply
       // once the send DTO accepts a promotion code.
       if (promotionCode != null) 'promotionCode': promotionCode,
@@ -154,6 +156,24 @@ class LockerOpsService {
         body: {'lockerId': lockerId, 'boxId': boxId, 'pinCode': pinCode},
       );
 
+  /// Customer feedback on a RESOLVED fault report — the other half of the
+  /// claim/resolve notification loop.
+  Future<Map<String, dynamic>> rateReport(int reportId, int rating, String? comment) =>
+      _map(
+        'POST',
+        '/api/lockers/reports/$reportId/rate',
+        body: {'rating': rating, 'comment': comment},
+      );
+
+  Future<Map<String, dynamic>?> getReportRating(int reportId) async {
+    try {
+      return await _map('GET', '/api/lockers/reports/$reportId/rating');
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
   // ---- Manager ----
   Future<List<Map<String, dynamic>>> managerStats() =>
       _list('/api/manage/lockers/stats');
@@ -218,6 +238,15 @@ class LockerOpsService {
   /// KTV đánh dấu đã kiểm tra xong 1 lịch → dời mốc đến hạn kế tiếp.
   Future<Map<String, dynamic>> completeSchedule(int scheduleId) =>
       _map('POST', '/api/maintenance/schedules/$scheduleId/complete');
+
+  /// Mở ô khẩn cấp không cần PIN khách — luôn được ghi vào audit log
+  /// (credential MASTER) ở backend.
+  Future<Map<String, dynamic>> forceOpenBox(int boxId) =>
+      _map('POST', '/api/maintenance/boxes/$boxId/force-open');
+
+  /// Điểm đánh giá trung bình KTV nhận được từ các report mình xử lý.
+  Future<Map<String, dynamic>> myRatingAverage() =>
+      _map('GET', '/api/maintenance/my-rating-average');
 
   /// Human-readable message from an [ApiResponse] error payload.
   static String errorMessage(Object error) {

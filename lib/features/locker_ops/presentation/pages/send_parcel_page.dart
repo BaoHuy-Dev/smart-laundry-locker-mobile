@@ -45,6 +45,8 @@ class _SendParcelPageState extends State<SendParcelPage> {
 
   static const _fee = 15000;
 
+  static const _sizes = ['SMALL', 'MEDIUM', 'LARGE'];
+
   List<Map<String, dynamic>> _lockers = [];
   int? _lockerId;
   bool _loadingLockers = true;
@@ -52,6 +54,7 @@ class _SendParcelPageState extends State<SendParcelPage> {
   Map<String, dynamic>? _order;
   int _discount = 0;
   String? _promoCode;
+  String _size = 'MEDIUM';
 
   int get _netFee => (_fee - _discount).clamp(0, _fee);
 
@@ -110,6 +113,7 @@ class _SendParcelPageState extends State<SendParcelPage> {
             _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
         note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
         promotionCode: _promoCode,
+        size: _size,
       );
       if (!mounted) return;
       setState(() => _order = order);
@@ -135,6 +139,12 @@ class _SendParcelPageState extends State<SendParcelPage> {
       if (mounted) setState(() => _loading = false);
     }
   }
+
+  String _sizeLabel(String size) => switch (size) {
+        'SMALL' => 'Nhỏ',
+        'LARGE' => 'Lớn',
+        _ => 'Vừa',
+      };
 
   void _snack(String msg) {
     if (!mounted) return;
@@ -187,6 +197,26 @@ class _SendParcelPageState extends State<SendParcelPage> {
               selectedId: _lockerId,
               onSelected: (l) => setState(() => _lockerId = l['id'] as int?),
             ),
+          const SizedBox(height: 20),
+          const OpsSectionLabel('Kích thước hàng', icon: LucideIcons.packageSearch),
+          Wrap(
+            spacing: 8,
+            children: _sizes.map((s) {
+              final selected = _size == s;
+              return ChoiceChip(
+                label: Text(_sizeLabel(s)),
+                selected: selected,
+                onSelected: (_) => setState(() => _size = s),
+                selectedColor: opsPrimary,
+                labelStyle: TextStyle(
+                  color: selected ? Colors.white : opsDark,
+                  fontWeight: FontWeight.w600,
+                ),
+                backgroundColor: Colors.white,
+                side: BorderSide(color: selected ? opsPrimary : opsBorder),
+              );
+            }).toList(),
+          ),
           const SizedBox(height: 20),
           const OpsSectionLabel('Người nhận', icon: LucideIcons.userRound),
           _field(

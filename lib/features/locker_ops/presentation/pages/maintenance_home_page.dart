@@ -25,6 +25,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
   List<Map<String, dynamic>> _schedules = [];
   bool _loading = true;
   String? _myUserId;
+  Map<String, dynamic>? _ratingAverage;
 
   // Inspection tab state
   List<Map<String, dynamic>> _lockers = [];
@@ -70,6 +71,10 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
       try {
         final schedules = await _service.maintenanceSchedules();
         if (mounted) setState(() => _schedules = schedules);
+      } catch (_) {}
+      try {
+        final avg = await _service.myRatingAverage();
+        if (mounted) setState(() => _ratingAverage = avg);
       } catch (_) {}
       final validSelected = lockers.any(
         (locker) => _asInt(locker['id']) == _selectedLockerId,
@@ -651,6 +656,14 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
             ));
         }
 
+        // Luôn có sẵn bất kể trạng thái — override khẩn cấp, luôn ghi audit log.
+        actions.add(tile(
+          Icons.lock_open,
+          'Mở tủ khẩn cấp',
+          const Color(0xFFEA580C),
+          () => _forceOpenFlow(boxId),
+        ));
+
         return SafeArea(
           top: false,
           child: Column(
@@ -700,6 +713,36 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
         );
       },
     );
+  }
+
+  /// Mở tủ khẩn cấp không cần PIN khách — luôn xác nhận trước vì hành động
+  /// được ghi vào audit log (credential MASTER) phía backend.
+  Future<void> _forceOpenFlow(int boxId) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mở tủ khẩn cấp'),
+        content: const Text(
+          'Tủ sẽ được mở qua MQTT mà không cần PIN khách. Hành động này sẽ được ghi lại trong nhật ký hệ thống.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEA580C),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Xác nhận mở'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await _runCellAction(() => _service.forceOpenBox(boxId), 'Đã gửi lệnh mở tủ khẩn cấp');
   }
 
   /// Chạy 1 thao tác đổi trạng thái ô + báo kết quả + reload danh sách.
@@ -1017,6 +1060,16 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
             ),
           ],
         ),
+        if ((_ratingAverage?['count'] as int?) != null &&
+            (_ratingAverage!['count'] as int) > 0) ...[
+          const SizedBox(height: 8),
+          OpsBanner(
+            text:
+                'Điểm đánh giá của bạn: ${_ratingAverage!['average']}/5 (${_ratingAverage!['count']} lượt)',
+            icon: Icons.star_rate_rounded,
+            tone: OpsBannerTone.success,
+          ),
+        ],
         const SizedBox(height: 10),
         const OpsBanner(
           text:
@@ -1259,6 +1312,17 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
                   text:
                       '$lockerLabel${boxLabel != null ? ' · ô $boxLabel' : ''}',
                 ),
+                if ((r['reporterName'] ?? '').toString().isNotEmpty ||
+                    (r['reporterPhone'] ?? '').toString().isNotEmpty)
+                  _MiniPill(
+                    icon: Icons.person_outline,
+                    text: [
+                      if ((r['reporterName'] ?? '').toString().isNotEmpty)
+                        r['reporterName'].toString(),
+                      if ((r['reporterPhone'] ?? '').toString().isNotEmpty)
+                        r['reporterPhone'].toString(),
+                    ].join(' · '),
+                  ),
                 if ((r['cellType'] ?? '').toString().isNotEmpty)
                   _MiniPill(
                     icon: Icons.grid_view_outlined,

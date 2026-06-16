@@ -88,12 +88,56 @@ class _MyReportsPageState extends State<MyReportsPage> {
   }
 }
 
-class _ReportCard extends StatelessWidget {
+class _ReportCard extends StatefulWidget {
   const _ReportCard({required this.report});
   final Map<String, dynamic> report;
 
   @override
+  State<_ReportCard> createState() => _ReportCardState();
+}
+
+class _ReportCardState extends State<_ReportCard> {
+  final _service = LockerOpsService();
+  Map<String, dynamic>? _rating;
+  bool _loadingRating = false;
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.report['status'] == 'RESOLVED') {
+      _loadRating();
+    }
+  }
+
+  Future<void> _loadRating() async {
+    setState(() => _loadingRating = true);
+    try {
+      final rating = await _service.getReportRating(widget.report['id'] as int);
+      if (mounted) setState(() => _rating = rating);
+    } finally {
+      if (mounted) setState(() => _loadingRating = false);
+    }
+  }
+
+  Future<void> _submitRating(int stars) async {
+    setState(() => _submitting = true);
+    try {
+      final result = await _service.rateReport(widget.report['id'] as int, stars, null);
+      if (mounted) setState(() => _rating = result);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(LockerOpsService.errorMessage(e))),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final report = widget.report;
     final status = report['status'] as String?;
     final description = report['description'] as String?;
     final lockerLabel =
@@ -153,7 +197,7 @@ class _ReportCard extends StatelessWidget {
                 text: 'Đội bảo trì đang xử lý báo cáo này.',
               ),
             )
-          else if (status == 'RESOLVED')
+          else if (status == 'RESOLVED') ...[
             const Padding(
               padding: EdgeInsets.only(top: 10),
               child: OpsBanner(
@@ -162,6 +206,59 @@ class _ReportCard extends StatelessWidget {
                 text: 'Báo cáo đã được xử lý xong.',
               ),
             ),
+            const SizedBox(height: 10),
+            if (_loadingRating)
+              const SizedBox(
+                height: 20,
+                child: Center(
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              )
+            else if (_rating != null)
+              Row(
+                children: [
+                  ...List.generate(
+                    5,
+                    (i) => Icon(
+                      i < (_rating!['rating'] as int)
+                          ? LucideIcons.star
+                          : LucideIcons.star,
+                      size: 16,
+                      color: i < (_rating!['rating'] as int)
+                          ? const Color(0xFFF59E0B)
+                          : opsBorder,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Bạn đã đánh giá',
+                    style: TextStyle(fontSize: 12, color: opsMutedText),
+                  ),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  const Text(
+                    'Đánh giá xử lý: ',
+                    style: TextStyle(fontSize: 12, color: opsMutedText),
+                  ),
+                  ...List.generate(
+                    5,
+                    (i) => IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      icon: const Icon(LucideIcons.star, size: 18, color: Color(0xFFF59E0B)),
+                      onPressed: _submitting ? null : () => _submitRating(i + 1),
+                    ),
+                  ),
+                ],
+              ),
+          ],
         ],
       ),
     );
