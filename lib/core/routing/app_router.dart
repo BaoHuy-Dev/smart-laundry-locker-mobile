@@ -33,6 +33,7 @@ import 'package:smart_laundry_locker/core/presentation/pages/qr_scanner_page.dar
 import 'package:smart_laundry_locker/core/presentation/pages/directions_map_page.dart';
 import 'package:smart_laundry_locker/features/notifications/presentation/pages/notification_list_page.dart';
 import 'package:smart_laundry_locker/features/vouchers/presentation/pages/my_vouchers_page.dart';
+import 'package:smart_laundry_locker/features/promotions/presentation/pages/promotions_page.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
 import 'package:go_router/go_router.dart';
 
@@ -95,6 +96,7 @@ class AppRouter {
   static const String orderDetail = '/orders/detail';
   static const String myDelegations = '/my-delegations';
   static const String myVouchers = '/my-vouchers';
+  static const String promotions = '/promotions';
   static const String userLaundryOrder = '/user/laundry-order';
   static const String managerHome = '/manager';
   static const String maintenanceHome = '/maintenance-home';
@@ -468,6 +470,11 @@ class AppRouter {
         path: myVouchers,
         name: 'my_vouchers',
         builder: (context, state) => const MyVouchersPage(),
+      ),
+      GoRoute(
+        path: promotions,
+        name: 'promotions',
+        builder: (context, state) => const PromotionsPage(),
       ),
       GoRoute(
         path: stores,

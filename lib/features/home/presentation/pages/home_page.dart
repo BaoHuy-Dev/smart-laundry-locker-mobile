@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'package:flutter/services.dart';
 import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
+import 'package:smart_laundry_locker/features/promotions/data/models/promotion_model.dart';
+import 'package:smart_laundry_locker/features/promotions/presentation/providers/promotion_provider.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:smart_laundry_locker/core/utils/currency_formatter.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -64,6 +66,7 @@ class _HomePageState extends ConsumerState<HomePage>
         profile.loadProfile();
       }
       ref.read(lockerNotifierProvider).getLocations();
+      ref.read(promotionNotifierProvider).load();
     });
   }
 
@@ -86,6 +89,7 @@ class _HomePageState extends ConsumerState<HomePage>
     await Future.wait<void>([
       profile.loadProfile(),
       ref.read(lockerNotifierProvider).getLocations(refresh: true),
+      ref.read(promotionNotifierProvider).load(),
     ]);
   }
 
@@ -136,20 +140,11 @@ class _HomePageState extends ConsumerState<HomePage>
             _buildChips(context),
             const SizedBox(height: 16),
             _buildWalletCard(context),
-            const SizedBox(height: 20),
-            _buildWelcomeCard(context),
-            const SizedBox(height: 28),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: BrandSectionHeader(
-                icon: LucideIcons.store,
-                title: 'Các nơi đặt locker',
-                onSeeAll: () => context.go(AppRouter.lockers),
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildStoreSection(context),
             const SizedBox(height: 24),
+            _buildPopularLockersSection(context),
+            const SizedBox(height: 24),
+            _buildFlashSaleSection(context),
+            const SizedBox(height: 28),
           ],
         ),
       ),
@@ -404,7 +399,7 @@ class _HomePageState extends ConsumerState<HomePage>
       BrandFilterChip(
         icon: LucideIcons.gift,
         label: 'Ưu đãi',
-        onTap: () => context.push(AppRouter.myVouchers),
+        onTap: () => context.push(AppRouter.promotions),
       ),
     ];
 
@@ -420,13 +415,95 @@ class _HomePageState extends ConsumerState<HomePage>
     );
   }
 
-  Widget _buildWelcomeCard(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+  // ── "Popular Workouts" style: horizontal locker cards ──────────────────────
+
+  Widget _buildPopularLockersSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: BrandSectionHeader(
+            icon: LucideIcons.store,
+            title: 'Các nơi đặt locker',
+            onSeeAll: () => context.go(AppRouter.lockers),
+          ),
+        ),
+        const SizedBox(height: 14),
+        _buildLockerHorizontalList(context),
+      ],
+    );
+  }
+
+  Widget _buildLockerHorizontalList(BuildContext context) {
+    final LockerProvider lockerProvider = ref.watch(lockerNotifierProvider);
+    final LockerState state = lockerProvider.state;
+
+    if (state.isLoading && state.locations.isEmpty) {
+      return SizedBox(
+        height: 196,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          itemCount: 3,
+          separatorBuilder: (_, __) => const SizedBox(width: 14),
+          itemBuilder: (_, __) => Container(
+            width: 220,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
+        ),
+      );
+    }
+    if (state.error != null && state.locations.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: _storeMessage(LucideIcons.triangleAlert, state.error!, const Color(0xFFE53E3E)),
+      );
+    }
+    if (state.locations.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: _storeMessage(LucideIcons.store, 'Chưa có nơi đặt locker nào', const Color(0xFFA0AEC0)),
+      );
+    }
+    return SizedBox(
+      height: 196,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: state.locations.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 14),
+        itemBuilder: (_, index) => _buildLockerHorizontalCard(context, state.locations[index]),
+      ),
+    );
+  }
+
+  Widget _buildLockerHorizontalCard(BuildContext context, LockerLocation location) {
+    final colors = _gradientForLocation(location.id);
+    final initials = _initialsForName(location.name);
+    return GestureDetector(
+      onTap: () => Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => StoreLockerGridPage(
+            store: Store(
+              id: int.tryParse(location.id) ?? 0,
+              name: location.name,
+              address: location.address,
+              latitude: location.latitude,
+              longitude: location.longitude,
+              active: location.isActive,
+            ),
+          ),
+        ),
+      ),
       child: Container(
-        height: 140,
+        width: 220,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.12),
@@ -436,60 +513,332 @@ class _HomePageState extends ConsumerState<HomePage>
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Row(
+          borderRadius: BorderRadius.circular(20),
+          child: Stack(
+            fit: StackFit.expand,
             children: [
-              Expanded(
-                flex: 6,
-                child: Container(
-                  decoration: const BoxDecoration(
+              // Background image or gradient
+              (location.imageUrl != null && location.imageUrl!.isNotEmpty)
+                  ? CachedNetworkImage(
+                      imageUrl: location.imageUrl!,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => _lockerCardGradient(colors, initials),
+                      errorWidget: (_, __, ___) => _lockerCardGradient(colors, initials),
+                    )
+                  : _lockerCardGradient(colors, initials),
+              // Dark bottom overlay
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: AislBrand.softHeaderGradient,
+                      colors: [Colors.transparent, Colors.black.withValues(alpha: 0.60)],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      stops: const [0.4, 1.0],
                     ),
                   ),
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        'Welcome!',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.black,
-                        ),
+                ),
+              ),
+              // Status badge top-left
+              Positioned(
+                top: 12,
+                left: 12,
+                child: BrandStatusBadge(
+                  label: location.isActive ? 'Hoạt động' : 'Đóng cửa',
+                  dotColor: location.isActive ? AislBrand.statusGreen : Colors.grey,
+                  textColor: location.isActive ? AislBrand.statusGreenText : Colors.grey.shade700,
+                ),
+              ),
+              // Name + address bottom
+              Positioned(
+                bottom: 14,
+                left: 14,
+                right: 14,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      location.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
                       ),
-                      SizedBox(height: 8),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(LucideIcons.mapPin, color: Colors.white60, size: 11),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(
+                            location.address.isNotEmpty ? location.address : 'Chưa có địa chỉ',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white60, fontSize: 11),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _lockerCardGradient(List<Color> colors, String initials) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              initials,
+              style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w800, letterSpacing: 2),
+            ),
+            const SizedBox(height: 4),
+            const Icon(LucideIcons.lockKeyhole, color: Colors.white38, size: 22),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Flash Sale section ─────────────────────────────────────────────────────
+
+  Widget _buildFlashSaleSection(BuildContext context) {
+    final PromotionProvider promoProvider = ref.watch(promotionNotifierProvider);
+    final promos = promoProvider.promotions;
+    final isLoading = promoProvider.isLoading;
+
+    if (!isLoading && promos.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: BrandSectionHeader(
+            icon: LucideIcons.zap,
+            title: 'Flash Sale',
+            onSeeAll: () => context.push(AppRouter.promotions),
+          ),
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          height: 175,
+          child: isLoading && promos.isEmpty
+              ? _buildFlashSaleSkeleton()
+              : ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: promos.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 14),
+                  itemBuilder: (_, i) => _buildFlashSaleCard(context, promos[i], i),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFlashSaleSkeleton() {
+    return ListView.separated(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: 3,
+      separatorBuilder: (_, __) => const SizedBox(width: 14),
+      itemBuilder: (_, __) => ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Container(width: 260, color: const Color(0xFFE2E8F0)),
+      ),
+    );
+  }
+
+  Widget _buildFlashSaleCard(BuildContext context, PromotionModel promo, int idx) {
+    final colors = _gradients[idx % _gradients.length];
+    return GestureDetector(
+      onTap: () => context.push(AppRouter.promotions),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: SizedBox(
+          width: 260,
+          height: 175,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Background: image or gradient
+              (promo.imageUrl != null && promo.imageUrl!.isNotEmpty)
+                  ? CachedNetworkImage(
+                      imageUrl: promo.imageUrl!,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => _flashGradientBg(colors),
+                      errorWidget: (_, __, ___) => _flashGradientBg(colors),
+                    )
+                  : _flashGradientBg(colors),
+              // Dark vignette overlay
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.transparent, Colors.black.withValues(alpha: 0.60)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+              ),
+              // Top-left: Flash Sale tag
+              Positioned(
+                top: 12,
+                left: 12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF97316),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(LucideIcons.zap, size: 11, color: Colors.white),
+                      SizedBox(width: 4),
                       Text(
-                        'Hãy để chúng tôi là nơi an toàn của bạn.',
+                        'FLASH SALE',
                         style: TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF666666),
-                          height: 1.4,
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-              Expanded(
-                flex: 5,
+              // Top-right: Discount badge
+              Positioned(
+                top: 12,
+                right: 12,
                 child: Container(
-                  color: const Color(0xFF1A3A4A),
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Image.asset(
-                        'assets/images/logo.png',
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const Icon(
-                          LucideIcons.box,
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE53E3E),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    promo.discountLabel,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+              // Bottom: name + expiry + code
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        promo.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
                           color: Colors.white,
-                          size: 48,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                          shadows: [Shadow(color: Colors.black45, blurRadius: 4)],
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 7),
+                      Row(
+                        children: [
+                          Icon(
+                            LucideIcons.clock,
+                            size: 11,
+                            color: promo.isExpiringSoon
+                                ? const Color(0xFFFBBF24)
+                                : Colors.white70,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            promo.expiryLabel,
+                            style: TextStyle(
+                              color: promo.isExpiringSoon
+                                  ? const Color(0xFFFBBF24)
+                                  : Colors.white70,
+                              fontSize: 11,
+                              fontWeight: promo.isExpiringSoon
+                                  ? FontWeight.w700
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                          const Spacer(),
+                          GestureDetector(
+                            onTap: () {
+                              Clipboard.setData(ClipboardData(text: promo.code));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Đã sao chép: ${promo.code}'),
+                                  backgroundColor: AislBrand.navy,
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.white30),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    promo.code,
+                                    style: const TextStyle(
+                                      fontFamily: 'monospace',
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 11,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  const Icon(
+                                    LucideIcons.copy,
+                                    size: 10,
+                                    color: Colors.white70,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -500,58 +849,21 @@ class _HomePageState extends ConsumerState<HomePage>
     );
   }
 
-  Widget _buildStoreSection(BuildContext context) {
-    final LockerProvider lockerProvider = ref.watch(lockerNotifierProvider);
-    final LockerState state = lockerProvider.state;
-
-    if (state.isLoading && state.locations.isEmpty) {
-      return _storeStateCard(
-        const SizedBox(
-          height: 120,
-          child: Center(
-            child: CircularProgressIndicator(color: AislBrand.navy),
-          ),
+  Widget _flashGradientBg(List<Color> colors) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: colors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-      );
-    }
-    if (state.error != null && state.locations.isEmpty) {
-      return _storeStateCard(
-        _storeMessage(
-          LucideIcons.triangleAlert,
-          state.error!,
-          const Color(0xFFE53E3E),
+      ),
+      child: Center(
+        child: Icon(
+          LucideIcons.ticket,
+          size: 56,
+          color: Colors.white.withValues(alpha: 0.15),
         ),
-      );
-    }
-    if (state.locations.isEmpty) {
-      return _storeStateCard(
-        _storeMessage(
-          LucideIcons.store,
-          'Chưa có nơi đặt locker nào',
-          const Color(0xFFA0AEC0),
-        ),
-      );
-    }
-    return _buildLockerFeatureCard(context, state.locations.first);
-  }
-
-  Widget _storeStateCard(Widget child) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AislBrand.cardBorder),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: child,
       ),
     );
   }
@@ -594,143 +906,6 @@ class _HomePageState extends ConsumerState<HomePage>
     }
     final n = parts.first;
     return n.length >= 2 ? n.substring(0, 2).toUpperCase() : n.toUpperCase();
-  }
-
-  Widget _gradientThumbnail(List<Color> colors, String initials) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: colors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            initials,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 32,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 2,
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Icon(LucideIcons.lockKeyhole, color: Colors.white54, size: 24),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLockerFeatureCard(BuildContext context, LockerLocation location) {
-    final colors = _gradientForLocation(location.id);
-    final initials = _initialsForName(location.name);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: GestureDetector(
-        onTap: () => Navigator.push<void>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => StoreLockerGridPage(
-              store: Store(
-                id: int.tryParse(location.id) ?? 0,
-                name: location.name,
-                address: location.address,
-                latitude: location.latitude,
-                longitude: location.longitude,
-                active: location.isActive,
-              ),
-            ),
-          ),
-        ),
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AislBrand.cardBorder),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(24),
-                    ),
-                    child: SizedBox(
-                      height: 180,
-                      width: double.infinity,
-                      child: (location.imageUrl != null &&
-                              location.imageUrl!.isNotEmpty)
-                          ? CachedNetworkImage(
-                              imageUrl: location.imageUrl!,
-                              fit: BoxFit.cover,
-                              placeholder: (_, __) =>
-                                  _gradientThumbnail(colors, initials),
-                              errorWidget: (_, __, ___) =>
-                                  _gradientThumbnail(colors, initials),
-                            )
-                          : _gradientThumbnail(colors, initials),
-                    ),
-                  ),
-                  Positioned(
-                    top: 14,
-                    left: 14,
-                    child: BrandStatusBadge(
-                      label: location.isActive ? 'Hoạt động' : 'Đóng cửa',
-                      dotColor: location.isActive
-                          ? AislBrand.statusGreen
-                          : Colors.grey,
-                      textColor: location.isActive
-                          ? AislBrand.statusGreenText
-                          : Colors.grey.shade700,
-                    ),
-                  ),
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      location.name,
-                      style: const TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w800,
-                        color: AislBrand.textTitle,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      location.address.isNotEmpty
-                          ? location.address
-                          : 'Chưa có địa chỉ',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AislBrand.textMuted,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   // ---------------------------------------------------------------------------
@@ -1037,153 +1212,6 @@ class _HomePageState extends ConsumerState<HomePage>
     );
   }
 
-  Widget _buildBlogSection(BuildContext context, HomeProvider provider) {
-    if (provider.blogs.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Text(
-            'Tin tức & Cẩm nang',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              color: Colors.black87,
-            ),
-          ),
-        ),
-        SizedBox(
-          height: 260,
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            scrollDirection: Axis.horizontal,
-            itemCount: provider.blogs.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 16),
-            itemBuilder: (context, index) {
-              final blog = provider.blogs[index];
-              return InkWell(
-                onTap: () {
-                  // Show detail dialog or navigate
-                  SmartDialog.show(
-                    builder: (ctx) => AlertDialog(
-                      title: Text(blog.title),
-                      content: SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (blog.imageUrl != null)
-                              Image.network(blog.imageUrl!),
-                            const SizedBox(height: 12),
-                            Text(blog.content),
-                          ],
-                        ),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => SmartDialog.dismiss(),
-                          child: const Text('Đóng'),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-                child: Container(
-                  width: 280,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(16),
-                        ),
-                        child: blog.imageUrl != null
-                            ? Image.network(
-                                blog.imageUrl!,
-                                height: 140,
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Container(
-                                      height: 140,
-                                      color: Colors.grey[200],
-                                      child: const Icon(
-                                        LucideIcons.image,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                              )
-                            : Container(
-                                height: 140,
-                                color: Colors.grey[200],
-                                child: const Icon(
-                                  LucideIcons.newspaper,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              DateFormat('dd/MM/yyyy').format(blog.createdAt),
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              blog.title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            if (blog.subTitle != null &&
-                                blog.subTitle!.isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                blog.subTitle!,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildWalletSection(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -1280,226 +1308,6 @@ class _HomePageState extends ConsumerState<HomePage>
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildMainActions(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              'Dịch vụ tiện ích',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _buildExpressCard(
-                  'Thuê tủ',
-                  'An toàn',
-                  LucideIcons.key,
-                  const Color(0xFFF0F7FF),
-                  Colors.blue.shade500,
-                  () => context.push(AppRouter.rentLocker),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildExpressCard(
-                  'Lấy hàng',
-                  'Tiện lợi',
-                  LucideIcons.packageOpen,
-                  const Color(0xFFFFF8F0),
-                  const Color(0xFF5F8FB8),
-                  () => context.push(AppRouter.lockerOtp),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildExpressCard(
-                  'Gửi hàng',
-                  'Nhanh chóng',
-                  LucideIcons.send,
-                  const Color(0xFFF3FAF4),
-                  Colors.green.shade500,
-                  () => context.push(AppRouter.sendParcel),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _buildExpressCard(
-                  'Ủy quyền',
-                  'Mở tủ',
-                  LucideIcons.lockOpen,
-                  const Color(0xFFEFF6FF),
-                  Colors.blue.shade600,
-                  () => context.push(AppRouter.authorizedOpening),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildExpressCard(
-                  'Giat do',
-                  'Tao don',
-                  LucideIcons.washingMachine,
-                  const Color(0xFFF4F7FF),
-                  AISLShadcnTheme.navyPrimary,
-                  () => context.push(AppRouter.userLaundryOrder),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildExpressCard(
-                  'Đơn tủ',
-                  'Theo dõi',
-                  LucideIcons.package,
-                  const Color(0xFFFFF4F6),
-                  Colors.pink.shade500,
-                  () => context.push(AppRouter.myLockerOrders),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStoresEntry(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => context.push(AppRouter.stores),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AISLShadcnTheme.navyPrimary,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  LucideIcons.store,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Khám phá cửa hàng',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                      ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      'Tìm cửa hàng & tủ gần bạn',
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right, color: Colors.white70),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildExpressCard(
-    String title,
-    String subtitle,
-    IconData icon,
-    Color bgColor,
-    Color iconColor,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 130, // Adjusted for 3 columns
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            Expanded(
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.6),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: iconColor.withValues(alpha: 0.2),
-                        blurRadius: 8,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                  child: Icon(icon, color: iconColor, size: 28),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-                color: Colors.black87,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 9,
-                color: Colors.grey.shade600,
-                height: 1.1,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
     );
   }
 
