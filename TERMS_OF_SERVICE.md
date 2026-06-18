@@ -1,13 +1,13 @@
-# Điều khoản sử dụng — Lock.R (Smart Laundry Locker)
+# Điều khoản sử dụng — Lock.R (Smart Locker)
 
 **Ngày hiệu lực:** 18/06/2026
 
-Vui lòng đọc kỹ Điều khoản sử dụng ("Điều khoản") này trước khi sử dụng ứng dụng Lock.R Locker ("Ứng dụng") do Smart Laundry Locker ("chúng tôi") cung cấp. Bằng việc tạo tài khoản hoặc sử dụng Ứng dụng, bạn đồng ý bị ràng buộc bởi các Điều khoản này.
+Vui lòng đọc kỹ Điều khoản sử dụng ("Điều khoản") này trước khi sử dụng ứng dụng Lock.R ("Ứng dụng") do Smart Locker ("chúng tôi") cung cấp. Bằng việc tạo tài khoản hoặc sử dụng Ứng dụng, bạn đồng ý bị ràng buộc bởi các Điều khoản này.
 
 ## 1. Mô tả dịch vụ
 
 Ứng dụng cung cấp dịch vụ tủ locker thông minh, bao gồm:
-- Thuê tủ locker để lưu trữ đồ giặt/đồ cá nhân.
+- Thuê tủ locker để lưu trữ đồ cá nhân.
 - Gửi và nhận hàng qua hệ thống tủ locker.
 - Mở/đóng tủ bằng mã PIN hoặc mã QR.
 - Theo dõi trạng thái đơn hàng, lịch sử sử dụng.
@@ -41,7 +41,7 @@ Vui lòng đọc kỹ Điều khoản sử dụng ("Điều khoản") này trư�
 
 ## 6. Quyền sở hữu trí tuệ
 
-Toàn bộ nội dung, thương hiệu, mã nguồn, giao diện của Ứng dụng thuộc quyền sở hữu của Smart Laundry Locker hoặc các bên cấp phép liên quan. Bạn không được sao chép, sửa đổi, phân phối lại nếu không có sự cho phép bằng văn bản.
+Toàn bộ nội dung, thương hiệu, mã nguồn, giao diện của Ứng dụng thuộc quyền sở hữu của Smart Locker hoặc các bên cấp phép liên quan. Bạn không được sao chép, sửa đổi, phân phối lại nếu không có sự cho phép bằng văn bản.
 
 ## 7. Chấm dứt dịch vụ
 

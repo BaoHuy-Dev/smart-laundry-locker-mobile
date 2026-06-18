@@ -1,8 +1,8 @@
-# Chính sách bảo mật — Lock.R Locker (Smart Laundry Locker)
+# Chính sách bảo mật — Lock.R  (Smart Locker)
 
 **Ngày hiệu lực:** 18/06/2026
 
-Smart Laundry Locker ("chúng tôi") vận hành ứng dụng di động Lock.R Locker (gói ứng dụng: `com.laundrylocker.mobile`, "Ứng dụng"). Chính sách này giải thích chúng tôi thu thập, sử dụng, chia sẻ và bảo vệ thông tin của bạn như thế nào khi bạn sử dụng Ứng dụng.
+Smart Locker ("chúng tôi") vận hành ứng dụng di động Lock.R (gói ứng dụng: `com.laundrylocker.mobile`, "Ứng dụng"). Chính sách này giải thích chúng tôi thu thập, sử dụng, chia sẻ và bảo vệ thông tin của bạn như thế nào khi bạn sử dụng Ứng dụng.
 
 ## 1. Thông tin chúng tôi thu thập
 
