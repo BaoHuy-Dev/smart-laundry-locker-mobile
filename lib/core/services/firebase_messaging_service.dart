@@ -23,7 +23,7 @@ class FirebaseMessagingService {
   FirebaseMessagingService._();
   static final FirebaseMessagingService instance = FirebaseMessagingService._();
 
-  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
+  FirebaseMessaging get _firebaseMessaging => FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
