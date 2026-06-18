@@ -16,7 +16,6 @@ Smart Locker ("chúng tôi") vận hành ứng dụng di động Lock.R (gói �
 - **Vị trí (GPS):** dùng để tìm tủ locker gần bạn nhất (chỉ khi bạn cấp quyền vị trí).
 - **Thông tin thiết bị:** model máy, hệ điều hành, định danh thiết bị, ngôn ngữ.
 - **Token thông báo đẩy (push notification):** qua Firebase Cloud Messaging, để gửi thông báo trạng thái đơn hàng/tủ locker.
-- **Dữ liệu sử dụng:** lượt đăng nhập, thao tác trong app, log lỗi kỹ thuật.
 
 ### 1.3 Thông tin từ bên thứ ba
 - Nếu bạn đăng nhập bằng **Google Sign-In**, chúng tôi nhận tên, email và ảnh đại diện theo phạm vi bạn cho phép.
