@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart';
 
 class TopUpRemoteDataSourceImpl implements TopUpRemoteDataSource {
   final ApiClient _apiClient;
-  static const String _path = '/payments/topup/create';
+  static const String _path = '/api/payments/topup/create';
 
   TopUpRemoteDataSourceImpl(this._apiClient);
 
