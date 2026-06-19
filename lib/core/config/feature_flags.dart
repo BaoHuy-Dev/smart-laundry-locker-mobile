@@ -31,4 +31,9 @@ class FeatureFlags {
   /// Quảng cáo + blog ở trang chủ.
   /// Backend chưa có → `/advertisements`, `/blogs` 404.
   static const bool homeContentFeedEnabled = false;
+
+  /// Nhận diện khuôn mặt (đăng ký/đăng nhập bằng khuôn mặt).
+  /// Backend chưa có AI service → `/api/auth/ai/registered/{userId}`,
+  /// `/api/auth/ai/register`, `/api/auth/ai/verify` trả 500.
+  static const bool faceRecognitionEnabled = false;
 }
