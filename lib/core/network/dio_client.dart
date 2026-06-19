@@ -36,13 +36,16 @@ class DioClient {
       ),
     );
 
-    // Add pretty logger only in debug mode
+    // Add pretty logger only in debug mode.
+    // Chỉ log dòng request + lỗi; KHÔNG in header/body để tránh đổ token và
+    // dữ liệu nhạy cảm/không cần thiết ra console (yêu cầu của user).
     if (kDebugMode) {
       _dio.interceptors.add(
         PrettyDioLogger(
-          requestHeader: true,
-          requestBody: true,
-          responseBody: true,
+          request: true,
+          requestHeader: false,
+          requestBody: false,
+          responseBody: false,
           responseHeader: false,
           error: true,
           compact: true,

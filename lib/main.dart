@@ -8,6 +8,7 @@ import 'package:smart_laundry_locker/core/services/firebase_messaging_service.da
 import 'package:smart_laundry_locker/core/services/courier_mode_provider.dart';
 import 'package:smart_laundry_locker/firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
@@ -228,20 +229,25 @@ class _AislNotifyWidget extends StatelessWidget {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  try {
-    // Firebase is also auto-initialized natively (google-services plugin), so
-    // calling initializeApp again throws `[core/duplicate-app]` — which used to
-    // swallow the whole block and skip messaging init. Only initialize when no
-    // default app exists yet.
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
+  // Firebase chỉ chạy trên Android/iOS. Web chưa được cấu hình
+  // DefaultFirebaseOptions nên gọi vào sẽ ném lỗi đỏ "have not been configured
+  // for web" — bỏ qua hẳn trên web để console sạch.
+  if (!kIsWeb) {
+    try {
+      // Firebase is also auto-initialized natively (google-services plugin), so
+      // calling initializeApp again throws `[core/duplicate-app]` — which used to
+      // swallow the whole block and skip messaging init. Only initialize when no
+      // default app exists yet.
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+      }
+      // Initialize Messaging Service
+      await FirebaseMessagingService.instance.init();
+    } catch (e) {
+      debugPrint("Firebase init/messaging failed: $e");
     }
-    // Initialize Messaging Service
-    await FirebaseMessagingService.instance.init();
-  } catch (e) {
-    debugPrint("Firebase init/messaging failed: $e");
   }
 
   DioClient.instance.init();
