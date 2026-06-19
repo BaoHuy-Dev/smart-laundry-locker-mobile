@@ -355,19 +355,21 @@ class _ProfilePageState extends State<ProfilePage>
                 title: 'Thông tin cá nhân',
                 onTap: _handleEditProfile,
               ),
-              ListenableBuilder(
-                listenable: _profileProvider,
-                builder: (context, _) {
-                  final isRegistered = _profileProvider.isFaceRegistered;
-                  return ProfileMenuItem(
-                    icon: Icons.face_retouching_natural_outlined,
-                    title: isRegistered
-                        ? 'Đăng ký lại khuôn mặt'
-                        : 'Đăng ký khuôn mặt',
-                    onTap: _handleFaceRegistration,
-                  );
-                },
-              ),
+              // Tạm ẩn: backend chưa có AI service (/api/auth/ai/* trả 500).
+              if (FeatureFlags.faceRecognitionEnabled)
+                ListenableBuilder(
+                  listenable: _profileProvider,
+                  builder: (context, _) {
+                    final isRegistered = _profileProvider.isFaceRegistered;
+                    return ProfileMenuItem(
+                      icon: Icons.face_retouching_natural_outlined,
+                      title: isRegistered
+                          ? 'Đăng ký lại khuôn mặt'
+                          : 'Đăng ký khuôn mặt',
+                      onTap: _handleFaceRegistration,
+                    );
+                  },
+                ),
               ProfileMenuItem(
                 icon: LucideIcons.shield,
                 title: 'Bảo mật',

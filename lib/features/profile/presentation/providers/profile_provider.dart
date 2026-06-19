@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:smart_laundry_locker/core/config/feature_flags.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
 import 'package:smart_laundry_locker/core/services/firebase_messaging_service.dart';
 import 'package:smart_laundry_locker/features/profile/application/use_cases/get_profile_use_case.dart';
@@ -102,7 +103,10 @@ class ProfileProvider extends ChangeNotifier {
 
   Future<bool> _getFaceRegistrationStatus(String userId) async {
     // Face-recognition is a legacy feature with no backend in the current
-    // microservices stack. Never let its failure abort profile loading.
+    // microservices stack (`/api/auth/ai/registered/{id}` trả 500). Tạm tắt
+    // qua FeatureFlags để không gọi mạng (tránh lỗi đỏ trên Network/log).
+    if (!FeatureFlags.faceRecognitionEnabled) return false;
+    // Never let its failure abort profile loading.
     try {
       final result = await _apiClient.get<dynamic>(
         '/api/auth/ai/registered/$userId',
