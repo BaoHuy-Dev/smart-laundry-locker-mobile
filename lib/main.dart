@@ -28,6 +28,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:smart_laundry_locker/features/home/presentation/providers/home_provider.dart';
 import 'package:smart_laundry_locker/features/home/data/repositories/home_repository.dart';
 import 'package:smart_laundry_locker/features/vouchers/presentation/providers/voucher_provider.dart';
+import 'package:smart_laundry_locker/core/theme/theme_provider.dart';
 import 'dart:async';
 
 class _AislToastWidget extends StatelessWidget {
@@ -429,49 +430,56 @@ class AislApp extends StatelessWidget {
               HomeProvider(HomeRepository(ApiClient()))..loadHomeData(),
         ),
         ChangeNotifierProvider(create: (_) => VoucherProvider()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
-      child: ShadApp.router(
-        title: 'Lockerly',
-        routerConfig: AppRouter.router,
-        theme: AISLShadcnTheme.lightTheme,
-        darkTheme: AISLShadcnTheme.darkTheme,
-        themeMode: ThemeMode.light,
-        builder: (context, child) {
-          return GlobalDispatchListener(
-            child: ScaffoldMessenger(
-              key: AppMessengerService.scaffoldMessengerKey,
-              child: FlutterSmartDialog.init(
-                toastBuilder: (String msg) => _AislToastWidget(msg: msg),
-                loadingBuilder: (String msg) => _AislLoadingWidget(msg: msg),
-                notifyStyle: FlutterSmartNotifyStyle(
-                  successBuilder: (msg) => _AislNotifyWidget(
-                    msg: msg,
-                    icon: LucideIcons.circleCheckBig,
-                    iconColor: const Color(0xFF10B981),
-                  ),
-                  failureBuilder: (msg) => _AislNotifyWidget(
-                    msg: msg,
-                    icon: LucideIcons.circleX,
-                    iconColor: const Color(0xFFEF4444),
-                  ),
-                  warningBuilder: (msg) => _AislNotifyWidget(
-                    msg: msg,
-                    icon: LucideIcons.triangleAlert,
-                    iconColor: const Color(0xFFF59E0B),
-                  ),
-                  alertBuilder: (msg) => _AislNotifyWidget(
-                    msg: msg,
-                    icon: LucideIcons.info,
-                    iconColor: AISLShadcnTheme.navyPrimary,
-                  ),
-                  errorBuilder: (msg) => _AislNotifyWidget(
-                    msg: msg,
-                    icon: LucideIcons.octagonAlert,
-                    iconColor: const Color(0xFFEF4444),
-                  ),
+      child: Builder(
+        builder: (context) {
+          final themeMode =
+              context.watch<ThemeProvider>().themeMode;
+          return ShadApp.router(
+            title: 'Lockerly',
+            routerConfig: AppRouter.router,
+            theme: AISLShadcnTheme.lightTheme,
+            darkTheme: AISLShadcnTheme.darkTheme,
+            themeMode: themeMode,
+            builder: (context, child) {
+              return GlobalDispatchListener(
+                child: ScaffoldMessenger(
+                  key: AppMessengerService.scaffoldMessengerKey,
+                  child: FlutterSmartDialog.init(
+                    toastBuilder: (String msg) => _AislToastWidget(msg: msg),
+                    loadingBuilder: (String msg) => _AislLoadingWidget(msg: msg),
+                    notifyStyle: FlutterSmartNotifyStyle(
+                      successBuilder: (msg) => _AislNotifyWidget(
+                        msg: msg,
+                        icon: LucideIcons.circleCheckBig,
+                        iconColor: const Color(0xFF10B981),
+                      ),
+                      failureBuilder: (msg) => _AislNotifyWidget(
+                        msg: msg,
+                        icon: LucideIcons.circleX,
+                        iconColor: const Color(0xFFEF4444),
+                      ),
+                      warningBuilder: (msg) => _AislNotifyWidget(
+                        msg: msg,
+                        icon: LucideIcons.triangleAlert,
+                        iconColor: const Color(0xFFF59E0B),
+                      ),
+                      alertBuilder: (msg) => _AislNotifyWidget(
+                        msg: msg,
+                        icon: LucideIcons.info,
+                        iconColor: AISLShadcnTheme.navyPrimary,
+                      ),
+                      errorBuilder: (msg) => _AislNotifyWidget(
+                        msg: msg,
+                        icon: LucideIcons.octagonAlert,
+                        iconColor: const Color(0xFFEF4444),
+                      ),
+                    ),
+                  )(context, child ?? const SizedBox.shrink()),
                 ),
-              )(context, child ?? const SizedBox.shrink()),
-            ),
+              );
+            },
           );
         },
       ),

@@ -1,5 +1,25 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
+/// Convenience extension so widgets can do `context.isDark`, `context.cardBg` etc.
+extension AislTheme on BuildContext {
+  bool get isDark => Theme.of(this).brightness == Brightness.dark;
+
+  Color get pageBg =>
+      isDark ? const Color(0xFF061A30) : const Color(0xFFF8FAFC);
+  Color get cardBg => isDark ? const Color(0xFF0A2342) : Colors.white;
+  Color get surfaceBg =>
+      isDark ? const Color(0xFF0D2B4A) : const Color(0xFFF0F4F8);
+  Color get textPrimary =>
+      isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
+  Color get textMuted =>
+      isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+  Color get dividerColor =>
+      isDark ? const Color(0xFF1E3A5F) : const Color(0xFFF1F5F9);
+  Color get borderColor =>
+      isDark ? const Color(0xFF1E4976) : const Color(0xFFE2E8F0);
+}
 
 /// Brand palette + shared building blocks ported from the legacy React Native
 /// customer app (`laundry-locker-frontend/mobile`) so the Flutter user screens
@@ -193,19 +213,30 @@ class BrandHeroHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = context.isDark;
+    final gradientColors = isDark
+        ? const <Color>[Color(0xFF061A30), Color(0xFF0A2342), Color(0xFF0D2B4A)]
+        : AislBrand.softHeaderGradient;
+    final titleColor = isDark ? const Color(0xFFF1F5F9) : AislBrand.navy;
+    final subtitleColor = isDark
+        ? const Color(0xFF94A3B8)
+        : AislBrand.navy.withValues(alpha: 0.8);
+
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: AislBrand.softHeaderGradient,
+          colors: gradientColors,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
         boxShadow: [
           BoxShadow(
-            color: Color(0x1A000000),
+            color: isDark
+                ? const Color(0xFF000000).withValues(alpha: 0.4)
+                : const Color(0x1A000000),
             blurRadius: 10,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -232,10 +263,10 @@ class BrandHeroHeader extends StatelessWidget {
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
-                        color: AislBrand.navy,
+                        color: titleColor,
                         letterSpacing: -0.5,
                       ),
                     ),
@@ -248,7 +279,7 @@ class BrandHeroHeader extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
-                          color: AislBrand.navy.withValues(alpha: 0.8),
+                          color: subtitleColor,
                         ),
                       ),
                     ],
@@ -272,6 +303,8 @@ class BrandSectionHeader extends StatelessWidget {
     required this.title,
     this.onSeeAll,
     this.seeAllLabel = 'XEM TẤT CẢ',
+    this.highlightColor,
+    this.highlightRollColor,
   });
 
   final IconData icon;
@@ -279,30 +312,47 @@ class BrandSectionHeader extends StatelessWidget {
   final VoidCallback? onSeeAll;
   final String seeAllLabel;
 
+  /// Màu thân banner (bật chế độ highlight giống "Đang thịnh hành" Threads)
+  final Color? highlightColor;
+
+  /// Màu phần cuộn 3D bên phải (mặc định tự tối hơn highlightColor nếu null)
+  final Color? highlightRollColor;
+
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: AislBrand.surface,
-            borderRadius: BorderRadius.circular(12),
+        if (highlightColor == null) ...[
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AislBrand.surface,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 18, color: AislBrand.navy),
           ),
-          child: Icon(icon, size: 18, color: AislBrand.navy),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AislBrand.textTitle,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AislBrand.textTitle,
+              ),
             ),
           ),
-        ),
+        ] else ...[
+          _HighlightBanner(
+            color: highlightColor!,
+            rollColor:
+                highlightRollColor ??
+                Color.lerp(highlightColor!, Colors.black, 0.30)!,
+            title: title,
+          ),
+          const Spacer(),
+        ],
         if (onSeeAll != null)
           GestureDetector(
             onTap: onSeeAll,
@@ -318,7 +368,11 @@ class BrandSectionHeader extends StatelessWidget {
                     color: AislBrand.navy,
                   ),
                 ),
-                const Icon(Icons.chevron_right, size: 16, color: AislBrand.navy),
+                const Icon(
+                  Icons.chevron_right,
+                  size: 16,
+                  color: AislBrand.navy,
+                ),
               ],
             ),
           ),
@@ -348,9 +402,9 @@ class BrandFilterChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.cardBg,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AislBrand.chipBorder),
+          border: Border.all(color: context.borderColor),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
@@ -366,10 +420,10 @@ class BrandFilterChip extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: AislBrand.navy,
+                color: context.textPrimary,
               ),
             ),
           ],
@@ -422,6 +476,67 @@ class BrandStatusBadge extends StatelessWidget {
               fontSize: 12,
               fontWeight: FontWeight.w700,
               color: textColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Highlight banner widget (Threads "Đang thịnh hành" style) ───────────────
+
+class _HighlightBanner extends StatelessWidget {
+  // color/rollColor kept for API compatibility but SVG asset is used for visuals
+  final Color color;
+  final Color rollColor;
+  final String title;
+
+  const _HighlightBanner({
+    required this.color,
+    required this.rollColor,
+    required this.title,
+  });
+
+  static const _textStyle = TextStyle(
+    fontSize: 15,
+    fontWeight: FontWeight.w800,
+    color: Color.fromARGB(255, 229, 255, 133),
+    letterSpacing: 0.3,
+  );
+
+  // SVG roll element occupies the rightmost ~7% of banner width.
+  // bannerWidth = (leftPad + textWidth) / 0.93  → roll fills remainder automatically.
+  static const double _leftPad = 14.0;
+  static const double _rollFraction = 0.07;
+
+  @override
+  Widget build(BuildContext context) {
+    final textScaler = MediaQuery.textScalerOf(context);
+    final tp = TextPainter(
+      text: TextSpan(text: title, style: _textStyle),
+      textDirection: TextDirection.ltr,
+      textScaler: textScaler,
+      maxLines: 1,
+    )..layout();
+
+    final bannerWidth = (_leftPad + tp.width) / (1 - _rollFraction);
+    final rightPad = bannerWidth - _leftPad - tp.width;
+
+    return SizedBox(
+      width: bannerWidth,
+      height: 30,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          SvgPicture.asset(
+            'assets/images/banner_highlight.svg',
+            fit: BoxFit.fill,
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(_leftPad, 0, rightPad, 0),
+            child: Center(
+              child: Text(title, softWrap: false, style: _textStyle),
             ),
           ),
         ],

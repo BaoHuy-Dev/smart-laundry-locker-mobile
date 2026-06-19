@@ -20,6 +20,7 @@ import 'package:go_router/go_router.dart';
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
 import 'courier/courier_order_detail_page.dart';
 import 'package:smart_laundry_locker/core/utils/enum_translator.dart';
+import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 
 class OrderPage extends StatefulWidget {
   const OrderPage({super.key});
@@ -134,17 +135,17 @@ class _OrderPageState extends State<OrderPage>
       builder: (context, isLoggedIn, child) {
         if (!isLoggedIn) {
           return Scaffold(
-            backgroundColor: Colors.white,
+            backgroundColor: context.pageBg,
             appBar: AppBar(
-              backgroundColor: Colors.white,
+              backgroundColor: context.pageBg,
               elevation: 0,
               centerTitle: true,
-              title: const Text(
+              title: Text(
                 'ĐƠN HÀNG',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+                  color: context.textPrimary,
                 ),
               ),
             ),
@@ -195,25 +196,23 @@ class _OrderPageState extends State<OrderPage>
                 );
 
                 if (courierProvider.isLoading) {
-                  return const Scaffold(
-                    backgroundColor: Colors.white,
-                    body: Center(child: CircularProgressIndicator()),
+                  return Scaffold(
+                    backgroundColor: context.pageBg,
+                    body: const Center(child: CircularProgressIndicator()),
                   );
                 }
 
                 return DefaultTabController(
                   length: 2,
                   child: Scaffold(
-                    backgroundColor: Colors.white,
+                    backgroundColor: context.pageBg,
                     body: SafeArea(
                       child: Column(
                         children: [
                           Container(
                             height: 118,
                             width: double.infinity,
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                            ),
+                            color: context.pageBg,
                             padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -223,21 +222,21 @@ class _OrderPageState extends State<OrderPage>
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      const Text(
+                                      Text(
                                         'ĐƠN HÀNG CỦA TÔI',
                                         style: TextStyle(
                                           fontSize: 22,
                                           fontWeight: FontWeight.w900,
-                                          color: Color(0xFF1A1A1A),
+                                          color: context.textPrimary,
                                         ),
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
                                         'Hôm nay bạn đã hoàn thành $completedToday đơn',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.w500,
-                                          color: Color(0xFF757575),
+                                          color: context.textMuted,
                                         ),
                                       ),
                                     ],
@@ -282,7 +281,7 @@ class _OrderPageState extends State<OrderPage>
                                         return Container(
                                           height: 48,
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFFF5F5F5),
+                                            color: context.surfaceBg,
                                             borderRadius: BorderRadius.circular(
                                               999,
                                             ),
@@ -1037,7 +1036,7 @@ class _OrderPageState extends State<OrderPage>
         }
 
         return Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: context.pageBg,
           body: Stack(
             children: [
               CustomScrollView(
@@ -1061,7 +1060,7 @@ class _OrderPageState extends State<OrderPage>
     Color accentColor,
   ) {
     return SliverAppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: context.pageBg,
       floating: true,
       pinned: true,
       elevation: 0,
@@ -1075,10 +1074,10 @@ class _OrderPageState extends State<OrderPage>
         },
         selectedOptionBuilder: (context, value) => Text(
           _categories[value] ?? 'Đơn hàng',
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,
-            color: Colors.black,
+            color: context.textPrimary,
           ),
         ),
         options: _categories.entries
@@ -1342,9 +1341,9 @@ class _OrderCard extends StatelessWidget {
       },
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.cardBg,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(color: context.borderColor),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.04),
@@ -1403,36 +1402,37 @@ class _OrderCard extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               order.orderCode,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Colors.black87,
+                color: context.textPrimary,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               isRental ? 'Thuê tủ' : 'Vận chuyển',
-              style: const TextStyle(fontSize: 13, color: Colors.black54),
+              style: TextStyle(fontSize: 13, color: context.textMuted),
             ),
             const SizedBox(height: 4),
             Text(
               DateFormat('dd/MM/yyyy HH:mm').format(order.createdAt),
-              style: const TextStyle(fontSize: 12, color: Colors.black38),
+              style: TextStyle(fontSize: 12, color: context.textMuted),
             ),
             const SizedBox(height: 12),
-            Divider(height: 1, color: Colors.grey[200]),
+            Divider(height: 1, color: context.dividerColor),
             const SizedBox(height: 12),
             if (isRental)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _feeCol('Phí tích lũy', _fmt(order.accumulatedFee)),
+                  _feeCol('Phí tích lũy', _fmt(order.accumulatedFee), context: context),
                   _feeCol(
                     'Đã thu',
                     _fmt(order.totalCollected),
                     valueColor: const Color(0xFF2E7D32),
+                    context: context,
                   ),
-                  _feeCol('Đơn giá', _fmt(order.currentRate)),
+                  _feeCol('Đơn giá', _fmt(order.currentRate), context: context),
                 ],
               )
             else
@@ -1441,10 +1441,10 @@ class _OrderCard extends StatelessWidget {
                 children: [
                   Text(
                     'Phí: ${_fmt(order.accumulatedFee)}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: context.textPrimary,
                     ),
                   ),
                   Text(
@@ -1466,13 +1466,14 @@ class _OrderCard extends StatelessWidget {
   String _fmt(double v) =>
       NumberFormat.currency(locale: 'vi_VN', symbol: '₫').format(v);
 
-  Widget _feeCol(String label, String value, {Color? valueColor}) {
+  Widget _feeCol(String label, String value,
+      {Color? valueColor, required BuildContext context}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 11, color: Colors.black54),
+          style: TextStyle(fontSize: 11, color: context.textMuted),
         ),
         const SizedBox(height: 2),
         Text(
@@ -1480,7 +1481,7 @@ class _OrderCard extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.bold,
-            color: valueColor ?? Colors.black87,
+            color: valueColor ?? context.textPrimary,
           ),
         ),
       ],

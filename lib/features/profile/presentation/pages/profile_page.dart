@@ -14,6 +14,7 @@ import 'package:smart_laundry_locker/core/routing/app_router.dart';
 import 'package:smart_laundry_locker/core/services/courier_mode_provider.dart';
 import 'package:smart_laundry_locker/core/services/app_initial_tab_service.dart';
 import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
+import 'package:smart_laundry_locker/core/theme/theme_provider.dart';
 import 'package:smart_laundry_locker/features/courier_dispatch/presentation/providers/courier_dispatch_injection.dart';
 import 'package:smart_laundry_locker/features/courier_dispatch/presentation/providers/courier_dispatch_provider.dart';
 import 'package:smart_laundry_locker/features/profile/presentation/mixins/profile_image_actions_mixin.dart';
@@ -256,7 +257,7 @@ class _ProfilePageState extends State<ProfilePage>
     // Show loading
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF2F4F7),
+        backgroundColor: context.pageBg,
         body: const Column(
           children: [
             BrandHeroHeader(
@@ -276,14 +277,14 @@ class _ProfilePageState extends State<ProfilePage>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) context.go(AppRouter.onboarding);
       });
-      return const Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        backgroundColor: context.pageBg,
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F7),
+      backgroundColor: context.pageBg,
       body: MultiProvider(
         providers: [
           ChangeNotifierProvider.value(value: _delegationProvider),
@@ -306,7 +307,7 @@ class _ProfilePageState extends State<ProfilePage>
                   await _loadUserProfile(forceRefresh: true);
                 },
                 color: AISLShadcnTheme.navyPrimary,
-                backgroundColor: Colors.white,
+                backgroundColor: context.cardBg,
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   child: Column(
@@ -417,7 +418,7 @@ class _ProfilePageState extends State<ProfilePage>
                         Icon(
                           LucideIcons.chevronRight,
                           size: 16,
-                          color: Colors.black54,
+                          color: context.textMuted,
                         ),
                       ],
                     ),
@@ -471,7 +472,7 @@ class _ProfilePageState extends State<ProfilePage>
                         Icon(
                           LucideIcons.chevronRight,
                           size: 16,
-                          color: Colors.black54,
+                          color: context.textMuted,
                         ),
                       ],
                     ),
@@ -782,7 +783,16 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   void _handleTheme() {
-    _showProfileSnackBar('Tính năng đang được phát triển');
+    final themeProvider = context.read<ThemeProvider>();
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return _ThemePickerSheet(current: themeProvider.themeMode);
+      },
+    ).then((value) {
+      // ignore
+    });
   }
 
   void _handleLocation() {
@@ -898,5 +908,171 @@ class _ProfilePageState extends State<ProfilePage>
     if (result == true) {
       await _staffApplicationProvider.loadStatus(userId);
     }
+  }
+}
+
+// ── Theme picker bottom sheet ──────────────────────────────────────────────────
+
+class _ThemePickerSheet extends StatelessWidget {
+  final ThemeMode current;
+  const _ThemePickerSheet({required this.current});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF0A2342) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    final mutedColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 20),
+            decoration: BoxDecoration(
+              color: mutedColor.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Text(
+            'Giao diện',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: textColor,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Chọn chủ đề hiển thị cho ứng dụng',
+            style: TextStyle(fontSize: 13, color: mutedColor),
+          ),
+          const SizedBox(height: 20),
+          _ThemeOption(
+            icon: LucideIcons.sun,
+            label: 'Sáng',
+            description: 'Giao diện nền trắng',
+            selected: current == ThemeMode.light,
+            onTap: () {
+              context.read<ThemeProvider>().setThemeMode(ThemeMode.light);
+              Navigator.pop(context);
+            },
+          ),
+          const SizedBox(height: 10),
+          _ThemeOption(
+            icon: LucideIcons.moon,
+            label: 'Tối',
+            description: 'Giao diện nền tối',
+            selected: current == ThemeMode.dark,
+            onTap: () {
+              context.read<ThemeProvider>().setThemeMode(ThemeMode.dark);
+              Navigator.pop(context);
+            },
+          ),
+          const SizedBox(height: 10),
+          _ThemeOption(
+            icon: LucideIcons.monitorSmartphone,
+            label: 'Theo hệ thống',
+            description: 'Tự động theo cài đặt thiết bị',
+            selected: current == ThemeMode.system,
+            onTap: () {
+              context.read<ThemeProvider>().setThemeMode(ThemeMode.system);
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ThemeOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String description;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ThemeOption({
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final navy = const Color(0xFF003D5B);
+    final selectedBg = navy.withValues(alpha: isDark ? 0.35 : 0.08);
+    final borderColor = selected
+        ? navy.withValues(alpha: isDark ? 0.7 : 0.4)
+        : (isDark ? const Color(0xFF1E4976) : const Color(0xFFE2E8F0));
+    final textColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    final mutedColor =
+        isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: selected ? selectedBg : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: borderColor, width: selected ? 1.5 : 1),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: selected
+                    ? navy.withValues(alpha: 0.12)
+                    : (isDark
+                        ? const Color(0xFF0D2B4A)
+                        : const Color(0xFFF0F4F8)),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon,
+                  size: 20, color: selected ? navy : mutedColor),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: textColor,
+                    ),
+                  ),
+                  Text(
+                    description,
+                    style: TextStyle(fontSize: 12, color: mutedColor),
+                  ),
+                ],
+              ),
+            ),
+            if (selected)
+              Icon(LucideIcons.circleCheck, size: 20, color: navy),
+          ],
+        ),
+      ),
+    );
   }
 }

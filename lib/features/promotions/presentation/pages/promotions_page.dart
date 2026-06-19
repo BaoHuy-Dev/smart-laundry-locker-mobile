@@ -42,7 +42,7 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
     final provider = ref.watch(promotionNotifierProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: context.pageBg,
       body: Column(
         children: [
           BrandHeroHeader(
@@ -100,92 +100,49 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
     }
 
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
       itemCount: provider.promotions.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 16),
+      separatorBuilder: (_, __) => Divider(height: 1, color: context.dividerColor),
       itemBuilder: (_, index) => _buildPromoCard(provider.promotions[index], index),
     );
   }
 
   Widget _buildPromoCard(PromotionModel promo, int index) {
     final colors = _gradientFor(promo.id);
+    final String? sub =
+        (promo.description != null && promo.description!.isNotEmpty)
+            ? promo.description
+            : null;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.07),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Image / Gradient banner
-            SizedBox(
-              height: 140,
-              width: double.infinity,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Left: image 110×110 ───────────────────────────────────────
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              width: 110,
+              height: 110,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  (promo.imageUrl != null && promo.imageUrl!.isNotEmpty)
-                      ? CachedNetworkImage(
-                          imageUrl: promo.imageUrl!,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => _gradientBanner(colors),
-                          errorWidget: (_, __, ___) => _gradientBanner(colors),
-                        )
-                      : _gradientBanner(colors),
-                  // Dark overlay
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.transparent, Colors.black.withValues(alpha: 0.45)],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
+                  CachedNetworkImage(
+                    imageUrl: promo.effectiveImageUrl,
+                    fit: BoxFit.cover,
+                    memCacheWidth: 220,
+                    memCacheHeight: 220,
+                    placeholder: (_, __) => _gradientPlaceholder(colors),
+                    errorWidget: (_, __, ___) => _gradientPlaceholder(colors),
                   ),
-                  // Top-left: Flash Sale tag
+                  // Discount badge bottom-left
                   Positioned(
-                    top: 12,
-                    left: 14,
+                    bottom: 7,
+                    left: 7,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF97316),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(LucideIcons.zap, size: 12, color: Colors.white),
-                          SizedBox(width: 4),
-                          Text(
-                            'FLASH SALE',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Top-right: Discount badge
-                  Positioned(
-                    top: 12,
-                    right: 14,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: const Color(0xFFE53E3E),
                         borderRadius: BorderRadius.circular(20),
@@ -195,91 +152,111 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w900,
-                          fontSize: 13,
+                          fontSize: 11,
                         ),
-                      ),
-                    ),
-                  ),
-                  // Bottom: name
-                  Positioned(
-                    bottom: 12,
-                    left: 14,
-                    right: 14,
-                    child: Text(
-                      promo.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                        shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            // Content
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          ),
+          const SizedBox(width: 14),
+          // ── Right: content ────────────────────────────────────────────
+          Expanded(
+            child: SizedBox(
+              height: 110,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  if (promo.description != null && promo.description!.isNotEmpty) ...[
-                    Text(
-                      promo.description!,
-                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600, height: 1.4),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                  // Flash Sale chip
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF97316).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                    const SizedBox(height: 10),
-                  ],
-                  if (promo.minOrderLabel != null) ...[
-                    Row(
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(LucideIcons.info, size: 12, color: Color(0xFF9CA3AF)),
-                        const SizedBox(width: 4),
+                        Icon(LucideIcons.zap,
+                            size: 10, color: Color(0xFFF97316)),
+                        SizedBox(width: 4),
                         Text(
-                          promo.minOrderLabel!,
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+                          'Flash Sale',
+                          style: TextStyle(
+                            color: Color(0xFFF97316),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                  ],
+                  ),
+                  // Title — 2 lines
+                  Text(
+                    promo.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      color: context.textPrimary,
+                      height: 1.3,
+                    ),
+                  ),
+                  // Subtitle / description
+                  if (sub != null)
+                    Text(
+                      sub,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: context.textMuted,
+                      ),
+                    )
+                  else
+                    const SizedBox.shrink(),
+                  // Bottom row: expiry + code chip
                   Row(
                     children: [
-                      // Expiry
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            LucideIcons.clock,
-                            size: 12,
-                            color: promo.isExpiringSoon ? const Color(0xFFE53E3E) : Colors.grey.shade500,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            promo.expiryLabel,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: promo.isExpiringSoon ? const Color(0xFFE53E3E) : Colors.grey.shade500,
-                              fontWeight: promo.isExpiringSoon ? FontWeight.w700 : FontWeight.normal,
-                            ),
-                          ),
-                        ],
+                      Icon(
+                        LucideIcons.clock,
+                        size: 12,
+                        color: promo.isExpiringSoon
+                            ? const Color(0xFFE53E3E)
+                            : const Color(0xFF94A3B8),
                       ),
-                      const Spacer(),
-                      // Code chip + copy
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          promo.expiryLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: promo.isExpiringSoon
+                                ? const Color(0xFFE53E3E)
+                                : const Color(0xFF94A3B8),
+                            fontWeight: promo.isExpiringSoon
+                                ? FontWeight.w700
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ),
                       GestureDetector(
                         onTap: () => _copyCode(context, promo.code),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 9, vertical: 4),
                           decoration: BoxDecoration(
-                            color: AislBrand.navy.withValues(alpha: 0.07),
+                            color: AislBrand.navy.withValues(alpha: 0.06),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AislBrand.navy.withValues(alpha: 0.25)),
+                            border: Border.all(
+                                color: AislBrand.navy.withValues(alpha: 0.18)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -289,13 +266,14 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                                 style: const TextStyle(
                                   fontFamily: 'monospace',
                                   fontWeight: FontWeight.w800,
-                                  fontSize: 13,
+                                  fontSize: 12,
                                   color: AislBrand.navy,
                                   letterSpacing: 0.5,
                                 ),
                               ),
-                              const SizedBox(width: 6),
-                              const Icon(LucideIcons.copy, size: 13, color: AislBrand.navy),
+                              const SizedBox(width: 5),
+                              const Icon(LucideIcons.copy,
+                                  size: 12, color: AislBrand.navy),
                             ],
                           ),
                         ),
@@ -305,13 +283,13 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _gradientBanner(List<Color> colors) {
+  Widget _gradientPlaceholder(List<Color> colors) {
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -321,7 +299,7 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
         ),
       ),
       child: const Center(
-        child: Icon(LucideIcons.ticket, size: 52, color: Colors.white24),
+        child: Icon(LucideIcons.ticket, size: 32, color: Colors.white24),
       ),
     );
   }

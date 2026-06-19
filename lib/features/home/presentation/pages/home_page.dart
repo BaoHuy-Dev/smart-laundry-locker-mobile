@@ -115,7 +115,7 @@ class _HomePageState extends ConsumerState<HomePage>
     }
 
     return Scaffold(
-      backgroundColor: AislBrand.pageBackground,
+      backgroundColor: context.pageBg,
       body: isCourierModeActive
           ? _buildCourierBody(context)
           : _buildCustomerBody(context),
@@ -138,8 +138,6 @@ class _HomePageState extends ConsumerState<HomePage>
             _buildHeader(context),
             const SizedBox(height: 20),
             _buildChips(context),
-            const SizedBox(height: 16),
-            _buildWalletCard(context),
             const SizedBox(height: 24),
             _buildPopularLockersSection(context),
             const SizedBox(height: 24),
@@ -184,42 +182,130 @@ class _HomePageState extends ConsumerState<HomePage>
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: Row(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              BrandAvatar(
-                imageUrl: profile?.avatarUrl,
-                name: name,
-                size: 50,
+              // ── Row 1: Avatar / name / bell ──────────────────────────
+              Row(
+                children: [
+                  BrandAvatar(
+                    imageUrl: profile?.avatarUrl,
+                    name: name,
+                    size: 48,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Hi $name!',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: AislBrand.navy,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _greeting(),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AislBrand.navy.withValues(alpha: 0.75),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _buildBell(context),
+                ],
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Hi $name!',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: AislBrand.navy,
+              const SizedBox(height: 16),
+              // ── Row 2: Wallet balance ─────────────────────────────────
+              Consumer<WalletProvider>(
+                builder: (context, wallet, _) => GestureDetector(
+                  onTap: () async {
+                    await context.push(AppRouter.topUp);
+                    if (context.mounted) wallet.getWalletBalance();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AislBrand.navy.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AislBrand.navy.withValues(alpha: 0.12),
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _greeting(),
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AislBrand.navy.withValues(alpha: 0.8),
-                      ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: AislBrand.navy.withValues(alpha: 0.10),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            LucideIcons.wallet,
+                            color: AislBrand.navy,
+                            size: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Số dư ví',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AislBrand.navy.withValues(alpha: 0.65),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              CurrencyFormatter.formatVnd(wallet.balance),
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: AislBrand.navy,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AislBrand.navy,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Text(
+                            'Nạp tiền',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
-              _buildBell(context),
             ],
           ),
         ),
@@ -227,98 +313,6 @@ class _HomePageState extends ConsumerState<HomePage>
     );
   }
 
-  Widget _buildWalletCard(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Consumer<WalletProvider>(
-        builder: (context, wallet, _) => GestureDetector(
-          onTap: () async {
-            await context.push(AppRouter.topUp);
-            if (context.mounted) wallet.getWalletBalance();
-          },
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color.fromARGB(255, 124, 185, 216), Color.fromARGB(255, 185, 218, 236)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: AislBrand.navy.withValues(alpha: 0.22),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    LucideIcons.wallet,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Số dư ví',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.white70,
-                        ),
-                      ),
-                      Text(
-                        CurrencyFormatter.formatVnd(wallet.balance),
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.30),
-                    ),
-                  ),
-                  child: const Text(
-                    'Nạp tiền',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildBell(BuildContext context) {
     return Consumer<NotificationProvider>(
@@ -427,6 +421,8 @@ class _HomePageState extends ConsumerState<HomePage>
             icon: LucideIcons.store,
             title: 'Các nơi đặt locker',
             onSeeAll: () => context.go(AppRouter.lockers),
+            highlightColor: const Color(0xFF766807),
+            highlightRollColor: const Color(0xFF58500D),
           ),
         ),
         const SizedBox(height: 14),
@@ -441,14 +437,14 @@ class _HomePageState extends ConsumerState<HomePage>
 
     if (state.isLoading && state.locations.isEmpty) {
       return SizedBox(
-        height: 196,
+        height: 158,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 20),
           itemCount: 3,
           separatorBuilder: (_, __) => const SizedBox(width: 14),
           itemBuilder: (_, __) => Container(
-            width: 220,
+            width: 250,
             decoration: BoxDecoration(
               color: Colors.grey.shade200,
               borderRadius: BorderRadius.circular(20),
@@ -470,7 +466,7 @@ class _HomePageState extends ConsumerState<HomePage>
       );
     }
     return SizedBox(
-      height: 196,
+      height: 158,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -501,7 +497,7 @@ class _HomePageState extends ConsumerState<HomePage>
         ),
       ),
       child: Container(
-        width: 220,
+        width: 250,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
@@ -632,19 +628,28 @@ class _HomePageState extends ConsumerState<HomePage>
             icon: LucideIcons.zap,
             title: 'Flash Sale',
             onSeeAll: () => context.push(AppRouter.promotions),
+            highlightColor: const Color(0xFF766807),
+            highlightRollColor: const Color(0xFF58500D),
           ),
         ),
         const SizedBox(height: 14),
-        SizedBox(
-          height: 175,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: isLoading && promos.isEmpty
               ? _buildFlashSaleSkeleton()
-              : ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  itemCount: promos.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 14),
-                  itemBuilder: (_, i) => _buildFlashSaleCard(context, promos[i], i),
+              : Column(
+                  children: [
+                    for (int i = 0; i < promos.take(10).length; i++) ...[
+                      if (i > 0)
+                        Divider(height: 1, color: context.dividerColor),
+                      RepaintBoundary(
+                        child: _FlashSaleCard(
+                          promo: promos[i],
+                          colors: _gradients[i % _gradients.length],
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
         ),
       ],
@@ -652,217 +657,18 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   Widget _buildFlashSaleSkeleton() {
-    return ListView.separated(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemCount: 3,
-      separatorBuilder: (_, __) => const SizedBox(width: 14),
-      itemBuilder: (_, __) => ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Container(width: 260, color: const Color(0xFFE2E8F0)),
-      ),
-    );
-  }
-
-  Widget _buildFlashSaleCard(BuildContext context, PromotionModel promo, int idx) {
-    final colors = _gradients[idx % _gradients.length];
-    return GestureDetector(
-      onTap: () => context.push(AppRouter.promotions),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: SizedBox(
-          width: 260,
-          height: 175,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Background: image or gradient
-              (promo.imageUrl != null && promo.imageUrl!.isNotEmpty)
-                  ? CachedNetworkImage(
-                      imageUrl: promo.imageUrl!,
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) => _flashGradientBg(colors),
-                      errorWidget: (_, __, ___) => _flashGradientBg(colors),
-                    )
-                  : _flashGradientBg(colors),
-              // Dark vignette overlay
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.transparent, Colors.black.withValues(alpha: 0.60)],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                ),
-              ),
-              // Top-left: Flash Sale tag
-              Positioned(
-                top: 12,
-                left: 12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF97316),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(LucideIcons.zap, size: 11, color: Colors.white),
-                      SizedBox(width: 4),
-                      Text(
-                        'FLASH SALE',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              // Top-right: Discount badge
-              Positioned(
-                top: 12,
-                right: 12,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE53E3E),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    promo.discountLabel,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ),
-              // Bottom: name + expiry + code
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        promo.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14,
-                          shadows: [Shadow(color: Colors.black45, blurRadius: 4)],
-                        ),
-                      ),
-                      const SizedBox(height: 7),
-                      Row(
-                        children: [
-                          Icon(
-                            LucideIcons.clock,
-                            size: 11,
-                            color: promo.isExpiringSoon
-                                ? const Color(0xFFFBBF24)
-                                : Colors.white70,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            promo.expiryLabel,
-                            style: TextStyle(
-                              color: promo.isExpiringSoon
-                                  ? const Color(0xFFFBBF24)
-                                  : Colors.white70,
-                              fontSize: 11,
-                              fontWeight: promo.isExpiringSoon
-                                  ? FontWeight.w700
-                                  : FontWeight.normal,
-                            ),
-                          ),
-                          const Spacer(),
-                          GestureDetector(
-                            onTap: () {
-                              Clipboard.setData(ClipboardData(text: promo.code));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Đã sao chép: ${promo.code}'),
-                                  backgroundColor: AislBrand.navy,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  duration: const Duration(seconds: 2),
-                                ),
-                              );
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.white30),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    promo.code,
-                                    style: const TextStyle(
-                                      fontFamily: 'monospace',
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 11,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 5),
-                                  const Icon(
-                                    LucideIcons.copy,
-                                    size: 10,
-                                    color: Colors.white70,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+    return Column(
+      children: List.generate(
+        2,
+        (_) => Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              height: 200,
+              color: const Color(0xFFE2E8F0),
+            ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _flashGradientBg(List<Color> colors) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: colors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Center(
-        child: Icon(
-          LucideIcons.ticket,
-          size: 56,
-          color: Colors.white.withValues(alpha: 0.15),
         ),
       ),
     );
@@ -1762,4 +1568,225 @@ class _CourierAction extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Flash Sale card — extracted for RepaintBoundary isolation ────────────────
+
+class _FlashSaleCard extends StatelessWidget {
+  final PromotionModel promo;
+  final List<Color> colors;
+
+  const _FlashSaleCard({required this.promo, required this.colors});
+
+  @override
+  Widget build(BuildContext context) {
+    final String? sub =
+        (promo.description != null && promo.description!.isNotEmpty)
+            ? promo.description
+            : null;
+
+    return GestureDetector(
+      onTap: () => context.push(AppRouter.promotions),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Left: image 110×110 ──────────────────────────────────
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: 110,
+                height: 110,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CachedNetworkImage(
+                      imageUrl: promo.effectiveImageUrl,
+                      fit: BoxFit.cover,
+                      memCacheWidth: 220,
+                      memCacheHeight: 220,
+                      placeholder: (_, __) => _gradientBg(),
+                      errorWidget: (_, __, ___) => _gradientBg(),
+                    ),
+                    Positioned(
+                      bottom: 7,
+                      left: 7,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE53E3E),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          promo.discountLabel,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            // ── Right: content ───────────────────────────────────────
+            Expanded(
+              child: SizedBox(
+                height: 110,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Flash Sale chip
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF97316).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(LucideIcons.zap,
+                              size: 10, color: Color(0xFFF97316)),
+                          SizedBox(width: 4),
+                          Text(
+                            'Flash Sale',
+                            style: TextStyle(
+                              color: Color(0xFFF97316),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Title — 2 lines
+                    Text(
+                      promo.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: context.textPrimary,
+                        height: 1.3,
+                      ),
+                    ),
+                    // Subtitle
+                    if (sub != null)
+                      Text(
+                        sub,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      )
+                    else
+                      const SizedBox.shrink(),
+                    // Bottom: expiry + code chip
+                    Row(
+                      children: [
+                        Icon(
+                          LucideIcons.clock,
+                          size: 12,
+                          color: promo.isExpiringSoon
+                              ? const Color(0xFFE53E3E)
+                              : const Color(0xFF94A3B8),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            promo.expiryLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: promo.isExpiringSoon
+                                  ? const Color(0xFFE53E3E)
+                                  : const Color(0xFF94A3B8),
+                              fontWeight: promo.isExpiringSoon
+                                  ? FontWeight.w700
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => _copyCode(context),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 9, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AislBrand.navy.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                  color: AislBrand.navy.withValues(alpha: 0.18)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  promo.code,
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12,
+                                    color: AislBrand.navy,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                const SizedBox(width: 5),
+                                const Icon(LucideIcons.copy,
+                                    size: 12, color: AislBrand.navy),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _copyCode(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: promo.code));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Đã sao chép: ${promo.code}'),
+        backgroundColor: AislBrand.navy,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Widget _gradientBg() => DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: colors,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: const Center(
+          child: Icon(LucideIcons.ticket, size: 32, color: Colors.white24),
+        ),
+      );
 }

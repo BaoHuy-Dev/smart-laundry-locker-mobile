@@ -412,7 +412,7 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F3F5),
+      backgroundColor: context.pageBg,
       body: Column(
         children: [
           BrandHeroHeader(
@@ -486,10 +486,10 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
                             padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                             child: Text(
                               item.header!,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF9CA3AF),
+                                color: ctx.textMuted,
                                 letterSpacing: 0.3,
                               ),
                             ),
@@ -556,10 +556,10 @@ class _TypeChip extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF111827) : Colors.transparent,
+          color: selected ? context.textPrimary : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? const Color(0xFF111827) : const Color(0xFFD1D5DB),
+            color: selected ? context.textPrimary : context.borderColor,
             width: 1.5,
           ),
         ),
@@ -571,7 +571,7 @@ class _TypeChip extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: selected ? Colors.white : const Color(0xFF374151),
+                color: selected ? (context.isDark ? const Color(0xFF061A30) : Colors.white) : context.textPrimary,
               ),
             ),
             if (count != null && count! > 0) ...[
@@ -581,8 +581,8 @@ class _TypeChip extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   color: selected
-                      ? Colors.white.withValues(alpha: 0.7)
-                      : const Color(0xFF9CA3AF),
+                      ? (context.isDark ? const Color(0xFF061A30) : Colors.white).withValues(alpha: 0.7)
+                      : context.textMuted,
                 ),
               ),
             ],
@@ -613,7 +613,7 @@ class _OrderCard extends StatelessWidget {
         status == 'COMPLETED' || status == 'CANCELED';
 
     return Material(
-      color: Colors.white,
+      color: context.cardBg,
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -636,22 +636,22 @@ class _OrderCard extends StatelessWidget {
                           children: [
                             Text(
                               typeLabel(type),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13,
-                                color: Color(0xFF6B7280),
+                                color: context.textMuted,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                             if (deadline != null) ...[
-                              const Text(
+                              Text(
                                 '  ·  ',
-                                style: TextStyle(color: Color(0xFF9CA3AF)),
+                                style: TextStyle(color: context.textMuted),
                               ),
                               Text(
                                 fmtDateTime(deadline),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13,
-                                  color: Color(0xFF6B7280),
+                                  color: context.textMuted,
                                 ),
                               ),
                             ],
@@ -689,10 +689,10 @@ class _OrderCard extends StatelessWidget {
                           children: [
                             Text(
                               fmtPrice(order['totalPrice']),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w800,
-                                color: Color(0xFF111827),
+                                color: context.textPrimary,
                               ),
                             ),
                             const Spacer(),
@@ -705,17 +705,17 @@ class _OrderCard extends StatelessWidget {
                                 ),
                                 decoration: BoxDecoration(
                                   border: Border.all(
-                                    color: const Color(0xFFD1D5DB),
+                                    color: context.borderColor,
                                     width: 1.5,
                                   ),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'Xem lại',
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
-                                    color: Color(0xFF374151),
+                                    color: context.textPrimary,
                                   ),
                                 ),
                               ),
