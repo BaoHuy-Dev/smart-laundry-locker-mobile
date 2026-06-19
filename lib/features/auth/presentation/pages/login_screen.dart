@@ -135,11 +135,15 @@ class _LoginScreenState extends State<LoginScreen>
         Row(
           children: [
             const Expanded(child: Divider()),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(
-                'Đăng nhập nhanh (DEV)',
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            Flexible(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  'Đăng nhập nhanh (DEV)',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
               ),
             ),
             const Expanded(child: Divider()),

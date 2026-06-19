@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:smart_laundry_locker/core/config/feature_flags.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
 
@@ -35,6 +36,9 @@ class WalletProvider extends ChangeNotifier {
   }
 
   Future<void> getWalletBalance() async {
+    // Tạm ẩn: backend chưa có wallet service (`/wallet/balance` trả 404).
+    // Bỏ qua gọi mạng để không sinh lỗi đỏ; số dư giữ ở 0.
+    if (!FeatureFlags.walletEnabled) return;
     if (_isLoading) return;
     _isLoading = true;
     _error = null;

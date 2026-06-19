@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:smart_laundry_locker/core/config/feature_flags.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
 import 'package:smart_laundry_locker/features/notifications/presentation/providers/notification_provider.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
@@ -372,16 +373,21 @@ class _ProfilePageState extends State<ProfilePage>
                 title: 'Bảo mật',
                 onTap: _handleSecurity,
               ),
-              ProfileMenuItem(
-                icon: LucideIcons.badgePercent,
-                title: 'Gói dịch vụ',
-                onTap: _handlePlans,
-              ),
-              ProfileMenuItem(
-                icon: LucideIcons.ticket,
-                title: 'Ưu đãi & Quà tặng',
-                onTap: _handleMyVouchers,
-              ),
+              // Tạm ẩn: backend chưa có subscription service (/plans, /subscriptions 404).
+              if (FeatureFlags.subscriptionEnabled)
+                ProfileMenuItem(
+                  icon: LucideIcons.badgePercent,
+                  title: 'Gói dịch vụ',
+                  onTap: _handlePlans,
+                ),
+              // Tạm ẩn: backend chưa có kho voucher (/promotions/vouchers/my 404).
+              // (Trang "Ưu đãi" qua chip ở trang chủ vẫn hoạt động.)
+              if (FeatureFlags.vouchersEnabled)
+                ProfileMenuItem(
+                  icon: LucideIcons.ticket,
+                  title: 'Ưu đãi & Quà tặng',
+                  onTap: _handleMyVouchers,
+                ),
               Consumer<NotificationProvider>(
                 builder: (context, provider, child) {
                   return ProfileMenuItem(
@@ -479,16 +485,18 @@ class _ProfilePageState extends State<ProfilePage>
                   );
                 },
               ),
-              ProfileMenuItem(
-                icon: LucideIcons.arrowLeftRight,
-                title: 'Giao dịch',
-                onTap: () => context.push(AppRouter.transactions),
-                trailing: Icon(
-                  LucideIcons.chevronRight,
-                  size: 16,
-                  color: Colors.black54,
+              // Tạm ẩn: backend chưa có lịch sử giao dịch/ví (/payments/transactions 404).
+              if (FeatureFlags.transactionsEnabled)
+                ProfileMenuItem(
+                  icon: LucideIcons.arrowLeftRight,
+                  title: 'Giao dịch',
+                  onTap: () => context.push(AppRouter.transactions),
+                  trailing: Icon(
+                    LucideIcons.chevronRight,
+                    size: 16,
+                    color: Colors.black54,
+                  ),
                 ),
-              ),
               Consumer<StaffApplicationProvider>(
                 builder: (context, provider, child) {
                   final app = provider.application;

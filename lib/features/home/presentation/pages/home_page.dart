@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
+import 'package:smart_laundry_locker/core/config/feature_flags.dart';
 import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:smart_laundry_locker/features/promotions/data/models/promotion_model.dart';
 import 'package:smart_laundry_locker/features/promotions/presentation/providers/promotion_provider.dart';
@@ -224,9 +225,10 @@ class _HomePageState extends ConsumerState<HomePage>
                   _buildBell(context),
                 ],
               ),
-              const SizedBox(height: 16),
-              // ── Row 2: Wallet balance ─────────────────────────────────
-              Consumer<WalletProvider>(
+              // ── Row 2: Số dư ví (tạm ẩn — backend chưa có wallet service) ──
+              if (FeatureFlags.walletEnabled) const SizedBox(height: 16),
+              if (FeatureFlags.walletEnabled)
+                Consumer<WalletProvider>(
                 builder: (context, wallet, _) => GestureDetector(
                   onTap: () async {
                     await context.push(AppRouter.topUp);
@@ -734,8 +736,9 @@ class _HomePageState extends ConsumerState<HomePage>
                 offset: const Offset(0, -30),
                 child: Column(
                   children: [
-                    _buildWalletSection(context),
-                    const SizedBox(height: 24),
+                    // Ví (tạm ẩn — backend chưa có wallet service)
+                    if (FeatureFlags.walletEnabled) _buildWalletSection(context),
+                    if (FeatureFlags.walletEnabled) const SizedBox(height: 24),
                     AnimatedBuilder(
                       animation: _courierOrdersProvider,
                       builder: (context, _) {

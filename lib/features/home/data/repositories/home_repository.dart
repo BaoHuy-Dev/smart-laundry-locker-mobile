@@ -1,3 +1,4 @@
+import 'package:smart_laundry_locker/core/config/feature_flags.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
 import '../models/advertisement_model.dart';
 import '../models/blog_model.dart';
@@ -8,6 +9,8 @@ class HomeRepository {
   HomeRepository(this._apiClient);
 
   Future<List<AdvertisementModel>> getActiveAdvertisements() async {
+    // Tạm ẩn: backend chưa có `/advertisements` (trả 404). Trả rỗng, không gọi.
+    if (!FeatureFlags.homeContentFeedEnabled) return [];
     try {
       final response = await _apiClient.get(
         '/advertisements',
@@ -23,6 +26,8 @@ class HomeRepository {
   }
 
   Future<List<BlogModel>> getRecentBlogs() async {
+    // Tạm ẩn: backend chưa có `/blogs` (trả 404). Trả rỗng, không gọi.
+    if (!FeatureFlags.homeContentFeedEnabled) return [];
     try {
       final response = await _apiClient.get(
         '/blogs',
