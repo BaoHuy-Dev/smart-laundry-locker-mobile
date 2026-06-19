@@ -46,6 +46,12 @@ class PromotionModel {
     );
   }
 
+  /// Luôn trả về URL ảnh hợp lệ: backend imageUrl nếu có, fallback ảnh đẹp theo seed
+  String get effectiveImageUrl {
+    if (imageUrl != null && imageUrl!.isNotEmpty) return imageUrl!;
+    return 'https://picsum.photos/seed/promo$id/600/400';
+  }
+
   String get discountLabel {
     if (discountType == 'PERCENTAGE') return '-${discountValue.toInt()}%';
     final f = NumberFormat('#,###', 'vi_VN');

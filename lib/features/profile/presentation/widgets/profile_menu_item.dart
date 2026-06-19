@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 
 /// Profile menu item widget
 class ProfileMenuItem extends StatelessWidget {
@@ -40,7 +41,7 @@ class ProfileMenuItem extends StatelessWidget {
               fontFamily: 'Manrope',
               fontSize: 16,
               fontWeight: FontWeight.w500,
-              color: textColor ?? Colors.black87,
+              color: textColor ?? context.textPrimary,
             ),
           ),
           subtitle: subtitle != null
@@ -49,14 +50,14 @@ class ProfileMenuItem extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: 'Manrope',
                     fontSize: 14,
-                    color: Colors.black54,
+                    color: context.textMuted,
                     fontWeight: FontWeight.w500,
                   ),
                 )
               : null,
           trailing:
               trailing ??
-              Icon(LucideIcons.chevronRight, size: 18, color: Colors.black54),
+              Icon(LucideIcons.chevronRight, size: 18, color: context.textMuted),
           onTap: onTap,
         ),
       ],
@@ -109,7 +110,7 @@ class ProfileMenuSwitchItem extends StatelessWidget {
               fontFamily: 'Manrope',
               fontSize: 16,
               fontWeight: FontWeight.w500,
-              color: Colors.black87,
+              color: context.textPrimary,
             ),
           ),
           subtitle: subtitle != null
@@ -118,7 +119,7 @@ class ProfileMenuSwitchItem extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: 'Manrope',
                     fontSize: 14,
-                    color: Colors.black54,
+                    color: context.textMuted,
                   ),
                 )
               : null,
@@ -186,7 +187,7 @@ class ProfileMenuBadgeItem extends StatelessWidget {
               fontFamily: 'Manrope',
               fontSize: 16,
               fontWeight: FontWeight.w500,
-              color: Colors.black87,
+              color: context.textPrimary,
             ),
           ),
           subtitle: subtitle != null
@@ -195,7 +196,7 @@ class ProfileMenuBadgeItem extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: 'Manrope',
                     fontSize: 14,
-                    color: Colors.black54,
+                    color: context.textMuted,
                   ),
                 )
               : null,
@@ -226,7 +227,7 @@ class ProfileMenuBadgeItem extends StatelessWidget {
                   ),
                 ),
               const SizedBox(width: 8),
-              Icon(LucideIcons.chevronRight, size: 16, color: Colors.black54),
+              Icon(LucideIcons.chevronRight, size: 16, color: context.textMuted),
             ],
           ),
           onTap: onTap,

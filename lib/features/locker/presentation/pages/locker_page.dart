@@ -103,7 +103,7 @@ class _LockerPageState extends ConsumerState<LockerPage> {
       builder: (context, isLoggedIn, child) {
         if (!isLoggedIn) {
           return Scaffold(
-            backgroundColor: const Color(0xFFF7FAFC),
+            backgroundColor: context.pageBg,
             body: Column(
               children: const [
                 BrandHeroHeader(
@@ -121,7 +121,7 @@ class _LockerPageState extends ConsumerState<LockerPage> {
         }
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF7FAFC),
+          backgroundColor: context.pageBg,
           body: Column(
             children: [
               BrandHeroHeader(
@@ -145,17 +145,18 @@ class _LockerPageState extends ConsumerState<LockerPage> {
                   controller: _searchController,
                   decoration: InputDecoration(
                     hintText: 'Tìm kiếm tủ...',
-                    prefixIcon: const Icon(LucideIcons.search, size: 18),
+                    prefixIcon: Icon(LucideIcons.search,
+                        size: 18, color: context.textMuted),
                     filled: true,
-                    fillColor: Colors.white,
+                    fillColor: context.cardBg,
                     contentPadding: const EdgeInsets.symmetric(vertical: 0),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: AislBrand.chipBorder),
+                      borderSide: BorderSide(color: context.borderColor),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: AislBrand.chipBorder),
+                      borderSide: BorderSide(color: context.borderColor),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -181,9 +182,10 @@ class _LockerPageState extends ConsumerState<LockerPage> {
     if (state.isLoading && state.locations.isEmpty) {
       // Skeleton loading for list
       return ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
         itemCount: 6,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        separatorBuilder: (_, __) =>
+            Divider(height: 1, color: context.dividerColor),
         itemBuilder: (context, index) => const _LockerItemSkeleton(),
       );
     }
@@ -232,7 +234,8 @@ class _LockerPageState extends ConsumerState<LockerPage> {
         controller: _scrollController,
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
         itemCount: state.locations.length + (state.isLoadingMore ? 1 : 0),
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        separatorBuilder: (_, __) =>
+            Divider(height: 1, color: context.dividerColor),
         itemBuilder: (context, index) {
           // Loading more indicator - show skeleton row
           if (index >= state.locations.length) {
@@ -259,70 +262,67 @@ class _LockerItemSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final box = (width * 0.18).clamp(48.0, 72.0);
-    final line1Height = (width * 0.035).clamp(12.0, 18.0);
-    final line2Height = (width * 0.03).clamp(10.0, 14.0);
-    final horizontalPadding = (width * 0.04).clamp(12.0, 20.0);
-    final spacing = (width * 0.02).clamp(4.0, 16.0);
-
-    return Container(
-      padding: EdgeInsets.all(horizontalPadding),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: box,
-            height: box,
+            width: 110,
+            height: 110,
             decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
-          SizedBox(width: spacing),
+          const SizedBox(width: 14),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  height: line1Height,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(4),
+            child: SizedBox(
+              height: 110,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    height: 14,
+                    width: 60,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(20),
+                    ),
                   ),
-                ),
-                SizedBox(height: spacing * 0.5),
-                Container(
-                  height: line2Height,
-                  width: double.infinity,
-                  constraints: BoxConstraints(maxWidth: width * 0.6),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(4),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 14,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        height: 14,
+                        width: 160,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                SizedBox(height: spacing * 0.25),
-                Container(
-                  height: line2Height,
-                  width: width * 0.4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(4),
+                  Container(
+                    height: 12,
+                    width: 200,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],

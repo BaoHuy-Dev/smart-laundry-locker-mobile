@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:smart_laundry_locker/features/locker/domain/entities/locker_location.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 
 /// Widget hiển thị một location item trong danh sách tủ.
 class LockerItem extends StatelessWidget {
@@ -39,36 +40,27 @@ class LockerItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = _gradient();
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.all(10),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Thumbnail: ảnh thực từ store nếu có, fallback gradient + initials
+            // Thumbnail 110×110
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: SizedBox(
-                width: 64,
-                height: 64,
+                width: 110,
+                height: 110,
                 child: (location.imageUrl != null &&
                         location.imageUrl!.isNotEmpty)
                     ? CachedNetworkImage(
                         imageUrl: location.imageUrl!,
                         fit: BoxFit.cover,
+                        memCacheWidth: 220,
+                        memCacheHeight: 220,
                         placeholder: (_, __) =>
                             _GradientThumb(colors: colors, initials: _initials()),
                         errorWidget: (_, __, ___) =>
@@ -77,66 +69,64 @@ class LockerItem extends StatelessWidget {
                     : _GradientThumb(colors: colors, initials: _initials()),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             // Info
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          location.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14,
-                            color: Colors.black87,
+              child: SizedBox(
+                height: 110,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Status chip
+                    _StatusChip(active: location.isActive),
+                    // Name — 2 lines
+                    Text(
+                      location.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: context.textPrimary,
+                        height: 1.3,
+                      ),
+                    ),
+                    // Address
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 1),
+                          child: Icon(LucideIcons.mapPin,
+                              size: 12, color: context.textMuted),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            location.address.isNotEmpty
+                                ? location.address
+                                : 'Chưa có địa chỉ',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.textMuted,
+                              height: 1.4,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      _StatusChip(active: location.isActive),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.only(top: 1),
-                        child: Icon(
-                          LucideIcons.mapPin,
-                          size: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          location.address.isNotEmpty
-                              ? location.address
-                              : 'Chưa có địa chỉ',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(width: 4),
-            const Icon(Icons.chevron_right, color: Color(0xFFCBD5E1), size: 20),
+            const Padding(
+              padding: EdgeInsets.only(top: 44),
+              child: Icon(Icons.chevron_right,
+                  color: Color(0xFFCBD5E1), size: 20),
+            ),
           ],
         ),
       ),
@@ -188,20 +178,24 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = active ? const Color(0xFF16A34A) : Colors.grey;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        active ? 'Mở cửa' : 'Đóng',
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: color,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
-      ),
+        const SizedBox(width: 5),
+        Text(
+          active ? 'Mở cửa' : 'Đóng',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -113,22 +113,21 @@ class CustomBottomNavigationBar extends StatelessWidget {
               height: 54,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [AislBrand.cyan, AislBrand.blue],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                color: Colors.white,
+                border: Border.all(
+                  color: const Color(0xFFE2E8F0),
+                  width: 1.5,
                 ),
-                border: Border.all(color: Colors.white, width: 2.5),
                 boxShadow: [
                   BoxShadow(
-                    color: AislBrand.cyan.withValues(alpha: 0.45),
-                    blurRadius: 14,
-                    offset: const Offset(0, 5),
+                    color: Colors.black.withValues(alpha: 0.10),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
               child: Center(
-                child: _buildIcon(item.icon, Colors.white, size: 25),
+                child: _buildIcon(item.icon, AislBrand.navy, size: 25),
               ),
             ),
           ),
