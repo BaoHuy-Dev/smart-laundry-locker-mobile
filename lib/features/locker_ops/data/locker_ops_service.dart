@@ -248,6 +248,52 @@ class LockerOpsService {
   Future<Map<String, dynamic>> myRatingAverage() =>
       _map('GET', '/api/maintenance/my-rating-average');
 
+  // ── STAFF ──────────────────────────────────────────────────────────────────
+
+  /// Danh sách tủ mà STAFF được phân công quản lý.
+  Future<List<Map<String, dynamic>>> staffLockers() =>
+      _list('/api/staff/lockers');
+
+  /// Sơ đồ ô của một tủ (dành cho STAFF).
+  Future<Map<String, dynamic>> staffLayout(int lockerId) =>
+      _map('GET', '/api/staff/lockers/$lockerId/layout');
+
+  /// Danh sách đơn hàng trong ca của STAFF.
+  Future<List<Map<String, dynamic>>> staffOrders() =>
+      _list('/api/staff/orders');
+
+  /// Thống kê tổng quan của các tủ STAFF quản lý.
+  Future<Map<String, dynamic>> staffStats() =>
+      _map('GET', '/api/staff/lockers/stats');
+
+  // ── TECHNICIAN ─────────────────────────────────────────────────────────────
+
+  /// Danh sách thiết bị IoT mà TECHNICIAN phụ trách.
+  Future<List<Map<String, dynamic>>> techDevices() =>
+      _list('/api/technician/devices');
+
+  /// Chi tiết một thiết bị IoT theo ID.
+  Future<Map<String, dynamic>> techDeviceDetail(int id) =>
+      _map('GET', '/api/technician/devices/$id');
+
+  /// Cập nhật trạng thái thiết bị (ONLINE / OFFLINE / ERROR).
+  Future<void> techUpdateStatus(int id, String status) async {
+    await _map(
+      'PUT',
+      '/api/technician/devices/$id/status',
+      body: {'status': status},
+    );
+  }
+
+  /// Nhật ký audit của một thiết bị IoT.
+  Future<List<Map<String, dynamic>>> techDeviceLogs(int id) =>
+      _list('/api/technician/devices/$id/logs');
+
+  /// Gửi lệnh restart thiết bị IoT.
+  Future<void> techRestartDevice(int id) async {
+    await _map('POST', '/api/technician/devices/$id/restart');
+  }
+
   /// Human-readable message from an [ApiResponse] error payload.
   static String errorMessage(Object error) {
     if (error is DioException) {

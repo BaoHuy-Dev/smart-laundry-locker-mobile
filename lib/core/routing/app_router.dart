@@ -51,6 +51,8 @@ import 'package:smart_laundry_locker/features/orders/presentation/pages/customer
 import 'package:smart_laundry_locker/features/user_laundry/presentation/pages/user_laundry_order_page.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/manager_home_page.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/maintenance_home_page.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/staff_home_page.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/technician_home_page.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/send_parcel_page.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/rent_locker_page.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/my_locker_orders_page.dart';
@@ -100,6 +102,8 @@ class AppRouter {
   static const String userLaundryOrder = '/user/laundry-order';
   static const String managerHome = '/manager';
   static const String maintenanceHome = '/maintenance-home';
+  static const String staffHome = '/staff-home';
+  static const String technicianHome = '/technician-home';
   static const String sendParcel = '/locker/send-parcel';
   static const String rentLocker = '/locker/rent';
   static const String myLockerOrders = '/locker/my-orders';
@@ -429,6 +433,16 @@ class AppRouter {
         path: maintenanceHome,
         name: 'maintenance_home',
         builder: (context, state) => const MaintenanceHomePage(),
+      ),
+      GoRoute(
+        path: staffHome,
+        name: 'staff_home',
+        builder: (context, state) => const StaffHomePage(),
+      ),
+      GoRoute(
+        path: technicianHome,
+        name: 'technician_home',
+        builder: (context, state) => const TechnicianHomePage(),
       ),
       GoRoute(
         path: sendParcel,
