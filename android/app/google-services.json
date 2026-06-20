@@ -14,12 +14,24 @@
       },
       "oauth_client": [
         {
-          "client_id": "1007589685877-1t7srs4alkukrm84odjlrf8ms0ea41le.apps.googleusercontent.com",
+          "client_id": "1007589685877-k8d7cldra6oq8f2op0o4ke28ntrjtqvq.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.laundrylocker.mobile",
-            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+            "certificate_hash": "a31a755ec416e8d97d4c750e864ce06308b84585"
           }
+        },
+        {
+          "client_id": "1007589685877-oe40k7162lf86uljlp6v4vjvqta0v106.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.laundrylocker.mobile",
+            "certificate_hash": "b1a88fbfe70865c629b0b0e51d5d6b8bbed9112d"
+          }
+        },
+        {
+          "client_id": "1007589685877-s8jcspo0fsils3f97sqgrmfaqhakrsam.apps.googleusercontent.com",
+          "client_type": 3
         }
       ],
       "api_key": [
@@ -29,7 +41,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1007589685877-s8jcspo0fsils3f97sqgrmfaqhakrsam.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

@@ -85,8 +85,17 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     QrConfirmRequestModel request,
   ) async {
     final response = await _apiClient.post<Map<String, dynamic>>(
-      '$_basePath/qr/confirm',
+      '/api/auth/qr-login/confirm',
       data: request.toJson(),
+    );
+    return _extractData(response);
+  }
+
+  @override
+  Future<Map<String, dynamic>> firebaseLogin({required String idToken}) async {
+    final response = await _apiClient.post<Map<String, dynamic>>(
+      '/api/auth/firebase',
+      data: {'idToken': idToken},
     );
     return _extractData(response);
   }

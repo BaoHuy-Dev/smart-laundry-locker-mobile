@@ -50,11 +50,11 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAyJUEVySYAdyvfdzZPA4EtCceT0tZwYNA',
-    appId: '1:816941944331:android:a28faa66fb378414ee410e',
-    messagingSenderId: '816941944331',
-    projectId: 'db-wsb-project',
-    storageBucket: 'db-wsb-project.firebasestorage.app',
+    apiKey: 'AIzaSyCqdITzgaApbsPeFn2aAbtKbOEVLIQvYo8',
+    appId: '1:1007589685877:android:1afa036d6ef7aba040963c',
+    messagingSenderId: '1007589685877',
+    projectId: 'laundry-locker-19a9d',
+    storageBucket: 'laundry-locker-19a9d.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(

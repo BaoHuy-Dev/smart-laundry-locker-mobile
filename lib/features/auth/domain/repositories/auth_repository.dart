@@ -22,6 +22,10 @@ abstract class AuthRepository {
     required Uint8List imageBytes,
   });
 
+  Future<Either<Failure, AuthTokenEntity>> firebaseLogin({
+    required String idToken,
+  });
+
   Future<Either<Failure, AuthTokenEntity>> verifyOtp({
     String? phoneNumber,
     String? email,

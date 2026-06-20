@@ -7,6 +7,8 @@ import 'package:smart_laundry_locker/features/auth/domain/entities/face_verify_r
 import 'package:smart_laundry_locker/features/auth/application/use_cases/confirm_qr_login_use_case.dart';
 import 'package:smart_laundry_locker/features/auth/application/use_cases/login_use_case.dart';
 import 'package:smart_laundry_locker/features/auth/application/use_cases/login_with_face_use_case.dart';
+import 'package:smart_laundry_locker/features/auth/application/use_cases/social_login_use_case.dart';
+import 'package:smart_laundry_locker/core/services/firebase_auth_service.dart';
 import 'package:smart_laundry_locker/features/auth/domain/entities/auth_token_entity.dart';
 import 'package:smart_laundry_locker/features/auth/infrastructure/utils/qr_session_id_parser.dart';
 import 'package:flutter/foundation.dart';
@@ -15,16 +17,22 @@ class LoginProvider extends ChangeNotifier {
   final LoginUseCase _loginUseCase;
   final LoginWithFaceUseCase _loginWithFaceUseCase;
   final ConfirmQrLoginUseCase _confirmQrLoginUseCase;
+  final SocialLoginUseCase _socialLoginUseCase;
+  final FirebaseAuthService _firebaseAuthService;
   final ApiClient _apiClient;
 
   LoginProvider({
     required LoginUseCase loginUseCase,
     required LoginWithFaceUseCase loginWithFaceUseCase,
     required ConfirmQrLoginUseCase confirmQrLoginUseCase,
+    required SocialLoginUseCase socialLoginUseCase,
+    required FirebaseAuthService firebaseAuthService,
     required ApiClient apiClient,
   }) : _loginUseCase = loginUseCase,
        _loginWithFaceUseCase = loginWithFaceUseCase,
        _confirmQrLoginUseCase = confirmQrLoginUseCase,
+       _socialLoginUseCase = socialLoginUseCase,
+       _firebaseAuthService = firebaseAuthService,
        _apiClient = apiClient;
 
   bool _isLoading = false;
@@ -113,6 +121,82 @@ class LoginProvider extends ChangeNotifier {
     final result = await _loginUseCase(params);
 
     result.fold(_handleFailure, _handleLoginSuccess);
+  }
+
+  String? _verificationId;
+  String? get verificationId => _verificationId;
+
+  Future<void> loginWithGoogle() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final idToken = await _firebaseAuthService.signInWithGoogle();
+      if (idToken == null) {
+        _isLoading = false;
+        notifyListeners();
+        return; // user cancelled
+      }
+      final result = await _socialLoginUseCase(idToken);
+      result.fold(_handleFailure, _handleLoginSuccess);
+    } catch (e) {
+      _isLoading = false;
+      _error = 'Đăng nhập Google thất bại';
+      notifyListeners();
+    }
+  }
+
+  Future<void> sendPhoneOtp(String phoneNumber) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _firebaseAuthService.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        codeSent: (String verId) {
+          _verificationId = verId;
+          _isLoading = false;
+          notifyListeners();
+        },
+        verificationFailed: (String error) {
+          _error = error;
+          _isLoading = false;
+          notifyListeners();
+        },
+      );
+    } catch (e) {
+      _isLoading = false;
+      _error = 'Lỗi gửi mã OTP';
+      notifyListeners();
+    }
+  }
+
+  Future<void> confirmPhoneOtp(String smsCode) async {
+    if (_verificationId == null) return;
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final idToken = await _firebaseAuthService.confirmOtp(
+        verificationId: _verificationId!,
+        smsCode: smsCode,
+      );
+      if (idToken == null) {
+        _isLoading = false;
+        _error = 'Mã xác nhận không đúng';
+        notifyListeners();
+        return;
+      }
+      final result = await _socialLoginUseCase(idToken);
+      result.fold(_handleFailure, _handleLoginSuccess);
+    } catch (e) {
+      _isLoading = false;
+      _error = 'Mã xác nhận không đúng hoặc đã hết hạn';
+      notifyListeners();
+    }
   }
 
   Future<void> loginWithFace({required Uint8List imageBytes}) async {
