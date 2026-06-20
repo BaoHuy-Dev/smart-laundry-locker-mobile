@@ -1,3 +1,8 @@
+# Secrets - NEVER commit Firebase Admin service-account keys (backend-only).
+# They grant full admin access to the Firebase project and must not ship in the app.
+*-firebase-adminsdk-*.json
+*serviceAccount*.json
+
 # Miscellaneous
 *.class
 *.log

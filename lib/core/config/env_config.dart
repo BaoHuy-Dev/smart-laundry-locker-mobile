@@ -11,9 +11,12 @@ abstract class EnvConfig {
   )
   static const String apiBaseUrl = _EnvConfig.apiBaseUrl;
 
-  // Web Client ID (for backend authentication - server-side verification)
-  // @EnviedField(varName: 'GOOGLE_WEB_CLIENT_ID', defaultValue: '')
-  // static const String googleWebClientId = _EnvConfig.googleWebClientId;
+  // Google Web (server) client ID — passed as `serverClientId` to google_sign_in
+  // so Google sign-in returns an ID token whose audience the backend (Firebase
+  // Admin) can verify. PUBLIC value (also present in
+  // android/app/google-services.json oauth_client type 3), not a secret.
+  static const String googleWebClientId =
+      '1007589685877-s8jcspo0fsils3f97sqgrmfaqhakrsam.apps.googleusercontent.com';
 
   // @EnviedField(varName: 'GOOGLE_MAPS_API_KEY', defaultValue: '')
   // static const String googleMapsApiKey = _EnvConfig.googleMapsApiKey;

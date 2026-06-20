@@ -4,7 +4,9 @@ import 'package:smart_laundry_locker/features/auth/application/use_cases/login_u
 import 'package:smart_laundry_locker/features/auth/application/use_cases/login_with_face_use_case.dart';
 import 'package:smart_laundry_locker/features/auth/application/use_cases/register_face_use_case.dart';
 import 'package:smart_laundry_locker/features/auth/application/use_cases/register_use_case.dart';
+import 'package:smart_laundry_locker/features/auth/application/use_cases/social_login_use_case.dart';
 import 'package:smart_laundry_locker/features/auth/application/use_cases/verify_otp_use_case.dart';
+import 'package:smart_laundry_locker/core/services/firebase_auth_service.dart';
 import 'package:smart_laundry_locker/features/auth/domain/repositories/auth_repository.dart';
 import 'package:smart_laundry_locker/features/auth/infrastructure/data_sources/auth_remote_data_source_impl.dart';
 import 'package:smart_laundry_locker/features/auth/infrastructure/repositories/auth_repository_impl.dart';
@@ -28,11 +30,15 @@ class AuthInjection {
     final loginUseCase = LoginUseCase(repository);
     final loginWithFaceUseCase = LoginWithFaceUseCase(repository);
     final confirmQrLoginUseCase = ConfirmQrLoginUseCase(repository);
+    final socialLoginUseCase = SocialLoginUseCase(repository);
+    final firebaseAuthService = FirebaseAuthService();
 
     return LoginProvider(
       loginUseCase: loginUseCase,
       loginWithFaceUseCase: loginWithFaceUseCase,
       confirmQrLoginUseCase: confirmQrLoginUseCase,
+      socialLoginUseCase: socialLoginUseCase,
+      firebaseAuthService: firebaseAuthService,
       apiClient: apiClient,
     );
   }

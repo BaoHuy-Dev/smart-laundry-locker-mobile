@@ -191,6 +191,25 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<Either<Failure, AuthTokenEntity>> firebaseLogin({
+    required String idToken,
+  }) async {
+    try {
+      final response = await _remoteDataSource.firebaseLogin(idToken: idToken);
+      final tokenModel = AuthTokenModel.fromJson(response);
+      return Right(tokenModel.toEntity());
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } on AuthenticationException catch (e) {
+      return Left(AuthenticationFailure(e.message));
+    } catch (e) {
+      return Left(UnknownFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, AuthTokenEntity>> verifyOtp({
     String? phoneNumber,
     String? email,
