@@ -147,6 +147,27 @@ class LoginProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> loginWithFacebook() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final idToken = await _firebaseAuthService.signInWithFacebook();
+      if (idToken == null) {
+        _isLoading = false;
+        notifyListeners();
+        return; // user cancelled
+      }
+      final result = await _socialLoginUseCase(idToken);
+      result.fold(_handleFailure, _handleLoginSuccess);
+    } catch (e) {
+      _isLoading = false;
+      _error = 'Đăng nhập Facebook thất bại';
+      notifyListeners();
+    }
+  }
+
   Future<void> sendPhoneOtp(String phoneNumber) async {
     _isLoading = true;
     _error = null;
