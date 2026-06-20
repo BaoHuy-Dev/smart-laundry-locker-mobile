@@ -730,18 +730,30 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
         ),
         const SizedBox(height: 16),
         Row(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _buildSocialButton(
-              icon: Icons.g_mobiledata,
-              label: 'Google',
-              onTap: () => _loginProvider.loginWithGoogle(),
+            Expanded(
+              child: _buildSocialButton(
+                icon: Icons.g_mobiledata,
+                label: 'Google',
+                onTap: () => _loginProvider.loginWithGoogle(),
+              ),
             ),
-            const SizedBox(width: 16),
-            _buildSocialButton(
-              icon: Icons.phone_android,
-              label: 'Số điện thoại',
-              onTap: () => _showPhoneOtpDialog(),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildSocialButton(
+                icon: Icons.facebook,
+                iconColor: const Color(0xFF1877F2),
+                label: 'Facebook',
+                onTap: () => _loginProvider.loginWithFacebook(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildSocialButton(
+                icon: Icons.phone_android,
+                label: 'SĐT',
+                onTap: () => _showPhoneOtpDialog(),
+              ),
             ),
           ],
         ),
@@ -749,21 +761,33 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
     );
   }
 
-  Widget _buildSocialButton({required IconData icon, required String label, required VoidCallback onTap}) {
+  Widget _buildSocialButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color? iconColor,
+  }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
           border: Border.all(color: Colors.black.withOpacity(0.1)),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 24),
-            const SizedBox(width: 8),
-            Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            Icon(icon, size: 22, color: iconColor),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ),
           ],
         ),
       ),

@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:smart_laundry_locker/core/config/env_config.dart';
 
@@ -47,6 +48,30 @@ class FirebaseAuthService {
       rethrow;
     } catch (e) {
       debugPrint('Google Sign In Error: $e');
+      rethrow;
+    }
+  }
+
+  /// Facebook sign-in -> Firebase credential -> Firebase ID token.
+  /// Returns null when the user cancels.
+  Future<String?> signInWithFacebook() async {
+    try {
+      final LoginResult result = await FacebookAuth.instance.login();
+      if (result.status == LoginStatus.cancelled) {
+        return null; // Cancelled by user
+      }
+      final AccessToken? accessToken = result.accessToken;
+      if (result.status != LoginStatus.success || accessToken == null) {
+        throw Exception('Facebook login failed: ${result.message}');
+      }
+
+      final credential =
+          FacebookAuthProvider.credential(accessToken.tokenString);
+      final userCredential =
+          await _firebaseAuth.signInWithCredential(credential);
+      return await userCredential.user?.getIdToken();
+    } catch (e) {
+      debugPrint('Facebook Sign In Error: $e');
       rethrow;
     }
   }

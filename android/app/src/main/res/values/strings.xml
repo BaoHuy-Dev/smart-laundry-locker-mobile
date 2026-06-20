@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Facebook Login (flutter_facebook_auth). App ID + Client Token are public
+         values embedded in the app; the App Secret stays only in Firebase. -->
+    <string name="facebook_app_id">1767424237196097</string>
+    <string name="fb_login_protocol_scheme">fb1767424237196097</string>
+    <string name="facebook_client_token">ddaed405081124fc03ba5f6886b4edc6</string>
+</resources>
