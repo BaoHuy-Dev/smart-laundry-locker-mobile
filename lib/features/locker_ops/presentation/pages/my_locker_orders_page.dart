@@ -3,8 +3,11 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import 'package:smart_laundry_locker/core/config/env_config.dart';
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
 import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
+import 'package:smart_laundry_locker/features/transactions/presentation/pages/top_up_page.dart'
+    show TopUpWebViewPage;
 import 'package:smart_laundry_locker/features/locker_ops/presentation/utils/locker_maps.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/ops_widgets.dart';
 import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
@@ -325,6 +328,58 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
     }
   }
 
+  /// Pick a payment method then pay the order. Wallet/Cash settle instantly;
+  /// VNPay/MoMo open the provider page in a WebView and settle via callback.
+  Future<void> _payDialog(Map<String, dynamic> order) async {
+    final orderId = _asInt(order['id']);
+    if (orderId == null) return;
+    final total = _asDouble(order['totalPrice']) ?? 0;
+
+    num balance = 0;
+    try {
+      balance = await _service.walletBalance();
+    } catch (_) {}
+    if (!mounted) return;
+
+    final method = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (ctx) => _PaymentMethodPicker(total: total, walletBalance: balance),
+    );
+    if (method == null) return;
+    await _doCheckout(orderId, method);
+  }
+
+  Future<void> _doCheckout(int orderId, String method) async {
+    try {
+      final res = await _service.checkout(
+        orderId,
+        method,
+        returnUrl: '${EnvConfig.apiBaseUrl}/payments/vnpay/callback',
+      );
+      final url = res['url'] as String?;
+      if ((method == 'VNPAY' || method == 'MOMO') &&
+          url != null &&
+          url.isNotEmpty) {
+        if (!mounted) return;
+        final ok = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(builder: (_) => TopUpWebViewPage(paymentUrl: url)),
+        );
+        if (ok == true) _snack('Thanh toán thành công');
+        await _load();
+      } else {
+        _snack('Thanh toán thành công');
+        await _load();
+      }
+    } catch (e) {
+      _snack(LockerOpsService.errorMessage(e));
+    }
+  }
+
   void _openDetail(Map<String, dynamic> order) {
     showModalBottomSheet<void>(
       context: context,
@@ -392,6 +447,10 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
               await _runAction(() => _service.cancelOrder(id), 'Đã hủy đơn');
             },
             onDirections: () => _openLockerDirections(order),
+            onPay: (_) async {
+              Navigator.pop(ctx);
+              await _payDialog(order);
+            },
           ),
         ),
       ),
@@ -854,6 +913,7 @@ class _DetailSheet extends StatelessWidget {
     required this.onReport,
     required this.onCancel,
     required this.onDirections,
+    required this.onPay,
   });
 
   final Map<String, dynamic> order;
@@ -867,6 +927,7 @@ class _DetailSheet extends StatelessWidget {
   final void Function(int boxId) onReport;
   final void Function(int orderId) onCancel;
   final VoidCallback onDirections;
+  final void Function(int orderId) onPay;
 
   @override
   Widget build(BuildContext context) {
@@ -891,7 +952,21 @@ class _DetailSheet extends StatelessWidget {
         status != 'COMPLETED' &&
         status != 'CANCELED';
 
+    final paymentStatus =
+        (order['paymentStatus'] as String? ?? 'UNPAID').toUpperCase();
+    final totalRaw = order['totalPrice'];
+    final totalNum = totalRaw is num ? totalRaw : num.tryParse('$totalRaw') ?? 0;
+    final canPay =
+        paymentStatus != 'PAID' && totalNum > 0 && status != 'CANCELED';
+
     final actions = <Widget>[
+      if (canPay)
+        OpsSheetAction(
+          label: 'Thanh toán ${fmtPrice(order['totalPrice'])}',
+          icon: LucideIcons.creditCard,
+          primary: true,
+          onTap: () => onPay(id),
+        ),
       if (canUnlock)
         OpsSheetAction(
           label: 'Mở tủ',
@@ -1069,6 +1144,117 @@ class _DetailSheet extends StatelessWidget {
         ...actions,
         const SizedBox(height: 8),
       ],
+    );
+  }
+}
+
+// ── Payment method picker ─────────────────────────────────────────────────────
+
+class _PaymentMethodPicker extends StatelessWidget {
+  const _PaymentMethodPicker({required this.total, required this.walletBalance});
+  final double total;
+  final num walletBalance;
+
+  @override
+  Widget build(BuildContext context) {
+    final insufficient = walletBalance < total;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Chọn phương thức thanh toán',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
+              color: opsDark,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Số tiền: ${fmtPrice(total)}',
+            style: const TextStyle(fontSize: 14, color: opsMutedText),
+          ),
+          const SizedBox(height: 16),
+          _MethodTile(
+            icon: LucideIcons.wallet,
+            title: 'Ví của tôi',
+            subtitle: insufficient
+                ? 'Số dư ${fmtPrice(walletBalance)} — không đủ, hãy nạp thêm'
+                : 'Số dư ${fmtPrice(walletBalance)} · thanh toán tức thì',
+            enabled: !insufficient,
+            onTap: () => Navigator.pop(context, 'WALLET'),
+          ),
+          _MethodTile(
+            icon: LucideIcons.creditCard,
+            title: 'VNPay',
+            subtitle: 'Thẻ ATM / QR ngân hàng',
+            onTap: () => Navigator.pop(context, 'VNPAY'),
+          ),
+          _MethodTile(
+            icon: LucideIcons.smartphone,
+            title: 'MoMo',
+            subtitle: 'Ví MoMo',
+            onTap: () => Navigator.pop(context, 'MOMO'),
+          ),
+          _MethodTile(
+            icon: LucideIcons.banknote,
+            title: 'Tiền mặt',
+            subtitle: 'Thanh toán tại quầy',
+            onTap: () => Navigator.pop(context, 'CASH'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MethodTile extends StatelessWidget {
+  const _MethodTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.enabled = true,
+  });
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: enabled ? 1 : 0.5,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: opsSurface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: opsBorder),
+        ),
+        child: ListTile(
+          enabled: enabled,
+          onTap: enabled ? onTap : null,
+          leading: Icon(icon, color: opsPrimary),
+          title: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w700, color: opsDark),
+          ),
+          subtitle: Text(
+            subtitle,
+            style: const TextStyle(fontSize: 12, color: opsMutedText),
+          ),
+          trailing: const Icon(
+            LucideIcons.chevronRight,
+            size: 18,
+            color: opsMutedText,
+          ),
+        ),
+      ),
     );
   }
 }

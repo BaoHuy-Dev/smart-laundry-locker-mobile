@@ -106,6 +106,32 @@ class LockerOpsService {
   Future<List<Map<String, dynamic>>> paymentsByOrder(int orderId) =>
       _list('/api/payments/order/$orderId');
 
+  /// Số dư ví hiện tại của khách (VND).
+  Future<num> walletBalance() async {
+    final data = await _map('GET', '/api/wallet');
+    final raw = data['balance'];
+    return raw is num ? raw : num.tryParse('$raw') ?? 0;
+  }
+
+  /// Thanh toán đơn theo phương thức WALLET | VNPAY | MOMO | CASH.
+  /// WALLET/CASH trả về payment đã COMPLETED; VNPAY/MOMO trả `url`/`deeplink`/`qr`
+  /// để mở cổng thanh toán. `returnUrl` để WebView detect callback.
+  Future<Map<String, dynamic>> checkout(
+    int orderId,
+    String method, {
+    String? bankCode,
+    String? returnUrl,
+  }) => _map(
+    'POST',
+    '/api/payments/checkout',
+    body: {
+      'orderId': orderId,
+      'method': method,
+      if (bankCode != null) 'bankCode': bankCode,
+      if (returnUrl != null) 'returnUrl': returnUrl,
+    },
+  );
+
   Future<Map<String, dynamic>> confirmDrop(int orderId) =>
       _map('PUT', '/api/orders/$orderId/confirm');
 
