@@ -11,6 +11,7 @@ import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
+import 'package:go_router/go_router.dart';
 
 /// Top-level background message handler
 @pragma('vm:entry-point')
