@@ -10,6 +10,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
+import 'package:smart_laundry_locker/core/routing/app_router.dart';
 
 /// Top-level background message handler
 @pragma('vm:entry-point')
@@ -244,8 +245,18 @@ class FirebaseMessagingService {
 
   void _handleMessageOpenedApp(RemoteMessage message) {
     debugPrint("Message opened app: ${message.data}");
-    // Handle Navigation based on data payload
-    // e.g if type == 'dispatch_order', navigate to Dispatch Map or show Dialog
+    final type = message.data['type'];
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = AppRouter.navigatorKey.currentContext;
+      if (context == null) return;
+
+      if (type == 'dispatch_order') {
+        context.go(AppRouter.activeDelivery);
+      } else {
+        context.go(AppRouter.notifications);
+      }
+    });
   }
 
   void _showIncomingOrderDialog(Map<String, dynamic> data) {
@@ -259,10 +270,9 @@ class FirebaseMessagingService {
         return IncomingOrderSheet(
           dispatchData: data,
           onAccept: () {
-            // Trigger CourierDeliveryProvider -> acceptOrder(dispatchId)
-            // Note: Navigation/Logic will be handled by the provider state change
             SmartDialog.showToast('Đã nhận đơn hàng!');
-            // TODO: Route to Active Delivery Screen
+            final ctx = AppRouter.navigatorKey.currentContext;
+            if (ctx != null) ctx.go(AppRouter.activeDelivery);
           },
           onDecline: () {
             SmartDialog.showToast('Đã từ chối đơn hàng');

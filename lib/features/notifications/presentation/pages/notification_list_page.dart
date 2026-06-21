@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
+import 'package:smart_laundry_locker/core/routing/app_router.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
 
 class NotificationListPage extends StatefulWidget {
@@ -52,7 +53,18 @@ class _NotificationListPageState extends State<NotificationListPage> {
     final payload = notification.dataPayload;
     if (payload == null) return;
 
-    // TODO: Routing logic based on actionType
+    switch (payload.actionType) {
+      case 'OPEN_ORDER_DETAIL':
+        if (payload.referenceId != null) {
+          context.push(AppRouter.orderDetail, extra: payload.referenceId);
+        }
+        break;
+      case 'OPEN_PROMOTION_TAB':
+        context.push(AppRouter.promotions);
+        break;
+      default:
+        break;
+    }
   }
 
   @override
