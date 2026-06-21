@@ -10,13 +10,13 @@ class FeatureFlags {
   const FeatureFlags._();
 
   /// Ví / số dư người dùng.
-  /// Backend chưa có wallet service → `GET /wallet/balance` trả 404.
-  static const bool walletEnabled = false;
+  /// Backend đã có wallet service (`GET /api/wallet`, cộng tiền sau topup VNPay).
+  static const bool walletEnabled = true;
 
   /// Nạp tiền + lịch sử giao dịch (phụ thuộc ví).
-  /// `GET /payments/transactions` chưa tồn tại (PaymentController chỉ có
-  /// `/api/payments`), và số dư không được cộng sau topup.
-  static const bool transactionsEnabled = false;
+  /// Backend: nạp qua `POST /api/payments/topup/create` → cộng ví; lịch sử ví
+  /// qua `GET /api/wallet/transactions`.
+  static const bool transactionsEnabled = true;
 
   /// Gói dịch vụ / subscription.
   /// Backend chưa có → `/plans/customer`, `/pricings`, `/subscriptions/*` 404.
