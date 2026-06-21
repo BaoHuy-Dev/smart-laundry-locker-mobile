@@ -74,8 +74,7 @@ class _LockerPageState extends ConsumerState<LockerPage> {
   }
 
   void _navigateToMap(LockerLocation location) {
-    Navigator.push<void>(
-      context,
+    Navigator.of(context, rootNavigator: true).push<void>(
       MaterialPageRoute(
         builder: (_) => StoreLockerGridPage(
           store: Store(
@@ -130,8 +129,7 @@ class _LockerPageState extends ConsumerState<LockerPage> {
                 trailing: BrandCircleIconButton(
                   icon: LucideIcons.mapPin,
                   onTap: () {
-                    Navigator.push(
-                      context,
+                    Navigator.of(context, rootNavigator: true).push<void>(
                       MaterialPageRoute(
                         builder: (context) => const LockerMapPage(),
                       ),

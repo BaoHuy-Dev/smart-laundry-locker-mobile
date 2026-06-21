@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:smart_laundry_locker/core/services/app_event_bus.dart';
 import 'package:smart_laundry_locker/features/orders/domain/entities/order.dart';
 import 'package:smart_laundry_locker/features/orders/domain/entities/order_detail.dart';
 import 'package:smart_laundry_locker/features/orders/presentation/providers/order_injection.dart';
@@ -46,19 +47,28 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
   Cabinet? _originCabinet;
   Cabinet? _destinationCabinet;
   bool _isLoadingCabinets = false;
+  StreamSubscription<AppEvent>? _eventSub;
 
   @override
   void initState() {
     super.initState();
     final apiClient = ApiClient();
     _provider = OrderInjection.provideOrderProvider(apiClient);
+
+    final currentId = widget.order?.id ?? widget.orderId;
+    _eventSub = AppEventBus.instance.events.listen((event) {
+      if (!mounted) return;
+      if (event is OrderChangedEvent &&
+          (event.orderId == null || event.orderId == currentId)) {
+        _provider.fetchOrderDetail(currentId);
+      }
+    });
     _lockerProvider = LockerInjection.provideLockerProvider(apiClient);
     _delegationProvider = DelegationInjection.provideDelegationProvider(
       apiClient,
     );
     _profileProvider = ProfileInjection.provideProfileProvider(apiClient);
 
-    final String currentId = widget.order?.id ?? widget.orderId;
     _delegationProvider.fetchDelegationByOrderId(currentId);
     _profileProvider.loadProfile();
 
@@ -114,6 +124,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
 
   @override
   void dispose() {
+    _eventSub?.cancel();
     _provider.dispose();
     _lockerProvider.dispose();
     _delegationProvider.dispose();

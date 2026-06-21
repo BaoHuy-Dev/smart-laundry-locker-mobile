@@ -1,14 +1,22 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:smart_laundry_locker/core/config/feature_flags.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
+import 'package:smart_laundry_locker/core/services/app_event_bus.dart';
 
 class WalletProvider extends ChangeNotifier {
   final ApiClient _apiClient;
+  StreamSubscription<AppEvent>? _eventSub;
 
   WalletProvider({ApiClient? apiClient})
     : _apiClient = apiClient ?? ApiClient() {
     TokenService.authState.addListener(_onAuthStateChanged);
+    _eventSub = AppEventBus.instance.events.listen((event) {
+      if (event is WalletUpdatedEvent || event is PaymentCompletedEvent) {
+        getWalletBalance();
+      }
+    });
   }
 
   void _onAuthStateChanged() {
@@ -67,6 +75,7 @@ class WalletProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _eventSub?.cancel();
     TokenService.authState.removeListener(_onAuthStateChanged);
     super.dispose();
   }

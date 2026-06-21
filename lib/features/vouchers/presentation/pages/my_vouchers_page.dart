@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 import '../providers/voucher_provider.dart';
 import '../../data/models/voucher_model.dart';
+import 'voucher_detail_page.dart';
 
 class MyVouchersPage extends StatefulWidget {
   const MyVouchersPage({super.key});
@@ -148,7 +149,14 @@ class _MyVouchersPageState extends State<MyVouchersPage>
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           final voucher = vouchers[index];
-          return _buildVoucherCard(voucher, isInactive);
+          return GestureDetector(
+            onTap: () => Navigator.of(context, rootNavigator: true).push<void>(
+              MaterialPageRoute(
+                builder: (_) => VoucherDetailPage(voucher: voucher),
+              ),
+            ),
+            child: _buildVoucherCard(voucher, isInactive),
+          );
         },
       ),
     );

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:smart_laundry_locker/core/config/feature_flags.dart';
 import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:smart_laundry_locker/features/promotions/data/models/promotion_model.dart';
+import 'package:smart_laundry_locker/features/promotions/presentation/pages/promotion_detail_page.dart';
 import 'package:smart_laundry_locker/features/promotions/presentation/providers/promotion_provider.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
 import 'package:flutter/material.dart';
@@ -483,8 +484,7 @@ class _HomePageState extends ConsumerState<HomePage>
     final colors = _gradientForLocation(location.id);
     final initials = _initialsForName(location.name);
     return GestureDetector(
-      onTap: () => Navigator.push<void>(
-        context,
+      onTap: () => Navigator.of(context, rootNavigator: true).push<void>(
         MaterialPageRoute(
           builder: (_) => StoreLockerGridPage(
             store: Store(
@@ -1589,7 +1589,11 @@ class _FlashSaleCard extends StatelessWidget {
             : null;
 
     return GestureDetector(
-      onTap: () => context.push(AppRouter.promotions),
+      onTap: () => Navigator.of(context, rootNavigator: true).push<void>(
+        MaterialPageRoute(
+          builder: (_) => PromotionDetailPage(promo: promo),
+        ),
+      ),
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 14),
