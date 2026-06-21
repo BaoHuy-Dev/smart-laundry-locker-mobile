@@ -14,6 +14,8 @@ abstract class AuthRemoteDataSource {
 
   Future<Map<String, dynamic>> confirmQrLogin(QrConfirmRequestModel request);
 
+  Future<Map<String, dynamic>> firebaseLogin({required String idToken});
+
   Future<Map<String, dynamic>> faceRegister({
     required String userId,
     required List<String> imagesBase64,

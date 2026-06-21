@@ -378,6 +378,8 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
           ),
           const SizedBox(height: 8),
           _buildFaceIdButton(),
+          const SizedBox(height: 16),
+          _buildSocialLoginSection(),
           Consumer<LoginProvider>(
             builder: (context, provider, _) {
               if (provider.error != null) {
@@ -490,6 +492,8 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
           ),
           const SizedBox(height: 16),
           _buildTermsCheckbox(),
+          const SizedBox(height: 16),
+          _buildSocialLoginSection(),
           Consumer<RegisterProvider>(
             builder: (context, provider, _) {
               if (provider.error != null) {
@@ -702,6 +706,198 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
         strokeWidth: 2,
         valueColor: AlwaysStoppedAnimation<Color>(AppColors.white),
       ),
+    );
+  }
+
+  Widget _buildSocialLoginSection() {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: Divider(color: Colors.black.withOpacity(0.1))),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'Hoặc tiếp tục với',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.black.withOpacity(0.5),
+                ),
+              ),
+            ),
+            Expanded(child: Divider(color: Colors.black.withOpacity(0.1))),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildSocialButton(
+                icon: Icons.g_mobiledata,
+                label: 'Google',
+                onTap: () => _loginProvider.loginWithGoogle(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildSocialButton(
+                icon: Icons.facebook,
+                iconColor: const Color(0xFF1877F2),
+                label: 'Facebook',
+                onTap: () => _loginProvider.loginWithFacebook(),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildSocialButton(
+                icon: Icons.phone_android,
+                label: 'SĐT',
+                onTap: () => _showPhoneOtpDialog(),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSocialButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color? iconColor,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.black.withOpacity(0.1)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 22, color: iconColor),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPhoneOtpDialog() {
+    final phoneController = TextEditingController();
+    final otpController = TextEditingController();
+    bool codeSent = false;
+
+    SmartDialog.show(
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return MultiProvider(
+              providers: [
+                ChangeNotifierProvider.value(value: _loginProvider),
+              ],
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 24),
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      codeSent ? 'Nhập mã OTP' : 'Đăng nhập bằng số điện thoại',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    if (!codeSent)
+                      TextField(
+                        controller: phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(
+                          labelText: 'Số điện thoại',
+                          hintText: '+84901234567',
+                          border: OutlineInputBorder(),
+                        ),
+                      )
+                    else
+                      TextField(
+                        controller: otpController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Mã OTP',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    const SizedBox(height: 24),
+                    Consumer<LoginProvider>(
+                      builder: (context, provider, _) {
+                        return Column(
+                          children: [
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: provider.isLoading
+                                    ? null
+                                    : () async {
+                                        if (!codeSent) {
+                                          if (phoneController.text.trim().isEmpty) return;
+                                          await provider.sendPhoneOtp(phoneController.text.trim());
+                                          if (provider.verificationId != null) {
+                                            setState(() => codeSent = true);
+                                          }
+                                        } else {
+                                          if (otpController.text.trim().isEmpty) return;
+                                          await provider.confirmPhoneOtp(otpController.text.trim());
+                                          if (provider.isSuccess) {
+                                            SmartDialog.dismiss();
+                                          }
+                                        }
+                                      },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.success,
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: provider.isLoading
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                      )
+                                    : Text(codeSent ? 'Xác nhận' : 'Gửi mã OTP'),
+                              ),
+                            ),
+                            if (provider.error != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: Text(
+                                  provider.error!,
+                                  style: const TextStyle(color: Colors.red),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
