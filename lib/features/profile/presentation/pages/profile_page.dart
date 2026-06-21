@@ -909,8 +909,7 @@ class _ProfilePageState extends State<ProfilePage>
       return;
     }
 
-    final result = await Navigator.push<bool>(
-      context,
+    final result = await Navigator.of(context, rootNavigator: true).push<bool>(
       MaterialPageRoute(builder: (_) => const EmployeeRegistrationPage()),
     );
 

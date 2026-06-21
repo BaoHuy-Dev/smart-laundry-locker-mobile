@@ -73,6 +73,11 @@ class PromotionModel {
     return 'Còn ${diff.inMinutes} phút';
   }
 
+  bool get isExpired {
+    if (endAt == null) return false;
+    return endAt!.isBefore(DateTime.now());
+  }
+
   bool get isExpiringSoon {
     if (endAt == null) return false;
     return endAt!.difference(DateTime.now()).inHours <= 24;

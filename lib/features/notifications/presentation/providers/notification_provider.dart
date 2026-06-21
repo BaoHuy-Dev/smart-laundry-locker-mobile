@@ -3,6 +3,7 @@ import 'package:smart_laundry_locker/features/notifications/infrastructure/servi
 import 'package:smart_laundry_locker/features/notifications/infrastructure/repositories/notification_repository.dart';
 import 'package:smart_laundry_locker/core/services/firebase_messaging_service.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
+import 'package:smart_laundry_locker/core/services/app_event_bus.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 
@@ -23,6 +24,11 @@ class NotificationProvider extends ChangeNotifier {
             'New message received in NotificationProvider: refreshing count',
           );
           loadUnreadCount();
+          // Propagate FCM data-type to domain event bus so screens auto-refresh
+          _emitDomainEvent(
+            message.data['type'] as String?,
+            message.data['referenceId']?.toString(),
+          );
         });
   }
 
@@ -39,7 +45,28 @@ class NotificationProvider extends ChangeNotifier {
             _unreadCount = exists ? _unreadCount : _unreadCount + 1;
           }
           notifyListeners();
+          // Propagate STOMP notification type to domain event bus
+          _emitDomainEvent(
+            notification.dataPayload?.actionType,
+            notification.dataPayload?.referenceId,
+          );
         });
+  }
+
+  static void _emitDomainEvent(String? actionType, String? referenceId) {
+    final bus = AppEventBus.instance;
+    switch (actionType) {
+      case 'ORDER_STATUS_CHANGED':
+        bus.emit(OrderChangedEvent(orderId: referenceId));
+      case 'PAYMENT_COMPLETED':
+        bus.emit(PaymentCompletedEvent(orderId: referenceId));
+        bus.emit(const WalletUpdatedEvent());
+      case 'PAYMENT_FAILED':
+        bus.emit(PaymentFailedEvent(orderId: referenceId));
+      case 'LOCKER_REPORT_CLAIMED':
+      case 'LOCKER_REPORT_RESOLVED':
+        bus.emit(ReportUpdatedEvent(reportId: referenceId));
+    }
   }
 
   void _handleAuthStateChanged() {

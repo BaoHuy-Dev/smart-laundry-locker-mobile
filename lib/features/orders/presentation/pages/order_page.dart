@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:smart_laundry_locker/features/orders/domain/entities/order.dart';
 
 import 'package:smart_laundry_locker/features/orders/presentation/providers/courier_orders_injection.dart';
@@ -18,6 +19,7 @@ import 'package:smart_laundry_locker/shared/widgets/unauthenticated_placeholder.
 import 'customer/customer_order_detail_page.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
+import 'package:smart_laundry_locker/core/services/app_event_bus.dart';
 import 'courier/courier_order_detail_page.dart';
 import 'package:smart_laundry_locker/core/utils/enum_translator.dart';
 import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
@@ -34,6 +36,7 @@ class _OrderPageState extends State<OrderPage>
   bool _isFilterOpen = false;
   late AnimationController _filterController;
   late Animation<Offset> _filterOffset;
+  StreamSubscription<AppEvent>? _eventSub;
 
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _orderCodeController = TextEditingController();
@@ -71,6 +74,13 @@ class _OrderPageState extends State<OrderPage>
 
     TokenService.authState.addListener(_onAuthStateChanged);
     _onAuthStateChanged();
+
+    _eventSub = AppEventBus.instance.events.listen((event) {
+      if (!mounted) return;
+      if (event is OrderChangedEvent || event is PaymentCompletedEvent) {
+        context.read<OrderProvider>().refresh();
+      }
+    });
   }
 
   void _onAuthStateChanged() {
@@ -88,6 +98,7 @@ class _OrderPageState extends State<OrderPage>
 
   @override
   void dispose() {
+    _eventSub?.cancel();
     TokenService.authState.removeListener(_onAuthStateChanged);
     _filterController.dispose();
     _searchController.dispose();

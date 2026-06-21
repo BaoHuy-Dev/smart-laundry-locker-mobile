@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:smart_laundry_locker/features/promotions/data/models/promotion_model.dart';
+import 'package:smart_laundry_locker/features/promotions/presentation/pages/promotion_detail_page.dart';
 import 'package:smart_laundry_locker/features/promotions/presentation/providers/promotion_provider.dart';
 import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 
@@ -103,7 +104,18 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
       itemCount: provider.promotions.length,
       separatorBuilder: (_, __) => Divider(height: 1, color: context.dividerColor),
-      itemBuilder: (_, index) => _buildPromoCard(provider.promotions[index], index),
+      itemBuilder: (ctx, index) {
+        final promo = provider.promotions[index];
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => Navigator.of(ctx).push<void>(
+            MaterialPageRoute(
+              builder: (_) => PromotionDetailPage(promo: promo),
+            ),
+          ),
+          child: _buildPromoCard(promo, index),
+        );
+      },
     );
   }
 
