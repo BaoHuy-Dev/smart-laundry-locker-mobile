@@ -10,6 +10,13 @@ class DioClient {
   DioClient._();
   static final DioClient instance = DioClient._();
 
+  /// Test-only: creates a DioClient backed by the given [dio] (already configured).
+  @visibleForTesting
+  DioClient.withDio(Dio dio) {
+    _dio = dio;
+    _initialized = true;
+  }
+
   late final Dio _dio;
 
   bool _initialized = false;

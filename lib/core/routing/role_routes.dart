@@ -10,7 +10,10 @@ String homeForRoles(List<String> roles) {
   if (roles.contains('TECHNICIAN')) {
     return AppRouter.technicianHome;
   }
-  if (roles.contains('MAINTENANCE') || roles.contains('STAFF')) {
+  if (roles.contains('MAINTENANCE')) {
+    return AppRouter.maintenanceHome;
+  }
+  if (roles.contains('STAFF')) {
     return AppRouter.staffHome;
   }
   return AppRouter.home;
