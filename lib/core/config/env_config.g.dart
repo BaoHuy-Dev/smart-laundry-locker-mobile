@@ -10,5 +10,5 @@ part of 'env_config.dart';
 // ignore_for_file: type=lint
 // generated_from: .env
 final class _EnvConfig {
-  static const String apiBaseUrl = 'http://146.190.84.136:8080';
+  static const String apiBaseUrl = 'https://api.locker-drone.tech';
 }
