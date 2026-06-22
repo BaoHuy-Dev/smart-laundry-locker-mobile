@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:smart_laundry_locker/core/network/dio_client.dart';
 import 'package:smart_laundry_locker/core/routing/role_routes.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
+import 'package:smart_laundry_locker/features/auth/presentation/widgets/auth_bottom_sheet.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 
@@ -420,6 +421,65 @@ class _LoginScreenState extends State<LoginScreen>
                                     color: Colors.white,
                                   ),
                                 ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            const Expanded(child: Divider()),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: Text(
+                                'Hoặc',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ),
+                            const Expanded(child: Divider()),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: () =>
+                              AuthBottomSheet.show(context, isLogin: true),
+                          icon: const Icon(LucideIcons.smartphone, size: 18),
+                          label: const Text(
+                            'Đăng nhập bằng Google · Facebook · SĐT',
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF0077B6),
+                            side: const BorderSide(color: Color(0xFF0077B6)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Center(
+                          child: GestureDetector(
+                            onTap: () =>
+                                AuthBottomSheet.show(context, isLogin: false),
+                            child: RichText(
+                              text: const TextSpan(
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF64748B),
+                                ),
+                                children: [
+                                  TextSpan(text: 'Chưa có tài khoản? '),
+                                  TextSpan(
+                                    text: 'Đăng ký ngay',
+                                    style: TextStyle(
+                                      color: Color(0xFF0077B6),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
                         if (kDebugMode) _buildQuickLogin(),
                       ],
