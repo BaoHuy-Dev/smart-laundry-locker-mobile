@@ -23,9 +23,14 @@ const kTestBaseUrl = 'http://test.local';
 
 // ── For UserGatewayClient subclasses (accept ApiClient) ────────────────────
 
+/// Ensures the DioClient singleton has a real Dio so TokenService callbacks
+/// (saveTokens/clearTokens → setAuthToken/clearAuthToken) don't crash in tests.
+void _ensureSingleton() => DioClient.instance.init(baseUrl: kTestBaseUrl);
+
 /// Creates a fresh [ApiClient] backed by a mock [Dio] + [DioAdapter].
 /// Use for: StoreService, UserOrderService, UserLockerService, etc.
 ({ApiClient apiClient, DioAdapter adapter}) createMockApiClient() {
+  _ensureSingleton();
   FlutterSecureStorage.setMockInitialValues({});
   final dio = Dio(BaseOptions(baseUrl: kTestBaseUrl));
   final adapter = DioAdapter(dio: dio, matcher: const UrlRequestMatcher());
@@ -39,6 +44,7 @@ const kTestBaseUrl = 'http://test.local';
   String userId = '1',
   List<String> roles = const ['CUSTOMER'],
 }) {
+  _ensureSingleton();
   final token = makeFakeJwt(sub: userId, roles: roles);
   FlutterSecureStorage.setMockInitialValues({'access_token': token});
   final dio = Dio(BaseOptions(baseUrl: kTestBaseUrl));
