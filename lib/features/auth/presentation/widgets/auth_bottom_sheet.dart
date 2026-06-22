@@ -797,17 +797,23 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
   void _showPhoneOtpDialog() {
     final phoneController = TextEditingController();
     final otpController = TextEditingController();
-    bool codeSent = false;
+    _loginProvider.clearPhoneVerification();
 
     SmartDialog.show(
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return MultiProvider(
-              providers: [
-                ChangeNotifierProvider.value(value: _loginProvider),
-              ],
-              child: Container(
+        return ChangeNotifierProvider.value(
+          value: _loginProvider,
+          child: Consumer<LoginProvider>(
+            builder: (context, provider, _) {
+              // Step is driven by the provider so the async codeSent callback
+              // actually reveals the OTP field.
+              final codeSent = provider.verificationId != null;
+              if (provider.isSuccess) {
+                WidgetsBinding.instance.addPostFrameCallback(
+                  (_) => SmartDialog.dismiss(),
+                );
+              }
+              return Container(
                 margin: const EdgeInsets.symmetric(horizontal: 24),
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
@@ -816,86 +822,103 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
                       codeSent ? 'Nhập mã OTP' : 'Đăng nhập bằng số điện thoại',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 16),
-                    if (!codeSent)
+                    if (!codeSent) ...[
                       TextField(
                         controller: phoneController,
                         keyboardType: TextInputType.phone,
+                        autofocus: true,
                         decoration: const InputDecoration(
                           labelText: 'Số điện thoại',
-                          hintText: '+84901234567',
+                          hintText: '0911649183',
                           border: OutlineInputBorder(),
                         ),
-                      )
-                    else
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.only(top: 6),
+                        child: Text(
+                          'Nhập số nội địa (0xxx) hoặc quốc tế (+84xxx) đều được.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ),
+                    ] else
                       TextField(
                         controller: otpController,
                         keyboardType: TextInputType.number,
+                        autofocus: true,
                         decoration: const InputDecoration(
-                          labelText: 'Mã OTP',
+                          labelText: 'Mã OTP (6 số)',
                           border: OutlineInputBorder(),
                         ),
                       ),
                     const SizedBox(height: 24),
-                    Consumer<LoginProvider>(
-                      builder: (context, provider, _) {
-                        return Column(
-                          children: [
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: provider.isLoading
-                                    ? null
-                                    : () async {
-                                        if (!codeSent) {
-                                          if (phoneController.text.trim().isEmpty) return;
-                                          await provider.sendPhoneOtp(phoneController.text.trim());
-                                          if (provider.verificationId != null) {
-                                            setState(() => codeSent = true);
-                                          }
-                                        } else {
-                                          if (otpController.text.trim().isEmpty) return;
-                                          await provider.confirmPhoneOtp(otpController.text.trim());
-                                          if (provider.isSuccess) {
-                                            SmartDialog.dismiss();
-                                          }
-                                        }
-                                      },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.success,
-                                  foregroundColor: Colors.white,
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: provider.isLoading
+                            ? null
+                            : () async {
+                                FocusScope.of(context).unfocus();
+                                if (!codeSent) {
+                                  final phone = phoneController.text.trim();
+                                  if (phone.isEmpty) return;
+                                  await provider.sendPhoneOtp(phone);
+                                } else {
+                                  final code = otpController.text.trim();
+                                  if (code.isEmpty) return;
+                                  await provider.confirmPhoneOtp(code);
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.success,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: provider.isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
                                 ),
-                                child: provider.isLoading
-                                    ? const SizedBox(
-                                        height: 20,
-                                        width: 20,
-                                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                      )
-                                    : Text(codeSent ? 'Xác nhận' : 'Gửi mã OTP'),
-                              ),
-                            ),
-                            if (provider.error != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8.0),
-                                child: Text(
-                                  provider.error!,
-                                  style: const TextStyle(color: Colors.red),
-                                ),
-                              ),
-                          ],
-                        );
-                      },
+                              )
+                            : Text(codeSent ? 'Xác nhận' : 'Gửi mã OTP'),
+                      ),
                     ),
+                    if (codeSent)
+                      TextButton(
+                        onPressed: provider.isLoading
+                            ? null
+                            : () {
+                                otpController.clear();
+                                provider.clearPhoneVerification();
+                              },
+                        child: const Text('Đổi số điện thoại'),
+                      ),
+                    if (provider.error != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Text(
+                          provider.error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ),
                   ],
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         );
       },
     );

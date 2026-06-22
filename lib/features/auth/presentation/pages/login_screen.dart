@@ -814,15 +814,29 @@ class _LoginScreenState extends State<LoginScreen>
   void _showPhoneOtpDialog() {
     final phoneController = TextEditingController();
     final otpController = TextEditingController();
-    bool codeSent = false;
+    // Always start fresh so the dialog opens on the "enter phone" step.
+    _loginProvider.clearPhoneVerification();
 
     SmartDialog.show(
       builder: (_) {
-        return StatefulBuilder(
-          builder: (context, setLocalState) {
-            return ChangeNotifierProvider.value(
-              value: _loginProvider,
-              child: Container(
+        return ChangeNotifierProvider.value(
+          value: _loginProvider,
+          child: Consumer<LoginProvider>(
+            builder: (context, provider, _) {
+              // Driving the step off the provider (not a local bool) is what
+              // makes the OTP field appear: Firebase's codeSent callback fires
+              // asynchronously and sets verificationId, triggering this rebuild.
+              final codeSent = provider.verificationId != null;
+
+              // Instant verification or a confirmed OTP -> close the dialog;
+              // the screen listener handles navigation.
+              if (provider.isSuccess) {
+                WidgetsBinding.instance.addPostFrameCallback(
+                  (_) => SmartDialog.dismiss(),
+                );
+              }
+
+              return Container(
                 margin: const EdgeInsets.symmetric(horizontal: 24),
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
@@ -831,9 +845,11 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
                       codeSent ? 'Nhập mã OTP' : 'Đăng nhập bằng số điện thoại',
+                      textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -841,101 +857,100 @@ class _LoginScreenState extends State<LoginScreen>
                       ),
                     ),
                     const SizedBox(height: 16),
-                    if (!codeSent)
+                    if (!codeSent) ...[
                       TextField(
                         controller: phoneController,
                         keyboardType: TextInputType.phone,
+                        autofocus: true,
                         decoration: const InputDecoration(
                           labelText: 'Số điện thoại',
-                          hintText: '+84901234567',
+                          hintText: '0911649183',
                           border: OutlineInputBorder(),
                         ),
-                      )
-                    else
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.only(top: 6),
+                        child: Text(
+                          'Nhập số nội địa (0xxx) hoặc quốc tế (+84xxx) đều được.',
+                          style: TextStyle(fontSize: 12, color: _kMuted),
+                        ),
+                      ),
+                    ] else
                       TextField(
                         controller: otpController,
                         keyboardType: TextInputType.number,
+                        autofocus: true,
                         decoration: const InputDecoration(
-                          labelText: 'Mã OTP',
+                          labelText: 'Mã OTP (6 số)',
+                          hintText: '------',
                           border: OutlineInputBorder(),
                         ),
                       ),
                     const SizedBox(height: 20),
-                    Consumer<LoginProvider>(
-                      builder: (context, provider, _) {
-                        return Column(
-                          children: [
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: provider.isLoading
-                                    ? null
-                                    : () async {
-                                        if (!codeSent) {
-                                          if (phoneController.text
-                                              .trim()
-                                              .isEmpty) {
-                                            return;
-                                          }
-                                          await provider.sendPhoneOtp(
-                                            phoneController.text.trim(),
-                                          );
-                                          if (provider.verificationId != null) {
-                                            setLocalState(() => codeSent = true);
-                                          }
-                                        } else {
-                                          if (otpController.text
-                                              .trim()
-                                              .isEmpty) {
-                                            return;
-                                          }
-                                          await provider.confirmPhoneOtp(
-                                            otpController.text.trim(),
-                                          );
-                                          if (provider.isSuccess) {
-                                            SmartDialog.dismiss();
-                                          }
-                                        }
-                                      },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _kBlue,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: provider.isLoading
+                            ? null
+                            : () async {
+                                FocusScope.of(context).unfocus();
+                                if (!codeSent) {
+                                  final phone = phoneController.text.trim();
+                                  if (phone.isEmpty) return;
+                                  await provider.sendPhoneOtp(phone);
+                                } else {
+                                  final code = otpController.text.trim();
+                                  if (code.isEmpty) return;
+                                  await provider.confirmPhoneOtp(code);
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _kBlue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: provider.isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
                                 ),
-                                child: provider.isLoading
-                                    ? const SizedBox(
-                                        height: 20,
-                                        width: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : Text(codeSent ? 'Xác nhận' : 'Gửi mã OTP'),
-                              ),
-                            ),
-                            if (provider.error != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Text(
-                                  provider.error!,
-                                  style: const TextStyle(color: Colors.red),
-                                ),
-                              ),
-                          ],
-                        );
-                      },
+                              )
+                            : Text(codeSent ? 'Xác nhận' : 'Gửi mã OTP'),
+                      ),
                     ),
+                    if (codeSent)
+                      TextButton(
+                        onPressed: provider.isLoading
+                            ? null
+                            : () {
+                                otpController.clear();
+                                provider.clearPhoneVerification();
+                              },
+                        child: const Text(
+                          'Đổi số điện thoại',
+                          style: TextStyle(color: _kBlue),
+                        ),
+                      ),
+                    if (provider.error != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          provider.error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ),
                   ],
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         );
       },
     );
