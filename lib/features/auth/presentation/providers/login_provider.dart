@@ -171,6 +171,7 @@ class LoginProvider extends ChangeNotifier {
   Future<void> sendPhoneOtp(String phoneNumber) async {
     _isLoading = true;
     _error = null;
+    _verificationId = null;
     notifyListeners();
 
     try {
@@ -186,12 +187,26 @@ class LoginProvider extends ChangeNotifier {
           _isLoading = false;
           notifyListeners();
         },
+        autoVerified: (String idToken) async {
+          // Instant verification: finish the social login automatically.
+          final result = await _socialLoginUseCase(idToken);
+          result.fold(_handleFailure, _handleLoginSuccess);
+        },
       );
     } catch (e) {
       _isLoading = false;
       _error = 'Lỗi gửi mã OTP';
       notifyListeners();
     }
+  }
+
+  /// Clears any in-progress phone verification so a freshly opened OTP dialog
+  /// starts at the "enter phone number" step.
+  void clearPhoneVerification() {
+    _verificationId = null;
+    _error = null;
+    _isLoading = false;
+    notifyListeners();
   }
 
   Future<void> confirmPhoneOtp(String smsCode) async {
@@ -295,6 +310,7 @@ class LoginProvider extends ChangeNotifier {
     _isFaceMatched = false;
     _matchedUserId = null;
     _authToken = null;
+    _verificationId = null;
     _isQrConfirmLoading = false;
     _qrConfirmSuccess = null;
     _qrError = null;
