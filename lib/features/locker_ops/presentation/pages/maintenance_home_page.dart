@@ -1324,6 +1324,10 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
   Future<void> _droneActions(Map<String, dynamic> drone) async {
     final droneId = _asInt(drone['id']);
     if (droneId == null) return;
+    final status = drone['status'] as String? ?? 'IDLE';
+    final battery = _asInt(drone['batteryPercent']) ?? 0;
+    final assignedToMe = drone['assignedTechnicianId'] != null &&
+        '${drone['assignedTechnicianId']}' == _myUserId;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -1354,24 +1358,38 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${drone['code'] ?? ''}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                          color: opsDark,
+                        ),
+                      ),
+                    ),
+                    _DroneStatusChip(status),
+                  ],
+                ),
+                const SizedBox(height: 4),
                 Text(
-                  '${drone['code'] ?? ''}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                    color: opsDark,
-                  ),
+                  'Pin $battery%'
+                  '${assignedToMe ? ' · bạn đang phụ trách' : ''}',
+                  style: const TextStyle(fontSize: 12, color: opsMutedText),
                 ),
                 const SizedBox(height: 16),
-                tile(
-                  Icons.assignment_ind_outlined,
-                  'Nhận xử lý',
-                  opsPrimary,
-                  () => _runCellAction(
-                    () => _service.claimDrone(droneId),
-                    'Đã nhận phụ trách drone',
+                if (!assignedToMe)
+                  tile(
+                    Icons.assignment_ind_outlined,
+                    'Nhận xử lý',
+                    opsPrimary,
+                    () => _runCellAction(
+                      () => _service.claimDrone(droneId),
+                      'Đã nhận phụ trách drone',
+                    ),
                   ),
-                ),
                 tile(
                   Icons.sync_alt,
                   'Đổi trạng thái',
@@ -1457,10 +1475,21 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
         ),
       ),
     );
-    final reason = reasonCtrl.text.trim();
+    final isFault = result == 'FAULT';
+    // Lý do chỉ có ý nghĩa với FAULT — bỏ qua text sót lại nếu đổi sang trạng thái khác.
+    final reason = isFault ? reasonCtrl.text.trim() : '';
     reasonCtrl.dispose();
     if (result == null) return;
-    if (result == 'FAULT' && reason.isEmpty) {
+    // Không gọi API nếu chọn lại đúng trạng thái cũ (trừ FAULT — cho phép cập nhật lý do mới).
+    if (result == (drone['status'] as String?) && !isFault) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Trạng thái không thay đổi')),
+        );
+      }
+      return;
+    }
+    if (isFault && reason.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Cần nhập lý do khi chuyển sang FAULT')),
