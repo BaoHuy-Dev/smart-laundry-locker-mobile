@@ -274,6 +274,45 @@ class LockerOpsService {
   Future<Map<String, dynamic>> myRatingAverage() =>
       _map('GET', '/api/maintenance/my-rating-average');
 
+  // ---- Drone fleet (maintenance) ----
+  // Pin/trạng thái bay hiện chưa có telemetry thật, KTV nhập tay qua các
+  // endpoint dưới đây (xem locker-service V10__drone_units.sql).
+
+  /// Danh sách toàn bộ drone (thiết bị bay vật lý, khác ô tủ cellType=DRONE).
+  Future<List<Map<String, dynamic>>> droneUnits() =>
+      _list('/api/maintenance/drones');
+
+  /// KTV nhận phụ trách một drone.
+  Future<Map<String, dynamic>> claimDrone(int id) =>
+      _map('POST', '/api/maintenance/drones/$id/claim');
+
+  /// Đổi trạng thái drone (IDLE/CHARGING/IN_FLIGHT/MAINTENANCE/FAULT).
+  /// [reason] bắt buộc khi chuyển sang FAULT.
+  Future<Map<String, dynamic>> updateDroneStatus(
+    int id,
+    String status, {
+    String? reason,
+  }) => _map(
+    'POST',
+    '/api/maintenance/drones/$id/status',
+    body: {'status': status, if (reason != null) 'reason': reason},
+  );
+
+  /// Cập nhật % pin hiện tại của drone (nhập tay).
+  Future<Map<String, dynamic>> updateDroneBattery(int id, int batteryPercent) =>
+      _map(
+        'POST',
+        '/api/maintenance/drones/$id/battery',
+        body: {'batteryPercent': batteryPercent},
+      );
+
+  /// Nhật ký bảo trì của một drone.
+  Future<List<Map<String, dynamic>>> droneLogs(int id) =>
+      _list('/api/maintenance/drones/$id/logs');
+
+  Future<Map<String, dynamic>> addDroneLog(int id, String note) =>
+      _map('POST', '/api/maintenance/drones/$id/logs', body: {'note': note});
+
   // ── STAFF ──────────────────────────────────────────────────────────────────
 
   /// Danh sách tủ mà STAFF được phân công quản lý.
