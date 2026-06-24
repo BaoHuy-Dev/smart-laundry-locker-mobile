@@ -306,4 +306,366 @@ void main() {
       expect(() => service.checkout(300, 'WALLET'), throwsA(isA<Exception>()));
     });
   });
+
+  // ── ADMIN ────────────────────────────────────────────────────────────────
+
+  group('ADMIN endpoints', () {
+    group('adminDashboard()', () {
+      test('returns overview stats map', () async {
+        adapter.onGet(
+          '/api/admin/dashboard/overview',
+          (server) => server.reply(200, apiOk({
+            'totalOrders': 150,
+            'totalUsers': 42,
+            'totalStores': 5,
+            'totalRevenue': 9000000,
+          })),
+        );
+
+        final result = await service.adminDashboard();
+        expect(result['totalOrders'], equals(150));
+        expect(result['totalUsers'], equals(42));
+        expect(result['totalStores'], equals(5));
+      });
+
+      test('returns empty map when data is null', () async {
+        adapter.onGet(
+          '/api/admin/dashboard/overview',
+          (server) => server.reply(200, apiOk(null)),
+        );
+
+        final result = await service.adminDashboard();
+        expect(result, isEmpty);
+      });
+    });
+
+    group('adminOrderStats()', () {
+      test('returns order statistics map', () async {
+        adapter.onGet(
+          '/api/admin/orders/statistics',
+          (server) => server.reply(200, apiOk({
+            'INITIALIZED': 10,
+            'STORING': 35,
+            'COMPLETED': 100,
+            'CANCELED': 5,
+          })),
+        );
+
+        final result = await service.adminOrderStats();
+        expect(result['STORING'], equals(35));
+        expect(result['COMPLETED'], equals(100));
+      });
+    });
+
+    group('adminRevenue()', () {
+      test('returns revenue breakdown map', () async {
+        adapter.onGet(
+          '/api/admin/orders/revenue',
+          (server) => server.reply(200, apiOk({
+            'todayRevenue': 1500000,
+            'weekRevenue': 8200000,
+            'monthRevenue': 32000000,
+          })),
+        );
+
+        final result = await service.adminRevenue();
+        expect(result['todayRevenue'], equals(1500000));
+        expect(result['monthRevenue'], equals(32000000));
+      });
+    });
+
+    group('adminUsers()', () {
+      test('returns list of users', () async {
+        adapter.onGet(
+          '/api/admin/users',
+          (server) => server.reply(200, apiOk([
+            {
+              'id': 1,
+              'email': 'admin@test.com',
+              'fullName': 'Admin',
+              'roles': ['ADMIN'],
+              'status': 'ACTIVE',
+            },
+            {
+              'id': 2,
+              'email': 'user@test.com',
+              'fullName': 'Customer',
+              'roles': ['CUSTOMER'],
+              'status': 'ACTIVE',
+            },
+          ])),
+        );
+
+        final result = await service.adminUsers();
+        expect(result, hasLength(2));
+        expect(result.first['email'], equals('admin@test.com'));
+        expect(result.last['roles'], equals(['CUSTOMER']));
+      });
+
+      test('returns empty list when no users', () async {
+        adapter.onGet(
+          '/api/admin/users',
+          (server) => server.reply(200, apiOk([])),
+        );
+
+        final result = await service.adminUsers();
+        expect(result, isEmpty);
+      });
+    });
+
+    group('adminSetUserStatus()', () {
+      test('returns updated user on INACTIVE', () async {
+        adapter.onPut(
+          '/api/admin/users/2/status',
+          (server) => server.reply(200, apiOk({
+            'id': 2,
+            'email': 'user@test.com',
+            'status': 'INACTIVE',
+          })),
+          data: {'status': 'INACTIVE'},
+        );
+
+        final result = await service.adminSetUserStatus(2, 'INACTIVE');
+        expect(result['status'], equals('INACTIVE'));
+      });
+
+      test('returns updated user on ACTIVE', () async {
+        adapter.onPut(
+          '/api/admin/users/2/status',
+          (server) => server.reply(200, apiOk({
+            'id': 2,
+            'status': 'ACTIVE',
+          })),
+          data: {'status': 'ACTIVE'},
+        );
+
+        final result = await service.adminSetUserStatus(2, 'ACTIVE');
+        expect(result['status'], equals('ACTIVE'));
+      });
+    });
+
+    group('adminSetUserRoles()', () {
+      test('assigns new role list to user', () async {
+        adapter.onPut(
+          '/api/admin/users/3/roles',
+          (server) => server.reply(200, apiOk({
+            'id': 3,
+            'roles': ['MANAGER'],
+          })),
+          data: {'roles': ['MANAGER']},
+        );
+
+        final result = await service.adminSetUserRoles(3, ['MANAGER']);
+        expect(result['roles'], equals(['MANAGER']));
+      });
+    });
+
+    group('adminStores()', () {
+      test('returns list of stores', () async {
+        adapter.onGet(
+          '/api/admin/stores',
+          (server) => server.reply(200, apiOk([
+            {
+              'id': 1,
+              'name': 'Chi nhánh Quận 1',
+              'address': '1 Đường ABC',
+              'phone': '0901234567',
+              'status': 'ACTIVE',
+            },
+            {
+              'id': 2,
+              'name': 'Chi nhánh Quận 3',
+              'address': '3 Đường XYZ',
+              'phone': '0907654321',
+              'status': 'INACTIVE',
+            },
+          ])),
+        );
+
+        final result = await service.adminStores();
+        expect(result, hasLength(2));
+        expect(result.first['name'], equals('Chi nhánh Quận 1'));
+        expect(result.last['status'], equals('INACTIVE'));
+      });
+    });
+
+    group('adminCreateStore()', () {
+      test('returns created store on success', () async {
+        adapter.onPost(
+          '/api/admin/stores',
+          (server) => server.reply(201, apiOk({
+            'id': 10,
+            'name': 'Chi nhánh Mới',
+            'address': '10 Phố Huế',
+            'status': 'ACTIVE',
+          })),
+          data: {'name': 'Chi nhánh Mới', 'address': '10 Phố Huế'},
+        );
+
+        final result = await service.adminCreateStore({
+          'name': 'Chi nhánh Mới',
+          'address': '10 Phố Huế',
+        });
+        expect(result['id'], equals(10));
+        expect(result['name'], equals('Chi nhánh Mới'));
+      });
+    });
+
+    group('adminSetStoreStatus()', () {
+      test('deactivates store', () async {
+        adapter.onPut(
+          '/api/admin/stores/1/status',
+          (server) => server.reply(200, apiOk({'id': 1, 'status': 'INACTIVE'})),
+          data: {'status': 'INACTIVE'},
+        );
+
+        final result = await service.adminSetStoreStatus(1, 'INACTIVE');
+        expect(result['status'], equals('INACTIVE'));
+      });
+
+      test('activates store', () async {
+        adapter.onPut(
+          '/api/admin/stores/1/status',
+          (server) => server.reply(200, apiOk({'id': 1, 'status': 'ACTIVE'})),
+          data: {'status': 'ACTIVE'},
+        );
+
+        final result = await service.adminSetStoreStatus(1, 'ACTIVE');
+        expect(result['status'], equals('ACTIVE'));
+      });
+    });
+
+    group('adminOrders()', () {
+      test('returns all orders when no status filter', () async {
+        adapter.onGet(
+          '/api/admin/orders',
+          (server) => server.reply(200, apiOk([
+            {'id': 500, 'orderType': 'SEND', 'status': 'STORING'},
+            {'id': 501, 'orderType': 'RENTAL', 'status': 'COMPLETED'},
+          ])),
+        );
+
+        final result = await service.adminOrders();
+        expect(result, hasLength(2));
+        expect(result.first['orderType'], equals('SEND'));
+      });
+
+      test('returns filtered orders when status is provided', () async {
+        adapter.onGet(
+          '/api/admin/orders',
+          (server) => server.reply(200, apiOk([
+            {'id': 500, 'orderType': 'SEND', 'status': 'STORING'},
+          ])),
+          queryParameters: {'status': 'STORING'},
+        );
+
+        final result = await service.adminOrders(status: 'STORING');
+        expect(result, hasLength(1));
+        expect(result.first['status'], equals('STORING'));
+      });
+
+      test('returns empty list when no orders', () async {
+        adapter.onGet(
+          '/api/admin/orders',
+          (server) => server.reply(200, apiOk([])),
+        );
+
+        final result = await service.adminOrders();
+        expect(result, isEmpty);
+      });
+    });
+
+    group('adminSetOrderStatus()', () {
+      test('updates order to COMPLETED', () async {
+        adapter.onPut(
+          '/api/admin/orders/500/status',
+          (server) => server.reply(200, apiOk({'id': 500, 'status': 'COMPLETED'})),
+          data: {'status': 'COMPLETED'},
+        );
+
+        final result = await service.adminSetOrderStatus(500, 'COMPLETED');
+        expect(result['status'], equals('COMPLETED'));
+      });
+
+      test('cancels order', () async {
+        adapter.onPut(
+          '/api/admin/orders/500/status',
+          (server) => server.reply(200, apiOk({'id': 500, 'status': 'CANCELED'})),
+          data: {'status': 'CANCELED'},
+        );
+
+        final result = await service.adminSetOrderStatus(500, 'CANCELED');
+        expect(result['status'], equals('CANCELED'));
+      });
+    });
+
+    group('adminPromotions()', () {
+      test('returns list of promotions', () async {
+        adapter.onGet(
+          '/api/admin/promotions',
+          (server) => server.reply(200, apiOk([
+            {
+              'id': 1,
+              'code': 'SUMMER20',
+              'discountType': 'PERCENT',
+              'discountValue': 20,
+              'status': 'ACTIVE',
+              'startDate': '2026-06-01T00:00:00',
+              'endDate': '2026-06-30T23:59:59',
+            },
+            {
+              'id': 2,
+              'code': 'FLAT50K',
+              'discountType': 'FIXED',
+              'discountValue': 50000,
+              'status': 'INACTIVE',
+            },
+          ])),
+        );
+
+        final result = await service.adminPromotions();
+        expect(result, hasLength(2));
+        expect(result.first['code'], equals('SUMMER20'));
+        expect(result.last['discountType'], equals('FIXED'));
+      });
+    });
+
+    group('adminCreatePromotion()', () {
+      test('returns created promotion', () async {
+        final body = {
+          'code': 'NEWYEAR10',
+          'discountType': 'PERCENT',
+          'discountValue': 10.0,
+          'startDate': '2026-12-31T00:00:00.000',
+          'endDate': '2027-01-01T23:59:59.000',
+        };
+        adapter.onPost(
+          '/api/admin/promotions',
+          (server) => server.reply(201, apiOk({
+            'id': 5,
+            'code': 'NEWYEAR10',
+            'discountType': 'PERCENT',
+            'discountValue': 10.0,
+            'status': 'ACTIVE',
+          })),
+          data: body,
+        );
+
+        final result = await service.adminCreatePromotion(body);
+        expect(result['code'], equals('NEWYEAR10'));
+        expect(result['discountValue'], equals(10.0));
+      });
+    });
+
+    group('adminDeletePromotion()', () {
+      test('completes without throwing on success', () async {
+        adapter.onDelete(
+          '/api/admin/promotions/1',
+          (server) => server.reply(200, apiOk(null)),
+        );
+
+        await expectLater(service.adminDeletePromotion(1), completes);
+      });
+    });
+  });
 }
