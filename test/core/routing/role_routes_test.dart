@@ -3,15 +3,27 @@ import 'package:smart_laundry_locker/core/routing/role_routes.dart';
 
 void main() {
   group('homeForRoles', () {
-    group('MANAGER / ADMIN', () {
+    group('ADMIN (highest priority)', () {
+      test('ADMIN routes to /admin-home', () {
+        expect(homeForRoles(['ADMIN']), equals('/admin-home'));
+      });
+      test('ADMIN+MANAGER routes to /admin-home (ADMIN wins)', () {
+        expect(homeForRoles(['ADMIN', 'MANAGER']), equals('/admin-home'));
+      });
+      test('ADMIN+CUSTOMER routes to /admin-home (ADMIN wins)', () {
+        expect(homeForRoles(['CUSTOMER', 'ADMIN']), equals('/admin-home'));
+      });
+      test('ADMIN does NOT route to /manager', () {
+        expect(homeForRoles(['ADMIN']), isNot(equals('/manager')));
+      });
+    });
+
+    group('MANAGER', () {
       test('MANAGER routes to /manager', () {
         expect(homeForRoles(['MANAGER']), equals('/manager'));
       });
-      test('ADMIN routes to /manager', () {
-        expect(homeForRoles(['ADMIN']), equals('/manager'));
-      });
-      test('MANAGER+ADMIN routes to /manager', () {
-        expect(homeForRoles(['MANAGER', 'ADMIN']), equals('/manager'));
+      test('MANAGER does NOT route to /admin-home', () {
+        expect(homeForRoles(['MANAGER']), isNot(equals('/admin-home')));
       });
     });
 
@@ -48,15 +60,20 @@ void main() {
       });
     });
 
-    group('role priority (highest wins)', () {
-      test('MANAGER takes priority over CUSTOMER', () {
+    group('role priority order: ADMIN > MANAGER > TECHNICIAN > MAINTENANCE > STAFF > customer', () {
+      test('ADMIN beats MANAGER', () {
+        expect(homeForRoles(['MANAGER', 'ADMIN']), equals('/admin-home'));
+      });
+      test('MANAGER beats TECHNICIAN', () {
+        expect(homeForRoles(['TECHNICIAN', 'MANAGER']), equals('/manager'));
+      });
+      test('MANAGER beats CUSTOMER', () {
         expect(homeForRoles(['CUSTOMER', 'MANAGER']), equals('/manager'));
       });
-      test('TECHNICIAN takes priority over CUSTOMER', () {
+      test('TECHNICIAN beats CUSTOMER', () {
         expect(homeForRoles(['CUSTOMER', 'TECHNICIAN']), equals('/technician-home'));
       });
-      test('MAINTENANCE is separate from STAFF', () {
-        // MAINTENANCE and STAFF are different roles with different home pages
+      test('MAINTENANCE and STAFF have separate home pages', () {
         expect(homeForRoles(['MAINTENANCE']), isNot(equals('/staff-home')));
         expect(homeForRoles(['STAFF']), isNot(equals('/maintenance-home')));
       });
