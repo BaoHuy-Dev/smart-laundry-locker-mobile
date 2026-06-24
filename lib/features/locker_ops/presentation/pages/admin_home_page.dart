@@ -175,8 +175,9 @@ class _AdminHomePageState extends State<AdminHomePage>
     final totalStores = _adminVal(_overview, 'totalStores') ??
         _adminVal(_overview, 'storeCount') ??
         '${_stores.length}';
-    final todayRevenue = _adminVal(_revenue, 'todayRevenue') ??
-        _adminVal(_revenue, 'today') ??
+    final todayRevenue = _adminVal(_overview, 'revenueToday') ??
+        _adminVal(_revenue, 'revenueToday') ??
+        _adminVal(_revenue, 'todayRevenue') ??
         '–';
 
     return RefreshIndicator(
@@ -228,7 +229,11 @@ class _AdminHomePageState extends State<AdminHomePage>
               ),
             ],
           ),
-          if (_orderStats != null && _orderStats!.isNotEmpty) ...[
+          if (_orderStats != null && _orderStats!.isNotEmpty) ...() {
+            final statusMap = (_orderStats!['byStatus'] as Map?)
+                    ?.cast<String, dynamic>() ??
+                _orderStats!;
+            return [
             const SizedBox(height: 16),
             const OpsSectionLabel(
               'Đơn theo trạng thái',
@@ -237,8 +242,8 @@ class _AdminHomePageState extends State<AdminHomePage>
             OpsCard(
               child: Column(
                 children: [
-                  for (final entry in _orderStats!.entries)
-                    if (entry.value != null)
+                  for (final entry in statusMap.entries)
+                    if (entry.value != null && entry.value is! Map)
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(
@@ -265,7 +270,8 @@ class _AdminHomePageState extends State<AdminHomePage>
                 ],
               ),
             ),
-          ],
+            ];
+          }(),
           if (_revenue != null && _revenue!.isNotEmpty) ...[
             const SizedBox(height: 16),
             const OpsSectionLabel(
@@ -604,9 +610,9 @@ class _AdminHomePageState extends State<AdminHomePage>
                       style:
                           const TextStyle(fontSize: 12, color: opsMutedText),
                     ),
-                  if ((s['phone']?.toString() ?? '').isNotEmpty)
+                  if ((s['phone']?.toString() ?? s['contactPhone']?.toString() ?? '').isNotEmpty)
                     Text(
-                      s['phone'].toString(),
+                      (s['phone'] ?? s['contactPhone']).toString(),
                       style:
                           const TextStyle(fontSize: 12, color: opsMutedText),
                     ),
@@ -808,10 +814,10 @@ class _AdminHomePageState extends State<AdminHomePage>
               spacing: 8,
               runSpacing: 4,
               children: [
-                if ((o['customerEmail'] ?? o['userEmail'] ?? '').toString().isNotEmpty)
+                if ((o['customerEmail'] ?? o['userEmail'] ?? o['userId']) != null)
                   _AdminPill(
                     icon: Icons.person_outline,
-                    text: (o['customerEmail'] ?? o['userEmail']).toString(),
+                    text: (o['customerEmail'] ?? o['userEmail'] ?? 'User #${o['userId']}').toString(),
                   ),
                 if (createdAt != null)
                   _AdminPill(icon: Icons.schedule, text: createdAt),
@@ -1057,7 +1063,7 @@ class _AdminHomePageState extends State<AdminHomePage>
     final codeCtrl = TextEditingController();
     final valueCtrl = TextEditingController();
     final minOrderCtrl = TextEditingController();
-    var discountType = 'PERCENT';
+    var discountType = 'PERCENT'; // PERCENT | FIXED_AMOUNT (matches backend enum)
     DateTime? startDate;
     DateTime? endDate;
 
@@ -1086,9 +1092,9 @@ class _AdminHomePageState extends State<AdminHomePage>
                 Wrap(
                   spacing: 8,
                   children: [
-                    for (final t in ['PERCENT', 'FIXED'])
+                    for (final t in ['PERCENT', 'FIXED_AMOUNT'])
                       ChoiceChip(
-                        label: Text(t),
+                        label: Text(t == 'FIXED_AMOUNT' ? 'FIXED' : t),
                         selected: discountType == t,
                         onSelected: (_) => setLocal(() => discountType = t),
                       ),
@@ -1098,7 +1104,7 @@ class _AdminHomePageState extends State<AdminHomePage>
                   controller: valueCtrl,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
-                    labelText: discountType == 'PERCENT' ? 'Phần trăm *' : 'Số tiền *',
+                    labelText: discountType == 'PERCENT' ? 'Phần trăm (%) *' : 'Số tiền (đ) *',
                   ),
                 ),
                 const SizedBox(height: 8),
