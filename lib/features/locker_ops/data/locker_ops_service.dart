@@ -359,6 +359,57 @@ class LockerOpsService {
     await _map('POST', '/api/technician/devices/$id/restart');
   }
 
+  // ── ADMIN ──────────────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> adminDashboard() =>
+      _map('GET', '/api/admin/dashboard/overview');
+
+  Future<Map<String, dynamic>> adminOrderStats() =>
+      _map('GET', '/api/admin/orders/statistics');
+
+  Future<Map<String, dynamic>> adminRevenue() =>
+      _map('GET', '/api/admin/orders/revenue');
+
+  Future<List<Map<String, dynamic>>> adminUsers() =>
+      _list('/api/admin/users');
+
+  Future<Map<String, dynamic>> adminSetUserStatus(int userId, String status) =>
+      _map('PUT', '/api/admin/users/$userId/status', body: {'status': status});
+
+  Future<Map<String, dynamic>> adminSetUserRoles(
+          int userId, List<String> roles) =>
+      _map('PUT', '/api/admin/users/$userId/roles', body: {'roles': roles});
+
+  Future<List<Map<String, dynamic>>> adminStores() =>
+      _list('/api/admin/stores');
+
+  Future<Map<String, dynamic>> adminCreateStore(Map<String, dynamic> data) =>
+      _map('POST', '/api/admin/stores', body: data);
+
+  Future<Map<String, dynamic>> adminSetStoreStatus(
+          int storeId, String status) =>
+      _map('PUT', '/api/admin/stores/$storeId/status',
+          body: {'status': status});
+
+  Future<List<Map<String, dynamic>>> adminOrders({String? status}) =>
+      _list('/api/admin/orders',
+          query: status != null ? {'status': status} : null);
+
+  Future<Map<String, dynamic>> adminSetOrderStatus(
+          int orderId, String status) =>
+      _map('PUT', '/api/admin/orders/$orderId/status',
+          body: {'status': status});
+
+  Future<List<Map<String, dynamic>>> adminPromotions() =>
+      _list('/api/admin/promotions');
+
+  Future<Map<String, dynamic>> adminCreatePromotion(
+          Map<String, dynamic> data) =>
+      _map('POST', '/api/admin/promotions', body: data);
+
+  Future<void> adminDeletePromotion(int id) async =>
+      _map('DELETE', '/api/admin/promotions/$id');
+
   /// Human-readable message from an [ApiResponse] error payload.
   static String errorMessage(Object error) {
     if (error is DioException) {
