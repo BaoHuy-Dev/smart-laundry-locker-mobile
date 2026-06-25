@@ -191,6 +191,8 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
             child: TabBar(
               controller: _tabs,
               isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              padding: EdgeInsets.zero,
               indicatorColor: opsPrimary,
               labelColor: opsDark,
               unselectedLabelColor: opsMutedText,

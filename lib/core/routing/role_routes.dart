@@ -1,10 +1,13 @@
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
 
 /// Landing page per signed-in role:
-/// MANAGER/ADMIN -> ops dashboard, TECHNICIAN -> technician home,
+/// ADMIN -> admin home, MANAGER -> ops dashboard, TECHNICIAN -> technician home,
 /// MAINTENANCE/STAFF -> staff/maintenance home, else customer home.
 String homeForRoles(List<String> roles) {
-  if (roles.contains('MANAGER') || roles.contains('ADMIN')) {
+  if (roles.contains('ADMIN')) {
+    return AppRouter.adminHome;
+  }
+  if (roles.contains('MANAGER')) {
     return AppRouter.managerHome;
   }
   if (roles.contains('TECHNICIAN')) {
