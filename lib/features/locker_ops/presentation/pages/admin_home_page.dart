@@ -15,7 +15,7 @@ class AdminHomePage extends StatefulWidget {
 class _AdminHomePageState extends State<AdminHomePage>
     with SingleTickerProviderStateMixin {
   final _service = LockerOpsService();
-  late final TabController _tabs = TabController(length: 5, vsync: this);
+  late final TabController _tabs = TabController(length: 6, vsync: this);
 
   // Tab 0 – Dashboard
   Map<String, dynamic>? _overview;
@@ -59,13 +59,76 @@ class _AdminHomePageState extends State<AdminHomePage>
 
   // Tab 2 – Stores
   List<Map<String, dynamic>> _stores = [];
+  String _storeSearch = '';
+  String? _storeStatusFilter;
+  String _storeSort = 'name';
+
+  List<Map<String, dynamic>> get _filteredStores {
+    String q = _storeSearch.toLowerCase();
+    var list = _stores.where((s) {
+      if (_storeStatusFilter != null && s['status'] != _storeStatusFilter) return false;
+      if (q.isNotEmpty) {
+        final name = (s['name'] ?? '').toString().toLowerCase();
+        final addr = (s['address'] ?? '').toString().toLowerCase();
+        if (!name.contains(q) && !addr.contains(q)) return false;
+      }
+      return true;
+    }).toList();
+    list.sort((a, b) {
+      if (_storeSort == 'status') {
+        return (a['status'] ?? '').toString().compareTo((b['status'] ?? '').toString());
+      }
+      return (a['name'] ?? '').toString().toLowerCase().compareTo((b['name'] ?? '').toString().toLowerCase());
+    });
+    return list;
+  }
 
   // Tab 3 – Orders
   List<Map<String, dynamic>> _orders = [];
   String? _orderFilter;
+  String _orderSearch = '';
+  String? _orderTypeFilter;
+
+  List<Map<String, dynamic>> get _filteredOrders {
+    final q = _orderSearch.toLowerCase();
+    return _orders.where((o) {
+      if (_orderFilter != null && o['status'] != _orderFilter) return false;
+      if (_orderTypeFilter != null) {
+        final type = (o['orderType'] ?? o['type'] ?? '').toString().toUpperCase();
+        if (type != _orderTypeFilter) return false;
+      }
+      if (q.isNotEmpty) {
+        final id = '#${o['id']}'.toLowerCase();
+        final email = (o['customerEmail'] ?? o['userEmail'] ?? '').toString().toLowerCase();
+        if (!id.contains(q) && !email.contains(q)) return false;
+      }
+      return true;
+    }).toList();
+  }
 
   // Tab 4 – Promotions
   List<Map<String, dynamic>> _promotions = [];
+  String _promoSearch = '';
+  String? _promoTypeFilter;
+  String? _promoStatusFilter;
+
+  List<Map<String, dynamic>> get _filteredPromotions {
+    final q = _promoSearch.toLowerCase();
+    return _promotions.where((p) {
+      if (_promoStatusFilter != null && p['status'] != _promoStatusFilter) return false;
+      if (_promoTypeFilter != null && p['discountType'] != _promoTypeFilter) return false;
+      if (q.isNotEmpty) {
+        final code = (p['code'] ?? '').toString().toLowerCase();
+        final name = (p['name'] ?? '').toString().toLowerCase();
+        if (!code.contains(q) && !name.contains(q)) return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  // Tab 5 – Drones
+  List<Map<String, dynamic>> _drones = [];
+  String? _droneStatusFilter;
 
   bool _loading = true;
 
@@ -91,9 +154,10 @@ class _AdminHomePageState extends State<AdminHomePage>
         _service.adminUsers().catchError((_) => <Map<String, dynamic>>[]),
         _service.adminStores().catchError((_) => <Map<String, dynamic>>[]),
         _service
-            .adminOrders(status: _orderFilter)
+            .adminOrders()
             .catchError((_) => <Map<String, dynamic>>[]),
         _service.adminPromotions().catchError((_) => <Map<String, dynamic>>[]),
+        _service.adminDrones().catchError((_) => <Map<String, dynamic>>[]),
       ]);
       if (!mounted) return;
       setState(() {
@@ -104,6 +168,7 @@ class _AdminHomePageState extends State<AdminHomePage>
         _stores = (results[4] as List).cast<Map<String, dynamic>>();
         _orders = (results[5] as List).cast<Map<String, dynamic>>();
         _promotions = (results[6] as List).cast<Map<String, dynamic>>();
+        _drones = (results[7] as List).cast<Map<String, dynamic>>();
       });
     } catch (e) {
       if (mounted) {
@@ -147,7 +212,7 @@ class _AdminHomePageState extends State<AdminHomePage>
           BrandHeroHeader(
             title: 'Quản trị hệ thống',
             subtitle:
-                '${_users.length} người dùng · ${_stores.length} cửa hàng',
+                '${_users.length} người dùng · ${_stores.length} cửa hàng · ${_drones.length} drone',
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -175,6 +240,7 @@ class _AdminHomePageState extends State<AdminHomePage>
                 Tab(text: 'Cửa hàng'),
                 Tab(text: 'Đơn hàng'),
                 Tab(text: 'Khuyến mãi'),
+                Tab(text: 'Drone'),
               ],
             ),
           ),
@@ -191,6 +257,7 @@ class _AdminHomePageState extends State<AdminHomePage>
                       _buildStores(),
                       _buildOrders(),
                       _buildPromotions(),
+                      _buildDrones(),
                     ],
                   ),
           ),
@@ -759,37 +826,126 @@ class _AdminHomePageState extends State<AdminHomePage>
   // ── Tab 2: Stores ───────────────────────────────────────────────────────────
 
   Widget _buildStores() {
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView(
-        padding: const EdgeInsets.all(12),
-        children: [
-          Row(
+    final filtered = _filteredStores;
+    final hasFilter = _storeSearch.isNotEmpty || _storeStatusFilter != null || _storeSort != 'name';
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+          child: Row(
             children: [
-              const Expanded(
-                child: OpsSectionLabel(
-                  'Cửa hàng',
-                  icon: Icons.store_outlined,
+              Expanded(
+                child: TextField(
+                  onChanged: (v) => setState(() => _storeSearch = v),
+                  decoration: InputDecoration(
+                    hintText: 'Tìm tên, địa chỉ...',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+                  ),
                 ),
+              ),
+              const SizedBox(width: 8),
+              Stack(
+                children: [
+                  IconButton(
+                    onPressed: _showStoreFilter,
+                    icon: const Icon(Icons.tune),
+                    style: IconButton.styleFrom(
+                      backgroundColor: hasFilter ? opsPrimary : Colors.grey.shade100,
+                      foregroundColor: hasFilter ? Colors.white : opsDark,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  if (hasFilter)
+                    Positioned(
+                      right: 6, top: 6,
+                      child: Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
+                    ),
+                ],
               ),
               TextButton.icon(
                 onPressed: _createStoreFlow,
                 icon: const Icon(Icons.add, size: 18, color: opsPrimary),
-                label: const Text(
-                  'Thêm mới',
-                  style: TextStyle(color: opsPrimary),
+                label: const Text('Thêm mới', style: TextStyle(color: opsPrimary, fontSize: 13)),
+              ),
+            ],
+          ),
+        ),
+        if (hasFilter)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+            child: Row(
+              children: [
+                Text('${filtered.length} / ${_stores.length} cửa hàng', style: const TextStyle(fontSize: 12, color: opsMutedText)),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => setState(() { _storeSearch = ''; _storeStatusFilter = null; _storeSort = 'name'; }),
+                  child: const Text('Xoá bộ lọc', style: TextStyle(fontSize: 12, color: opsPrimary)),
+                ),
+              ],
+            ),
+          ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              children: [
+                if (filtered.isEmpty)
+                  OpsEmptyState(icon: Icons.store_outlined, title: _stores.isEmpty ? 'Chưa có cửa hàng nào' : 'Không tìm thấy kết quả')
+                else
+                  for (final s in filtered) _storeCard(s),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showStoreFilter() {
+    var tempStatus = _storeStatusFilter;
+    var tempSort = _storeSort;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Bộ lọc & Sắp xếp', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 16),
+              const Text('Trạng thái', style: TextStyle(fontSize: 13, color: opsMutedText)),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, children: [
+                for (final s in [null, 'ACTIVE', 'INACTIVE', 'PENDING'])
+                  ChoiceChip(label: Text(s ?? 'Tất cả'), selected: tempStatus == s, onSelected: (_) => setLocal(() => tempStatus = s)),
+              ]),
+              const SizedBox(height: 16),
+              const Text('Sắp xếp theo', style: TextStyle(fontSize: 13, color: opsMutedText)),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, children: [
+                for (final entry in {'name': 'Tên', 'status': 'Trạng thái'}.entries)
+                  ChoiceChip(label: Text(entry.value), selected: tempSort == entry.key, onSelected: (_) => setLocal(() => tempSort = entry.key)),
+              ]),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () { setState(() { _storeStatusFilter = tempStatus; _storeSort = tempSort; }); Navigator.pop(ctx); },
+                  child: const Text('Áp dụng'),
                 ),
               ),
             ],
           ),
-          if (_stores.isEmpty)
-            const OpsEmptyState(
-              icon: Icons.store_outlined,
-              title: 'Chưa có cửa hàng nào',
-            )
-          else
-            for (final s in _stores) _storeCard(s),
-        ],
+        ),
       ),
     );
   }
@@ -943,27 +1099,55 @@ class _AdminHomePageState extends State<AdminHomePage>
   // ── Tab 3: Orders ───────────────────────────────────────────────────────────
 
   Widget _buildOrders() {
-    const statuses = [
-      null,
-      'INITIALIZED',
-      'STORING',
-      'COMPLETED',
-      'CANCELED',
-    ];
-    const labels = [
-      'Tất cả',
-      'Khởi tạo',
-      'Đang lưu',
-      'Hoàn thành',
-      'Đã huỷ',
-    ];
+    const statuses = [null, 'INITIALIZED', 'STORING', 'COMPLETED', 'CANCELED'];
+    const labels = ['Tất cả', 'Khởi tạo', 'Đang lưu', 'Hoàn thành', 'Đã huỷ'];
+    final filtered = _filteredOrders;
+    final hasFilter = _orderSearch.isNotEmpty || _orderTypeFilter != null;
 
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView(
-        padding: const EdgeInsets.all(12),
-        children: [
-          SizedBox(
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  onChanged: (v) => setState(() => _orderSearch = v),
+                  decoration: InputDecoration(
+                    hintText: 'Tìm mã đơn, email...',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Stack(
+                children: [
+                  IconButton(
+                    onPressed: _showOrderTypeFilter,
+                    icon: const Icon(Icons.tune),
+                    style: IconButton.styleFrom(
+                      backgroundColor: hasFilter ? opsPrimary : Colors.grey.shade100,
+                      foregroundColor: hasFilter ? Colors.white : opsDark,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  if (hasFilter)
+                    Positioned(
+                      right: 6, top: 6,
+                      child: Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+          child: SizedBox(
             height: 36,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
@@ -974,22 +1158,75 @@ class _AdminHomePageState extends State<AdminHomePage>
                 selected: _orderFilter == statuses[i],
                 selectedColor: opsPrimary.withValues(alpha: 0.15),
                 checkmarkColor: opsPrimary,
-                onSelected: (_) {
-                  setState(() => _orderFilter = statuses[i]);
-                  _load();
-                },
+                onSelected: (_) => setState(() => _orderFilter = statuses[i]),
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          if (_orders.isEmpty)
-            const OpsEmptyState(
-              icon: Icons.receipt_long_outlined,
-              title: 'Không có đơn hàng nào',
-            )
-          else
-            for (final o in _orders) _orderCard(o),
-        ],
+        ),
+        if (hasFilter)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+            child: Row(
+              children: [
+                Text('${filtered.length} / ${_orders.length} đơn hàng', style: const TextStyle(fontSize: 12, color: opsMutedText)),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => setState(() { _orderSearch = ''; _orderTypeFilter = null; }),
+                  child: const Text('Xoá bộ lọc', style: TextStyle(fontSize: 12, color: opsPrimary)),
+                ),
+              ],
+            ),
+          ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              children: [
+                if (filtered.isEmpty)
+                  OpsEmptyState(icon: Icons.receipt_long_outlined, title: _orders.isEmpty ? 'Không có đơn hàng nào' : 'Không tìm thấy kết quả')
+                else
+                  for (final o in filtered) _orderCard(o),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showOrderTypeFilter() {
+    var tempType = _orderTypeFilter;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Lọc loại đơn', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 16),
+              const Text('Loại đơn', style: TextStyle(fontSize: 13, color: opsMutedText)),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, children: [
+                for (final entry in {null: 'Tất cả', 'SEND': 'Gửi hàng', 'RENTAL': 'Thuê tủ', 'STORAGE': 'Lưu trữ'}.entries)
+                  ChoiceChip(label: Text(entry.value), selected: tempType == entry.key, onSelected: (_) => setLocal(() => tempType = entry.key)),
+              ]),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () { setState(() => _orderTypeFilter = tempType); Navigator.pop(ctx); },
+                  child: const Text('Áp dụng'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1132,37 +1369,126 @@ class _AdminHomePageState extends State<AdminHomePage>
   // ── Tab 4: Promotions ───────────────────────────────────────────────────────
 
   Widget _buildPromotions() {
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView(
-        padding: const EdgeInsets.all(12),
-        children: [
-          Row(
+    final filtered = _filteredPromotions;
+    final hasFilter = _promoSearch.isNotEmpty || _promoStatusFilter != null || _promoTypeFilter != null;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+          child: Row(
             children: [
-              const Expanded(
-                child: OpsSectionLabel(
-                  'Khuyến mãi',
-                  icon: Icons.local_offer_outlined,
+              Expanded(
+                child: TextField(
+                  onChanged: (v) => setState(() => _promoSearch = v),
+                  decoration: InputDecoration(
+                    hintText: 'Tìm mã code, tên...',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+                  ),
                 ),
+              ),
+              const SizedBox(width: 8),
+              Stack(
+                children: [
+                  IconButton(
+                    onPressed: _showPromoFilter,
+                    icon: const Icon(Icons.tune),
+                    style: IconButton.styleFrom(
+                      backgroundColor: hasFilter ? opsPrimary : Colors.grey.shade100,
+                      foregroundColor: hasFilter ? Colors.white : opsDark,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  if (hasFilter)
+                    Positioned(
+                      right: 6, top: 6,
+                      child: Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
+                    ),
+                ],
               ),
               TextButton.icon(
                 onPressed: _createPromotionFlow,
                 icon: const Icon(Icons.add, size: 18, color: opsPrimary),
-                label: const Text(
-                  'Thêm mới',
-                  style: TextStyle(color: opsPrimary),
+                label: const Text('Thêm mới', style: TextStyle(color: opsPrimary, fontSize: 13)),
+              ),
+            ],
+          ),
+        ),
+        if (hasFilter)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+            child: Row(
+              children: [
+                Text('${filtered.length} / ${_promotions.length} khuyến mãi', style: const TextStyle(fontSize: 12, color: opsMutedText)),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => setState(() { _promoSearch = ''; _promoStatusFilter = null; _promoTypeFilter = null; }),
+                  child: const Text('Xoá bộ lọc', style: TextStyle(fontSize: 12, color: opsPrimary)),
+                ),
+              ],
+            ),
+          ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              children: [
+                if (filtered.isEmpty)
+                  OpsEmptyState(icon: Icons.local_offer_outlined, title: _promotions.isEmpty ? 'Chưa có khuyến mãi nào' : 'Không tìm thấy kết quả')
+                else
+                  for (final p in filtered) _promotionCard(p),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showPromoFilter() {
+    var tempStatus = _promoStatusFilter;
+    var tempType = _promoTypeFilter;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Bộ lọc khuyến mãi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 16),
+              const Text('Trạng thái', style: TextStyle(fontSize: 13, color: opsMutedText)),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, children: [
+                for (final entry in {null: 'Tất cả', 'ACTIVE': 'Đang dùng', 'INACTIVE': 'Tắt'}.entries)
+                  ChoiceChip(label: Text(entry.value), selected: tempStatus == entry.key, onSelected: (_) => setLocal(() => tempStatus = entry.key)),
+              ]),
+              const SizedBox(height: 16),
+              const Text('Loại giảm giá', style: TextStyle(fontSize: 13, color: opsMutedText)),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, children: [
+                for (final entry in {null: 'Tất cả', 'PERCENT': 'Phần trăm', 'FIXED_AMOUNT': 'Số tiền cố định'}.entries)
+                  ChoiceChip(label: Text(entry.value), selected: tempType == entry.key, onSelected: (_) => setLocal(() => tempType = entry.key)),
+              ]),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () { setState(() { _promoStatusFilter = tempStatus; _promoTypeFilter = tempType; }); Navigator.pop(ctx); },
+                  child: const Text('Áp dụng'),
                 ),
               ),
             ],
           ),
-          if (_promotions.isEmpty)
-            const OpsEmptyState(
-              icon: Icons.local_offer_outlined,
-              title: 'Chưa có khuyến mãi nào',
-            )
-          else
-            for (final p in _promotions) _promotionCard(p),
-        ],
+        ),
       ),
     );
   }
@@ -1428,6 +1754,207 @@ class _AdminHomePageState extends State<AdminHomePage>
     return v != null ? '$v' : null;
   }
 
+  // ── Tab 5: Drones ──────────────────────────────────────────────────────────
+
+  Widget _buildDrones() {
+    const statuses = [null, 'IDLE', 'CHARGING', 'IN_USE', 'FAULT'];
+    const labels = ['Tất cả', 'IDLE', 'Đang sạc', 'Đang dùng', 'Lỗi'];
+
+    final filtered = _droneStatusFilter == null
+        ? _drones
+        : _drones.where((d) => d['status'] == _droneStatusFilter).toList();
+
+    final idle = _drones.where((d) => d['status'] == 'IDLE').length;
+    final charging = _drones.where((d) => d['status'] == 'CHARGING').length;
+    final fault = _drones.where((d) => d['status'] == 'FAULT').length;
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+          child: Row(
+            children: [
+              _DroneStatBadge(label: 'Tổng', value: _drones.length, color: opsPrimary),
+              const SizedBox(width: 8),
+              _DroneStatBadge(label: 'IDLE', value: idle, color: const Color(0xFF16A34A)),
+              const SizedBox(width: 8),
+              _DroneStatBadge(label: 'Sạc', value: charging, color: const Color(0xFFF59E0B)),
+              const SizedBox(width: 8),
+              _DroneStatBadge(label: 'Lỗi', value: fault, color: const Color(0xFFDC2626)),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+          child: SizedBox(
+            height: 36,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: statuses.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) => FilterChip(
+                label: Text(labels[i]),
+                selected: _droneStatusFilter == statuses[i],
+                selectedColor: opsPrimary.withValues(alpha: 0.15),
+                checkmarkColor: opsPrimary,
+                onSelected: (_) => setState(() => _droneStatusFilter = statuses[i]),
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              children: [
+                if (filtered.isEmpty)
+                  OpsEmptyState(
+                    icon: Icons.flight_outlined,
+                    title: _drones.isEmpty ? 'Chưa có drone nào' : 'Không tìm thấy drone',
+                  )
+                else
+                  for (final d in filtered) _droneCard(d),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _droneCard(Map<String, dynamic> d) {
+    final status = d['status']?.toString() ?? '–';
+    final battery = (d['batteryPercent'] as num?)?.toDouble() ?? 0.0;
+    final code = d['code']?.toString() ?? '–';
+    final lockerName = d['lockerName']?.toString() ?? 'Tủ #${d['lockerId']}';
+    final fault = d['faultReason']?.toString() ?? '';
+
+    Color statusColor() => switch (status) {
+      'IDLE' => const Color(0xFF16A34A),
+      'CHARGING' => const Color(0xFFF59E0B),
+      'IN_USE' || 'IN_FLIGHT' => opsPrimary,
+      'FAULT' => const Color(0xFFDC2626),
+      _ => opsMutedText,
+    };
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: OpsCard(
+        onTap: () => _droneDetail(d),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.flight, size: 18, color: opsPrimary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(code, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: opsDark)),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(color: statusColor().withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
+                  child: Text(status, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: statusColor())),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(lockerName, style: const TextStyle(fontSize: 12, color: opsMutedText)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.battery_charging_full, size: 14, color: opsMutedText),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: battery / 100.0,
+                      minHeight: 6,
+                      backgroundColor: Colors.grey.shade200,
+                      color: battery < 20 ? const Color(0xFFDC2626) : battery < 50 ? const Color(0xFFF59E0B) : const Color(0xFF16A34A),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text('${battery.toStringAsFixed(0)}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: opsDark)),
+              ],
+            ),
+            if (fault.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(fault, style: const TextStyle(fontSize: 11, color: Color(0xFFDC2626))),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _droneDetail(Map<String, dynamic> d) async {
+    final droneId = _asInt(d['id']);
+    if (droneId == null) return;
+
+    final allStatuses = ['IDLE', 'CHARGING', 'IN_USE', 'MAINTENANCE', 'FAULT'];
+    var selectedStatus = d['status']?.toString() ?? 'IDLE';
+    final batteryCtrl = TextEditingController(text: (d['batteryPercent'] as num?)?.toStringAsFixed(0) ?? '');
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (sheetCtx, setLocal) => Padding(
+          padding: EdgeInsets.only(left: 20, right: 20, top: 4, bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Drone ${d['code'] ?? '#$droneId'}',
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: opsDark)),
+              Text(d['lockerName']?.toString() ?? '', style: const TextStyle(fontSize: 12, color: opsMutedText)),
+              const SizedBox(height: 16),
+              const Text('Đổi trạng thái', style: TextStyle(fontSize: 13, color: opsMutedText, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8, runSpacing: 8,
+                children: [
+                  for (final s in allStatuses)
+                    ChoiceChip(label: Text(s), selected: selectedStatus == s, onSelected: (_) => setLocal(() => selectedStatus = s)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: batteryCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Pin (%)', isDense: true, border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: opsPrimary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                  onPressed: () {
+                    Navigator.pop(sheetCtx);
+                    final battery = double.tryParse(batteryCtrl.text);
+                    _run(() async {
+                      await _service.updateDroneStatus(droneId, selectedStatus);
+                      if (battery != null) await _service.updateDroneBattery(droneId, battery.round());
+                    }, 'Đã cập nhật drone ${d['code']}');
+                  },
+                  child: const Text('Lưu thay đổi'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    batteryCtrl.dispose();
+  }
+
   List<String> _roleList(dynamic roles) {
     if (roles is List) return roles.map((e) => '$e').toList();
     if (roles is String && roles.isNotEmpty) return [roles];
@@ -1527,6 +2054,28 @@ class _AdminPill extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DroneStatBadge extends StatelessWidget {
+  const _DroneStatBadge({required this.label, required this.value, required this.color});
+  final String label;
+  final int value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(10), border: Border.all(color: color.withValues(alpha: 0.22))),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('$value', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: color)),
+          Text(label, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600)),
         ],
       ),
     );
