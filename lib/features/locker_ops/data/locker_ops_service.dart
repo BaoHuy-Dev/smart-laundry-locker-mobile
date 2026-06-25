@@ -410,6 +410,10 @@ class LockerOpsService {
   Future<void> adminDeletePromotion(int id) async =>
       _map('DELETE', '/api/admin/promotions/$id');
 
+  Future<List<Map<String, dynamic>>> adminDrones({String? status}) =>
+      _list('/api/admin/drones',
+          query: status != null ? {'status': status} : null);
+
   /// Human-readable message from an [ApiResponse] error payload.
   static String errorMessage(Object error) {
     if (error is DioException) {
