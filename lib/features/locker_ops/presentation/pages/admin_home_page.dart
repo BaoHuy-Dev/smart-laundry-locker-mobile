@@ -1827,13 +1827,13 @@ class _AdminHomePageState extends State<AdminHomePage>
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
           child: Row(
             children: [
-              _DroneStatBadge(label: 'Tổng', value: _drones.length, color: opsPrimary),
+              Expanded(child: _DroneStatBadge(label: 'Tổng', value: _drones.length, color: opsPrimary)),
               const SizedBox(width: 8),
-              _DroneStatBadge(label: 'IDLE', value: idle, color: const Color(0xFF16A34A)),
+              Expanded(child: _DroneStatBadge(label: 'IDLE', value: idle, color: const Color(0xFF16A34A))),
               const SizedBox(width: 8),
-              _DroneStatBadge(label: 'Sạc', value: charging, color: const Color(0xFFF59E0B)),
+              Expanded(child: _DroneStatBadge(label: 'Sạc', value: charging, color: const Color(0xFFF59E0B))),
               const SizedBox(width: 8),
-              _DroneStatBadge(label: 'Lỗi', value: fault, color: const Color(0xFFDC2626)),
+              Expanded(child: _DroneStatBadge(label: 'Lỗi', value: fault, color: const Color(0xFFDC2626))),
             ],
           ),
         ),
@@ -2122,12 +2122,13 @@ class _DroneStatBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(color: color.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(10), border: Border.all(color: color.withValues(alpha: 0.22))),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('$value', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: color)),
+          Text('$value', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: color)),
           Text(label, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600)),
         ],
       ),
