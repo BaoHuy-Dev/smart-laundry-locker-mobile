@@ -24,6 +24,38 @@ class _AdminHomePageState extends State<AdminHomePage>
 
   // Tab 1 – Users
   List<Map<String, dynamic>> _users = [];
+  String _userSearch = '';
+  String? _userStatusFilter;  // null = all, 'ACTIVE', 'INACTIVE'
+  final Set<String> _userRoleFilter = {};
+  String _userSort = 'name'; // 'name' | 'role' | 'status'
+
+  List<Map<String, dynamic>> get _filteredUsers {
+    var list = _users.where((u) {
+      final name = (u['fullName'] ?? u['name'] ?? u['email'] ?? '').toString().toLowerCase();
+      final email = (u['email'] ?? '').toString().toLowerCase();
+      final q = _userSearch.toLowerCase();
+      if (q.isNotEmpty && !name.contains(q) && !email.contains(q)) return false;
+      if (_userStatusFilter != null && u['status'] != _userStatusFilter) return false;
+      if (_userRoleFilter.isNotEmpty) {
+        final roles = _roleList(u['roles']);
+        if (!roles.any(_userRoleFilter.contains)) return false;
+      }
+      return true;
+    }).toList();
+    list.sort((a, b) {
+      switch (_userSort) {
+        case 'role':
+          return (_roleList(a['roles']).firstOrNull ?? '').compareTo(_roleList(b['roles']).firstOrNull ?? '');
+        case 'status':
+          return (a['status'] ?? '').toString().compareTo((b['status'] ?? '').toString());
+        default:
+          final na = (a['fullName'] ?? a['email'] ?? '').toString();
+          final nb = (b['fullName'] ?? b['email'] ?? '').toString();
+          return na.toLowerCase().compareTo(nb.toLowerCase());
+      }
+    });
+    return list;
+  }
 
   // Tab 2 – Stores
   List<Map<String, dynamic>> _stores = [];
@@ -322,19 +354,194 @@ class _AdminHomePageState extends State<AdminHomePage>
   // ── Tab 1: Users ────────────────────────────────────────────────────────────
 
   Widget _buildUsers() {
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView(
-        padding: const EdgeInsets.all(12),
-        children: [
-          if (_users.isEmpty)
-            const OpsEmptyState(
-              icon: Icons.people_outline,
-              title: 'Chưa có người dùng',
-            )
-          else
-            for (final u in _users) _userCard(u),
-        ],
+    final filtered = _filteredUsers;
+    final hasActiveFilter = _userStatusFilter != null || _userRoleFilter.isNotEmpty || _userSort != 'name';
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  onChanged: (v) => setState(() => _userSearch = v),
+                  decoration: InputDecoration(
+                    hintText: 'Tìm tên, email…',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Stack(
+                children: [
+                  IconButton(
+                    onPressed: _showUserFilter,
+                    icon: const Icon(Icons.tune),
+                    style: IconButton.styleFrom(
+                      backgroundColor: hasActiveFilter ? opsPrimary : Colors.grey.shade100,
+                      foregroundColor: hasActiveFilter ? Colors.white : opsDark,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  if (hasActiveFilter)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        if (hasActiveFilter)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+            child: Row(
+              children: [
+                Text(
+                  '${filtered.length} / ${_users.length} người dùng',
+                  style: const TextStyle(fontSize: 12, color: opsMutedText),
+                ),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => setState(() {
+                    _userSearch = '';
+                    _userStatusFilter = null;
+                    _userRoleFilter.clear();
+                    _userSort = 'name';
+                  }),
+                  child: const Text(
+                    'Xoá bộ lọc',
+                    style: TextStyle(fontSize: 12, color: opsPrimary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              children: [
+                if (filtered.isEmpty)
+                  OpsEmptyState(
+                    icon: Icons.people_outline,
+                    title: _users.isEmpty ? 'Chưa có người dùng' : 'Không tìm thấy kết quả',
+                  )
+                else
+                  for (final u in filtered) _userCard(u),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showUserFilter() {
+    var tempStatus = _userStatusFilter;
+    final tempRoles = Set<String>.from(_userRoleFilter);
+    var tempSort = _userSort;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Bộ lọc & Sắp xếp',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 16),
+              const Text('Trạng thái', style: TextStyle(fontSize: 13, color: opsMutedText)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final s in [null, 'ACTIVE', 'INACTIVE'])
+                    ChoiceChip(
+                      label: Text(s ?? 'Tất cả'),
+                      selected: tempStatus == s,
+                      onSelected: (_) => setLocal(() => tempStatus = s),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Text('Vai trò', style: TextStyle(fontSize: 13, color: opsMutedText)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  for (final r in ['ADMIN', 'MANAGER', 'STAFF', 'MAINTENANCE', 'CUSTOMER', 'USER'])
+                    FilterChip(
+                      label: Text(r),
+                      selected: tempRoles.contains(r),
+                      onSelected: (v) => setLocal(() => v ? tempRoles.add(r) : tempRoles.remove(r)),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Text('Sắp xếp theo', style: TextStyle(fontSize: 13, color: opsMutedText)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final entry in {'name': 'Tên', 'role': 'Vai trò', 'status': 'Trạng thái'}.entries)
+                    ChoiceChip(
+                      label: Text(entry.value),
+                      selected: tempSort == entry.key,
+                      onSelected: (_) => setLocal(() => tempSort = entry.key),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () {
+                    setState(() {
+                      _userStatusFilter = tempStatus;
+                      _userRoleFilter
+                        ..clear()
+                        ..addAll(tempRoles);
+                      _userSort = tempSort;
+                    });
+                    Navigator.pop(ctx);
+                  },
+                  child: const Text('Áp dụng'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
