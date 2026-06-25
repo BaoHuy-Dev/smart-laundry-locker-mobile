@@ -130,6 +130,7 @@ class _AdminHomePageState extends State<AdminHomePage>
             child: TabBar(
               controller: _tabs,
               isScrollable: true,
+              tabAlignment: TabAlignment.center,
               indicatorColor: opsPrimary,
               labelColor: opsDark,
               unselectedLabelColor: opsMutedText,
