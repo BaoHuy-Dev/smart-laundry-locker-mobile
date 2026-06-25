@@ -129,13 +129,16 @@ class _AdminHomePageState extends State<AdminHomePage>
             color: Colors.white,
             child: TabBar(
               controller: _tabs,
-              isScrollable: true,
-              tabAlignment: TabAlignment.center,
               indicatorColor: opsPrimary,
               labelColor: opsDark,
               unselectedLabelColor: opsMutedText,
+              labelStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+              unselectedLabelStyle: const TextStyle(fontSize: 12),
               tabs: const [
-                Tab(text: 'Dashboard'),
+                Tab(text: 'Tổng quan'),
                 Tab(text: 'Người dùng'),
                 Tab(text: 'Cửa hàng'),
                 Tab(text: 'Đơn hàng'),

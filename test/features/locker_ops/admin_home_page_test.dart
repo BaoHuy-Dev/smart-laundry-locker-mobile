@@ -61,7 +61,7 @@ void main() {
     testWidgets('Dashboard tab', (tester) async {
       await tester.pumpWidget(buildApp());
       await tester.pumpAndSettle();
-      expect(find.text('Dashboard'), findsOneWidget);
+      expect(find.text('Tổng quan'), findsNWidgets(2)); // tab label + section header
     });
 
     testWidgets('Người dùng tab', (tester) async {
@@ -110,7 +110,7 @@ void main() {
     testWidgets('shows overview section label', (tester) async {
       await tester.pumpWidget(buildApp());
       await tester.pumpAndSettle();
-      expect(find.text('Tổng quan'), findsOneWidget);
+      expect(find.text('Tổng quan'), findsNWidgets(2)); // tab label + section header
     });
 
     testWidgets('shows order stats section', (tester) async {
