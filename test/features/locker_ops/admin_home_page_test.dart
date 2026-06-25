@@ -46,11 +46,16 @@ void main() {
       expect(find.text('Quản trị hệ thống'), findsOneWidget);
     });
 
-    testWidgets('shows user + store count in subtitle', (tester) async {
+    testWidgets('shows user + store count in subtitle after visiting those tabs', (tester) async {
       await tester.pumpWidget(buildApp());
       await tester.pumpAndSettle();
-      // Subtitle contains counts from the loaded data
+      // Navigate to Users tab to trigger its load
+      await tester.tap(find.text('Người dùng').first);
+      await tester.pumpAndSettle();
       expect(find.textContaining('người dùng'), findsOneWidget);
+      // Navigate to Stores tab to trigger its load
+      await tester.tap(find.text('Cửa hàng').first);
+      await tester.pumpAndSettle();
       expect(find.textContaining('cửa hàng'), findsOneWidget);
     });
   });

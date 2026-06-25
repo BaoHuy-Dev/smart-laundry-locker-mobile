@@ -130,46 +130,69 @@ class _AdminHomePageState extends State<AdminHomePage>
   List<Map<String, dynamic>> _drones = [];
   String? _droneStatusFilter;
 
-  bool _loading = true;
+  final Map<int, bool> _tabLoaded = {};
+  final Map<int, bool> _tabLoading = {};
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _tabs.addListener(_onTabChanged);
+    _loadTab(0);
   }
 
   @override
   void dispose() {
+    _tabs.removeListener(_onTabChanged);
     _tabs.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  void _onTabChanged() {
+    if (_tabs.indexIsChanging) return;
+    final i = _tabs.index;
+    if (!(_tabLoaded[i] ?? false)) _loadTab(i);
+  }
+
+  Future<void> _loadTab(int tab, {bool force = false}) async {
+    if (_tabLoading[tab] == true) return;
+    if ((_tabLoaded[tab] ?? false) && !force) return;
+    setState(() => _tabLoading[tab] = true);
     try {
-      final results = await Future.wait([
-        _service.adminDashboard().catchError((_) => <String, dynamic>{}),
-        _service.adminOrderStats().catchError((_) => <String, dynamic>{}),
-        _service.adminRevenue().catchError((_) => <String, dynamic>{}),
-        _service.adminUsers().catchError((_) => <Map<String, dynamic>>[]),
-        _service.adminStores().catchError((_) => <Map<String, dynamic>>[]),
-        _service
-            .adminOrders()
-            .catchError((_) => <Map<String, dynamic>>[]),
-        _service.adminPromotions().catchError((_) => <Map<String, dynamic>>[]),
-        _service.adminDrones().catchError((_) => <Map<String, dynamic>>[]),
-      ]);
-      if (!mounted) return;
-      setState(() {
-        _overview = results[0] as Map<String, dynamic>?;
-        _orderStats = results[1] as Map<String, dynamic>?;
-        _revenue = results[2] as Map<String, dynamic>?;
-        _users = (results[3] as List).cast<Map<String, dynamic>>();
-        _stores = (results[4] as List).cast<Map<String, dynamic>>();
-        _orders = (results[5] as List).cast<Map<String, dynamic>>();
-        _promotions = (results[6] as List).cast<Map<String, dynamic>>();
-        _drones = (results[7] as List).cast<Map<String, dynamic>>();
-      });
+      switch (tab) {
+        case 0:
+          final r = await Future.wait([
+            _service.adminDashboard().catchError((_) => <String, dynamic>{}),
+            _service.adminOrderStats().catchError((_) => <String, dynamic>{}),
+            _service.adminRevenue().catchError((_) => <String, dynamic>{}),
+          ]);
+          if (!mounted) return;
+          setState(() {
+            _overview = r[0] as Map<String, dynamic>?;
+            _orderStats = r[1] as Map<String, dynamic>?;
+            _revenue = r[2] as Map<String, dynamic>?;
+            _tabLoaded[0] = true;
+          });
+        case 1:
+          final u = await _service.adminUsers().catchError((_) => <Map<String, dynamic>>[]);
+          if (!mounted) return;
+          setState(() { _users = u; _tabLoaded[1] = true; });
+        case 2:
+          final s = await _service.adminStores().catchError((_) => <Map<String, dynamic>>[]);
+          if (!mounted) return;
+          setState(() { _stores = s; _tabLoaded[2] = true; });
+        case 3:
+          final o = await _service.adminOrders().catchError((_) => <Map<String, dynamic>>[]);
+          if (!mounted) return;
+          setState(() { _orders = o; _tabLoaded[3] = true; });
+        case 4:
+          final p = await _service.adminPromotions().catchError((_) => <Map<String, dynamic>>[]);
+          if (!mounted) return;
+          setState(() { _promotions = p; _tabLoaded[4] = true; });
+        case 5:
+          final d = await _service.adminDrones().catchError((_) => <Map<String, dynamic>>[]);
+          if (!mounted) return;
+          setState(() { _drones = d; _tabLoaded[5] = true; });
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -177,7 +200,7 @@ class _AdminHomePageState extends State<AdminHomePage>
         );
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() => _tabLoading[tab] = false);
     }
   }
 
@@ -186,14 +209,15 @@ class _AdminHomePageState extends State<AdminHomePage>
     if (mounted) context.go('/onboarding');
   }
 
-  Future<void> _run(Future<Object?> Function() fn, String ok) async {
+  Future<void> _run(Future<Object?> Function() fn, String ok, {int? reloadTab}) async {
     try {
       await fn();
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(ok)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ok)));
       }
-      await _load();
+      final tab = reloadTab ?? _tabs.index;
+      await _loadTab(tab, force: true);
+      if (tab == 3 && (_tabLoaded[0] ?? false)) await _loadTab(0, force: true);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -211,12 +235,18 @@ class _AdminHomePageState extends State<AdminHomePage>
         children: [
           BrandHeroHeader(
             title: 'Quản trị hệ thống',
-            subtitle:
-                '${_users.length} người dùng · ${_stores.length} cửa hàng · ${_drones.length} drone',
+            subtitle: [
+              if (_tabLoaded[1] ?? false) '${_users.length} người dùng',
+              if (_tabLoaded[2] ?? false) '${_stores.length} cửa hàng',
+              if (_tabLoaded[5] ?? false) '${_drones.length} drone',
+            ].join(' · '),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                BrandCircleIconButton(icon: Icons.refresh, onTap: _load),
+                BrandCircleIconButton(
+                  icon: Icons.refresh,
+                  onTap: () => _loadTab(_tabs.index, force: true),
+                ),
                 const SizedBox(width: 8),
                 BrandCircleIconButton(icon: Icons.logout, onTap: _logout),
               ],
@@ -245,21 +275,17 @@ class _AdminHomePageState extends State<AdminHomePage>
             ),
           ),
           Expanded(
-            child: _loading
-                ? const Center(
-                    child: CircularProgressIndicator(color: AislBrand.navy),
-                  )
-                : TabBarView(
-                    controller: _tabs,
-                    children: [
-                      _buildDashboard(),
-                      _buildUsers(),
-                      _buildStores(),
-                      _buildOrders(),
-                      _buildPromotions(),
-                      _buildDrones(),
-                    ],
-                  ),
+            child: TabBarView(
+              controller: _tabs,
+              children: [
+                _buildDashboard(),
+                _buildUsers(),
+                _buildStores(),
+                _buildOrders(),
+                _buildPromotions(),
+                _buildDrones(),
+              ],
+            ),
           ),
         ],
       ),
@@ -269,22 +295,26 @@ class _AdminHomePageState extends State<AdminHomePage>
   // ── Tab 0: Dashboard ───────────────────────────────────────────────────────
 
   Widget _buildDashboard() {
+    if (_tabLoading[0] == true && _overview == null) {
+      return const Center(child: CircularProgressIndicator(color: AislBrand.navy));
+    }
+
     final totalOrders = _adminVal(_overview, 'totalOrders') ??
         _adminVal(_orderStats, 'totalOrders') ??
         '–';
     final totalUsers = _adminVal(_overview, 'totalUsers') ??
         _adminVal(_overview, 'userCount') ??
-        '${_users.length}';
+        '–';
     final totalStores = _adminVal(_overview, 'totalStores') ??
         _adminVal(_overview, 'storeCount') ??
-        '${_stores.length}';
+        '–';
     final todayRevenue = _adminVal(_overview, 'revenueToday') ??
         _adminVal(_revenue, 'revenueToday') ??
         _adminVal(_revenue, 'todayRevenue') ??
         '–';
 
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: () => _loadTab(0, force: true),
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -421,6 +451,9 @@ class _AdminHomePageState extends State<AdminHomePage>
   // ── Tab 1: Users ────────────────────────────────────────────────────────────
 
   Widget _buildUsers() {
+    if (_tabLoading[1] == true && _users.isEmpty) {
+      return const Center(child: CircularProgressIndicator(color: AislBrand.navy));
+    }
     final filtered = _filteredUsers;
     final hasActiveFilter = _userStatusFilter != null || _userRoleFilter.isNotEmpty || _userSort != 'name';
     return Column(
@@ -507,7 +540,7 @@ class _AdminHomePageState extends State<AdminHomePage>
           ),
         Expanded(
           child: RefreshIndicator(
-            onRefresh: _load,
+            onRefresh: () => _loadTab(1, force: true),
             child: ListView(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
               children: [
@@ -742,6 +775,7 @@ class _AdminHomePageState extends State<AdminHomePage>
                     () => _run(
                       () => _service.adminSetUserStatus(userId, 'INACTIVE'),
                       'Đã khoá tài khoản',
+                      reloadTab: 1,
                     ),
                   )
                 else
@@ -752,6 +786,7 @@ class _AdminHomePageState extends State<AdminHomePage>
                     () => _run(
                       () => _service.adminSetUserStatus(userId, 'ACTIVE'),
                       'Đã mở khoá tài khoản',
+                      reloadTab: 1,
                     ),
                   ),
               ],
@@ -820,12 +855,16 @@ class _AdminHomePageState extends State<AdminHomePage>
     await _run(
       () => _service.adminSetUserRoles(userId, [result]),
       'Đã đổi role thành $result',
+      reloadTab: 1,
     );
   }
 
   // ── Tab 2: Stores ───────────────────────────────────────────────────────────
 
   Widget _buildStores() {
+    if (_tabLoading[2] == true && _stores.isEmpty) {
+      return const Center(child: CircularProgressIndicator(color: AislBrand.navy));
+    }
     final filtered = _filteredStores;
     final hasFilter = _storeSearch.isNotEmpty || _storeStatusFilter != null || _storeSort != 'name';
     return Column(
@@ -890,7 +929,7 @@ class _AdminHomePageState extends State<AdminHomePage>
           ),
         Expanded(
           child: RefreshIndicator(
-            onRefresh: _load,
+            onRefresh: () => _loadTab(2, force: true),
             child: ListView(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
               children: [
@@ -1007,6 +1046,7 @@ class _AdminHomePageState extends State<AdminHomePage>
                         isActive ? 'INACTIVE' : 'ACTIVE',
                       ),
                       isActive ? 'Đã tắt cửa hàng' : 'Đã kích hoạt cửa hàng',
+                      reloadTab: 2,
                     ),
                     child: Text(
                       isActive ? 'Tắt' : 'Bật',
@@ -1093,12 +1133,16 @@ class _AdminHomePageState extends State<AdminHomePage>
         if (phone.isNotEmpty) 'phone': phone,
       }),
       'Đã tạo cửa hàng "$name"',
+      reloadTab: 2,
     );
   }
 
   // ── Tab 3: Orders ───────────────────────────────────────────────────────────
 
   Widget _buildOrders() {
+    if (_tabLoading[3] == true && _orders.isEmpty) {
+      return const Center(child: CircularProgressIndicator(color: AislBrand.navy));
+    }
     const statuses = [null, 'INITIALIZED', 'STORING', 'COMPLETED', 'CANCELED'];
     const labels = ['Tất cả', 'Khởi tạo', 'Đang lưu', 'Hoàn thành', 'Đã huỷ'];
     final filtered = _filteredOrders;
@@ -1179,7 +1223,7 @@ class _AdminHomePageState extends State<AdminHomePage>
           ),
         Expanded(
           child: RefreshIndicator(
-            onRefresh: _load,
+            onRefresh: () => _loadTab(3, force: true),
             child: ListView(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
               children: [
@@ -1353,6 +1397,7 @@ class _AdminHomePageState extends State<AdminHomePage>
                       _run(
                         () => _service.adminSetOrderStatus(orderId, selected),
                         'Đã đổi trạng thái đơn #${o['id']}',
+                        reloadTab: 3,
                       );
                     },
                     child: const Text('Xác nhận'),
@@ -1369,6 +1414,9 @@ class _AdminHomePageState extends State<AdminHomePage>
   // ── Tab 4: Promotions ───────────────────────────────────────────────────────
 
   Widget _buildPromotions() {
+    if (_tabLoading[4] == true && _promotions.isEmpty) {
+      return const Center(child: CircularProgressIndicator(color: AislBrand.navy));
+    }
     final filtered = _filteredPromotions;
     final hasFilter = _promoSearch.isNotEmpty || _promoStatusFilter != null || _promoTypeFilter != null;
     return Column(
@@ -1433,7 +1481,7 @@ class _AdminHomePageState extends State<AdminHomePage>
           ),
         Expanded(
           child: RefreshIndicator(
-            onRefresh: _load,
+            onRefresh: () => _loadTab(4, force: true),
             child: ListView(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
               children: [
@@ -1593,6 +1641,7 @@ class _AdminHomePageState extends State<AdminHomePage>
     await _run(
       () => _service.adminDeletePromotion(promoId),
       'Đã xoá mã "$code"',
+      reloadTab: 4,
     );
   }
 
@@ -1743,6 +1792,7 @@ class _AdminHomePageState extends State<AdminHomePage>
         if (endDate != null) 'endDate': endDate!.toIso8601String(),
       }),
       'Đã tạo mã "$code"',
+      reloadTab: 4,
     );
   }
 
@@ -1757,6 +1807,9 @@ class _AdminHomePageState extends State<AdminHomePage>
   // ── Tab 5: Drones ──────────────────────────────────────────────────────────
 
   Widget _buildDrones() {
+    if (_tabLoading[5] == true && _drones.isEmpty) {
+      return const Center(child: CircularProgressIndicator(color: AislBrand.navy));
+    }
     const statuses = [null, 'IDLE', 'CHARGING', 'IN_USE', 'FAULT'];
     const labels = ['Tất cả', 'IDLE', 'Đang sạc', 'Đang dùng', 'Lỗi'];
 
@@ -1804,7 +1857,7 @@ class _AdminHomePageState extends State<AdminHomePage>
         ),
         Expanded(
           child: RefreshIndicator(
-            onRefresh: _load,
+            onRefresh: () => _loadTab(5, force: true),
             child: ListView(
               padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
               children: [
@@ -1942,7 +1995,7 @@ class _AdminHomePageState extends State<AdminHomePage>
                     _run(() async {
                       await _service.updateDroneStatus(droneId, selectedStatus);
                       if (battery != null) await _service.updateDroneBattery(droneId, battery.round());
-                    }, 'Đã cập nhật drone ${d['code']}');
+                    }, 'Đã cập nhật drone ${d['code']}', reloadTab: 5);
                   },
                   child: const Text('Lưu thay đổi'),
                 ),
