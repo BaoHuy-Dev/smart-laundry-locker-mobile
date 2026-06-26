@@ -209,7 +209,7 @@ class _AdminHomePageState extends State<AdminHomePage>
     if (mounted) context.go('/onboarding');
   }
 
-  Future<void> _run(Future<Object?> Function() fn, String ok, {int? reloadTab}) async {
+  Future<void> _run(Future<void> Function() fn, String ok, {int? reloadTab}) async {
     try {
       await fn();
       if (mounted) {
@@ -1810,8 +1810,8 @@ class _AdminHomePageState extends State<AdminHomePage>
     if (_tabLoading[5] == true && _drones.isEmpty) {
       return const Center(child: CircularProgressIndicator(color: AislBrand.navy));
     }
-    const statuses = [null, 'IDLE', 'CHARGING', 'IN_USE', 'FAULT'];
-    const labels = ['Tất cả', 'IDLE', 'Đang sạc', 'Đang dùng', 'Lỗi'];
+    const statuses = [null, 'IDLE', 'CHARGING', 'IN_FLIGHT', 'FAULT'];
+    const labels = ['Tất cả', 'IDLE', 'Đang sạc', 'Đang bay', 'Lỗi'];
 
     final filtered = _droneStatusFilter == null
         ? _drones
@@ -1835,6 +1835,18 @@ class _AdminHomePageState extends State<AdminHomePage>
               const SizedBox(width: 8),
               Expanded(child: _DroneStatBadge(label: 'Lỗi', value: fault, color: const Color(0xFFDC2626))),
             ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: _createDroneFlow,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Thêm drone'),
+              style: OutlinedButton.styleFrom(foregroundColor: opsPrimary),
+            ),
           ),
         ),
         Padding(
@@ -1948,9 +1960,11 @@ class _AdminHomePageState extends State<AdminHomePage>
     final droneId = _asInt(d['id']);
     if (droneId == null) return;
 
-    final allStatuses = ['IDLE', 'CHARGING', 'IN_USE', 'MAINTENANCE', 'FAULT'];
-    var selectedStatus = d['status']?.toString() ?? 'IDLE';
+    final allStatuses = ['IDLE', 'CHARGING', 'IN_FLIGHT', 'MAINTENANCE', 'FAULT'];
+    final initialStatus = d['status']?.toString() ?? 'IDLE';
+    var selectedStatus = initialStatus;
     final batteryCtrl = TextEditingController(text: (d['batteryPercent'] as num?)?.toStringAsFixed(0) ?? '');
+    final reasonCtrl = TextEditingController(text: d['faultReason']?.toString() ?? '');
 
     await showModalBottomSheet<void>(
       context: context,
@@ -1978,6 +1992,13 @@ class _AdminHomePageState extends State<AdminHomePage>
                     ChoiceChip(label: Text(s), selected: selectedStatus == s, onSelected: (_) => setLocal(() => selectedStatus = s)),
                 ],
               ),
+              if (selectedStatus == 'FAULT') ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: reasonCtrl,
+                  decoration: const InputDecoration(labelText: 'Lý do lỗi (bắt buộc)', isDense: true, border: OutlineInputBorder()),
+                ),
+              ],
               const SizedBox(height: 16),
               TextField(
                 controller: batteryCtrl,
@@ -1990,14 +2011,65 @@ class _AdminHomePageState extends State<AdminHomePage>
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: opsPrimary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                   onPressed: () {
+                    final reason = reasonCtrl.text.trim();
+                    if (selectedStatus == 'FAULT' && reason.isEmpty) {
+                      ScaffoldMessenger.of(sheetCtx).showSnackBar(
+                        const SnackBar(content: Text('Cần nhập lý do khi chuyển sang FAULT')),
+                      );
+                      return;
+                    }
                     Navigator.pop(sheetCtx);
                     final battery = double.tryParse(batteryCtrl.text);
                     _run(() async {
-                      await _service.updateDroneStatus(droneId, selectedStatus);
+                      if (selectedStatus != initialStatus || selectedStatus == 'FAULT') {
+                        await _service.updateDroneStatus(
+                          droneId,
+                          selectedStatus,
+                          reason: selectedStatus == 'FAULT' ? reason : null,
+                        );
+                      }
                       if (battery != null) await _service.updateDroneBattery(droneId, battery.round());
                     }, 'Đã cập nhật drone ${d['code']}', reloadTab: 5);
                   },
                   child: const Text('Lưu thay đổi'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(sheetCtx);
+                        _editDroneFlow(d);
+                      },
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      label: const Text('Sửa mã/tủ'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(sheetCtx);
+                        _createDroneScheduleFlow(d);
+                      },
+                      icon: const Icon(Icons.event_repeat, size: 16),
+                      label: const Text('Lịch định kỳ'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(sheetCtx);
+                    _decommissionDroneFlow(d);
+                  },
+                  icon: const Icon(Icons.delete_outline, size: 16, color: Color(0xFFDC2626)),
+                  label: const Text('Ngừng hoạt động', style: TextStyle(color: Color(0xFFDC2626))),
                 ),
               ),
             ],
@@ -2006,6 +2078,209 @@ class _AdminHomePageState extends State<AdminHomePage>
       ),
     );
     batteryCtrl.dispose();
+    reasonCtrl.dispose();
+  }
+
+  // ── #4 vòng đời drone (admin): tạo / sửa / ngừng hoạt động ──────────────────
+
+  Future<List<Map<String, dynamic>>> _lockerOptions() async {
+    try {
+      return await _service.lockers();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> _createDroneFlow() async {
+    final lockers = await _lockerOptions();
+    if (!mounted) return;
+    if (lockers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Chưa có tủ nào để gắn drone')),
+      );
+      return;
+    }
+    final codeCtrl = TextEditingController();
+    int? lockerId = _asInt(lockers.first['id']);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Thêm drone'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: codeCtrl,
+                decoration: const InputDecoration(labelText: 'Mã drone (vd: DRONE-04)', isDense: true),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<int>(
+                initialValue: lockerId,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Tủ gốc', isDense: true),
+                items: [
+                  for (final l in lockers)
+                    DropdownMenuItem(
+                      value: _asInt(l['id']),
+                      child: Text('${l['name'] ?? l['code'] ?? 'Tủ'} (#${l['id']})',
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                ],
+                onChanged: (v) => setLocal(() => lockerId = v),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: opsPrimary, foregroundColor: Colors.white),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Tạo'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final code = codeCtrl.text.trim();
+    codeCtrl.dispose();
+    if (ok != true || code.isEmpty || lockerId == null) return;
+    _run(() => _service.adminCreateDrone(lockerId!, code), 'Đã thêm drone $code', reloadTab: 5);
+  }
+
+  Future<void> _editDroneFlow(Map<String, dynamic> d) async {
+    final droneId = _asInt(d['id']);
+    if (droneId == null) return;
+    final lockers = await _lockerOptions();
+    if (!mounted) return;
+    final codeCtrl = TextEditingController(text: d['code']?.toString() ?? '');
+    int? lockerId = _asInt(d['lockerId']);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text('Sửa drone ${d['code'] ?? ''}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: codeCtrl,
+                decoration: const InputDecoration(labelText: 'Mã drone', isDense: true),
+              ),
+              const SizedBox(height: 12),
+              if (lockers.isNotEmpty)
+                DropdownButtonFormField<int>(
+                  initialValue: lockerId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Tủ gốc', isDense: true),
+                  items: [
+                    for (final l in lockers)
+                      DropdownMenuItem(
+                        value: _asInt(l['id']),
+                        child: Text('${l['name'] ?? l['code'] ?? 'Tủ'} (#${l['id']})',
+                            overflow: TextOverflow.ellipsis),
+                      ),
+                  ],
+                  onChanged: (v) => setLocal(() => lockerId = v),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: opsPrimary, foregroundColor: Colors.white),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Lưu'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final code = codeCtrl.text.trim();
+    codeCtrl.dispose();
+    if (ok != true) return;
+    _run(
+      () => _service.adminUpdateDrone(
+        droneId,
+        lockerId: lockerId,
+        code: code.isEmpty ? null : code,
+      ),
+      'Đã cập nhật drone',
+      reloadTab: 5,
+    );
+  }
+
+  Future<void> _decommissionDroneFlow(Map<String, dynamic> d) async {
+    final droneId = _asInt(d['id']);
+    if (droneId == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Ngừng hoạt động ${d['code'] ?? 'drone'}?'),
+        content: const Text('Drone sẽ bị ẩn khỏi danh sách vận hành. Lịch sử bảo trì vẫn được giữ.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626), foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Ngừng hoạt động'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    _run(() => _service.adminDecommissionDrone(droneId), 'Đã ngừng hoạt động drone', reloadTab: 5);
+  }
+
+  // ── #3 tạo lịch bảo trì định kỳ cho drone (admin) ───────────────────────────
+  Future<void> _createDroneScheduleFlow(Map<String, dynamic> d) async {
+    final droneId = _asInt(d['id']);
+    if (droneId == null) return;
+    final titleCtrl = TextEditingController(text: 'Kiểm tra định kỳ ${d['code'] ?? ''}'.trim());
+    final intervalCtrl = TextEditingController(text: '30');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Lịch định kỳ cho drone'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleCtrl,
+              decoration: const InputDecoration(labelText: 'Nội dung', isDense: true),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: intervalCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Chu kỳ (ngày)', isDense: true),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: opsPrimary, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Tạo'),
+          ),
+        ],
+      ),
+    );
+    final title = titleCtrl.text.trim();
+    final interval = int.tryParse(intervalCtrl.text.trim());
+    titleCtrl.dispose();
+    intervalCtrl.dispose();
+    if (ok != true || title.isEmpty || interval == null || interval < 1) return;
+    _run(
+      () => _service.adminCreateDroneSchedule(droneId, title, interval),
+      'Đã tạo lịch định kỳ cho drone',
+      reloadTab: 5,
+    );
   }
 
   List<String> _roleList(dynamic roles) {
