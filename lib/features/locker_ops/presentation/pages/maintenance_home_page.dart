@@ -273,34 +273,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
             const SizedBox(height: 8),
             _statusLegend(),
             const SizedBox(height: 12),
-            if (_layout?['landingPad'] == true)
-              Container(
-                padding: const EdgeInsets.all(10),
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.flight_land,
-                      color: Color(0xFF7C3AED),
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Bãi đáp drone trên nóc · marker ${_layout?['landingMarkerId'] ?? ''}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF7C3AED),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            if (_layout?['landingPad'] == true) _landingPadCard(),
             OpsCard(
               child: Column(
                 children: [
@@ -339,6 +312,138 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
           ],
         ],
       ),
+    );
+  }
+
+  // ---- #6 Bãi đáp drone trên nóc tủ: hiển thị + đổi trạng thái bảo trì ----
+  Widget _landingPadCard() {
+    const purple = Color(0xFF7C3AED);
+    final status = _layout?['landingPadStatus']?.toString() ?? 'OK';
+    final color = _landingPadColor(status);
+    return Container(
+      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: purple.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.flight_land, color: purple, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Bãi đáp drone trên nóc · marker ${_layout?['landingMarkerId'] ?? ''}',
+                  style: const TextStyle(fontSize: 12, color: purple),
+                ),
+              ),
+              _MiniPill(
+                icon: Icons.circle,
+                text: _landingPadLabel(status),
+                color: color,
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _landingPadStatusFlow,
+              icon: const Icon(Icons.build_outlined, size: 16, color: purple),
+              label: const Text('Cập nhật bãi đáp',
+                  style: TextStyle(color: purple)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _landingPadLabel(String status) => switch (status) {
+        'FAULT' => 'Lỗi',
+        'MAINTENANCE' => 'Đang bảo trì',
+        _ => 'Hoạt động',
+      };
+
+  Color _landingPadColor(String status) => switch (status) {
+        'FAULT' => const Color(0xFFDC2626),
+        'MAINTENANCE' => const Color(0xFFD97706),
+        _ => const Color(0xFF16A34A),
+      };
+
+  /// Dialog đổi trạng thái bãi đáp; bắt nhập lý do khi không phải OK.
+  Future<void> _landingPadStatusFlow() async {
+    final lockerId = _selectedLockerId;
+    if (lockerId == null) return;
+    final reasonCtrl = TextEditingController();
+    String selected = _layout?['landingPadStatus']?.toString() ?? 'OK';
+    const options = ['OK', 'MAINTENANCE', 'FAULT'];
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Trạng thái bãi đáp drone'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final s in options)
+                    ChoiceChip(
+                      label: Text(_landingPadLabel(s)),
+                      selected: selected == s,
+                      onSelected: (_) => setLocal(() => selected = s),
+                    ),
+                ],
+              ),
+              if (selected != 'OK') ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: reasonCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Lý do (khuyến nghị)',
+                    isDense: true,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: opsPrimary,
+                foregroundColor: Colors.white,
+                shape:
+                    RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => Navigator.pop(ctx, selected),
+              child: const Text('Lưu'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final reason = reasonCtrl.text.trim();
+    reasonCtrl.dispose();
+    if (result == null) return;
+    await _runCellAction(
+      () => _service.updateLandingPadStatus(
+        lockerId,
+        result,
+        reason: reason.isEmpty ? null : reason,
+      ),
+      'Đã cập nhật bãi đáp drone',
     );
   }
 
@@ -1140,7 +1245,12 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
   }
 
   Widget _scheduleCard(Map<String, dynamic> s, {required bool due}) {
-    final lockerLabel = s['lockerName'] ?? 'Tủ ${s['lockerId']}';
+    final isDrone = s['droneUnitId'] != null;
+    final lockerLabel = isDrone
+        ? 'Drone ${s['droneCode'] ?? s['droneUnitId']}'
+        : (s['lockerName'] ?? 'Tủ ${s['lockerId']}');
+    final targetIcon =
+        isDrone ? Icons.flight_takeoff : Icons.inventory_2_outlined;
     final nextDue = _fmtDate(s['nextDueAt']);
     final lastDone = _fmtDate(s['lastDoneAt']);
     final id = _asInt(s['id']);
@@ -1175,7 +1285,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
               spacing: 8,
               runSpacing: 6,
               children: [
-                _MiniPill(icon: Icons.inventory_2_outlined, text: '$lockerLabel'),
+                _MiniPill(icon: targetIcon, text: '$lockerLabel'),
                 _MiniPill(
                   icon: Icons.repeat,
                   text: 'Mỗi ${s['intervalDays']} ngày',
@@ -1390,6 +1500,16 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
                     () => _runCellAction(
                       () => _service.claimDrone(droneId),
                       'Đã nhận phụ trách drone',
+                    ),
+                  ),
+                if (assignedToMe)
+                  tile(
+                    Icons.assignment_return_outlined,
+                    'Nhả phụ trách',
+                    const Color(0xFF6B7280),
+                    () => _runCellAction(
+                      () => _service.releaseDrone(droneId),
+                      'Đã nhả phụ trách drone',
                     ),
                   ),
                 tile(
