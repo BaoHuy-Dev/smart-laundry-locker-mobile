@@ -286,6 +286,10 @@ class LockerOpsService {
   Future<Map<String, dynamic>> claimDrone(int id) =>
       _map('POST', '/api/maintenance/drones/$id/claim');
 
+  /// KTV nhả quyền phụ trách một drone (bàn giao ca).
+  Future<Map<String, dynamic>> releaseDrone(int id) =>
+      _map('POST', '/api/maintenance/drones/$id/release');
+
   /// Đổi trạng thái drone (IDLE/CHARGING/IN_FLIGHT/MAINTENANCE/FAULT).
   /// [reason] bắt buộc khi chuyển sang FAULT.
   Future<Map<String, dynamic>> updateDroneStatus(
@@ -312,6 +316,18 @@ class LockerOpsService {
 
   Future<Map<String, dynamic>> addDroneLog(int id, String note) =>
       _map('POST', '/api/maintenance/drones/$id/logs', body: {'note': note});
+
+  /// #6 KTV cập nhật trạng thái bảo trì bãi đáp drone của 1 tủ.
+  /// [status] = OK / FAULT / MAINTENANCE.
+  Future<Map<String, dynamic>> updateLandingPadStatus(
+    int lockerId,
+    String status, {
+    String? reason,
+  }) => _map(
+    'POST',
+    '/api/maintenance/lockers/$lockerId/landing-pad',
+    body: {'status': status, if (reason != null) 'reason': reason},
+  );
 
   // ── STAFF ──────────────────────────────────────────────────────────────────
 
@@ -413,6 +429,36 @@ class LockerOpsService {
   Future<List<Map<String, dynamic>>> adminDrones({String? status}) =>
       _list('/api/admin/drones',
           query: status != null ? {'status': status} : null);
+
+  /// #4 Thêm drone mới gắn vào 1 tủ làm trạm gốc.
+  Future<Map<String, dynamic>> adminCreateDrone(int lockerId, String code) =>
+      _map('POST', '/api/admin/lockers/drones',
+          body: {'lockerId': lockerId, 'code': code});
+
+  /// #4 Sửa drone: đổi tủ gốc và/hoặc đổi mã (trường null = giữ nguyên).
+  Future<Map<String, dynamic>> adminUpdateDrone(
+    int id, {
+    int? lockerId,
+    String? code,
+  }) => _map('PUT', '/api/admin/drones/$id', body: {
+        if (lockerId != null) 'lockerId': lockerId,
+        if (code != null) 'code': code,
+      });
+
+  /// #4 Ngừng hoạt động (decommission) một drone.
+  Future<void> adminDecommissionDrone(int id) async =>
+      _map('DELETE', '/api/admin/drones/$id');
+
+  /// #3 Tạo lịch bảo trì định kỳ cho 1 drone.
+  Future<Map<String, dynamic>> adminCreateDroneSchedule(
+    int droneUnitId,
+    String title,
+    int intervalDays,
+  ) => _map('POST', '/api/admin/lockers/schedules', body: {
+        'droneUnitId': droneUnitId,
+        'title': title,
+        'intervalDays': intervalDays,
+      });
 
   /// Human-readable message from an [ApiResponse] error payload.
   static String errorMessage(Object error) {
