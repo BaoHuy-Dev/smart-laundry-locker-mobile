@@ -25,6 +25,7 @@ class _FlightDataPageState extends State<FlightDataPage> {
   final FlightDataController _controller = FlightDataController();
   final MapController _map = MapController();
   LatLng? _lastCentered;
+  bool _mapReady = false;
 
   @override
   void initState() {
@@ -40,6 +41,7 @@ class _FlightDataPageState extends State<FlightDataPage> {
   }
 
   void _follow() {
+    if (!_mapReady) return; // MapController unusable until the map has rendered
     final pos = _controller.telemetry.position;
     if (pos == null) return;
     if (_lastCentered == null ||
@@ -181,9 +183,10 @@ class _FlightDataPageState extends State<FlightDataPage> {
             children: [
               FlutterMap(
                 mapController: _map,
-                options: const MapOptions(
-                  initialCenter: LatLng(10.762622, 106.660172),
+                options: MapOptions(
+                  initialCenter: const LatLng(10.762622, 106.660172),
                   initialZoom: 17,
+                  onMapReady: () => _mapReady = true,
                 ),
                 children: [
                   TileLayer(
