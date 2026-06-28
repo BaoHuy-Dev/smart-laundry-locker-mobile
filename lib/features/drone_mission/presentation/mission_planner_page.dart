@@ -33,6 +33,7 @@ class _MissionPlannerPageState extends State<MissionPlannerPage> {
   /// moves it instead of adding a new point.
   int? _moveIndex;
   bool _located = false;
+  bool _mapReady = false;
 
   @override
   void initState() {
@@ -63,7 +64,9 @@ class _MissionPlannerPageState extends State<MissionPlannerPage> {
         }
         _located = true;
       });
-      _map.move(me, 16);
+      // If the map has not rendered yet, MapOptions.initialCenter (= home) will
+      // already centre on `me`; otherwise recentre now.
+      if (_mapReady) _map.move(me, 16);
     } catch (_) {
       // Best-effort: planner still works centred on the default location.
     }
@@ -555,6 +558,7 @@ class _MissionPlannerPageState extends State<MissionPlannerPage> {
               initialCenter: _mission.home,
               initialZoom: 15,
               onTap: _onMapTap,
+              onMapReady: () => _mapReady = true,
             ),
             children: [
               TileLayer(
