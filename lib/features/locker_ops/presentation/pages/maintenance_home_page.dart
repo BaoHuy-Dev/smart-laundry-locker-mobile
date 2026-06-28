@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:smart_laundry_locker/core/routing/app_router.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
 import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/utils/locker_maps.dart';
@@ -1342,6 +1343,37 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
             icon: Icons.flight_outlined,
             text: 'Pin và trạng thái bay do kỹ thuật viên cập nhật tay — chưa '
                 'có telemetry thật từ drone.',
+          ),
+          const SizedBox(height: 12),
+          OpsCard(
+            onTap: () => context.push(AppRouter.droneMissionPlanner),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E5A8A).withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.map_outlined, color: Color(0xFF1E5A8A)),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Lập kế hoạch bay (Mission Planner)',
+                          style: TextStyle(fontWeight: FontWeight.w700)),
+                      SizedBox(height: 2),
+                      Text('Vẽ waypoint, đặt độ cao/lệnh, xuất file mission',
+                          style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           if (_drones.isEmpty)
