@@ -58,6 +58,7 @@ import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/send
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/rent_locker_page.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/my_locker_orders_page.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/my_reports_page.dart';
+import 'package:smart_laundry_locker/features/drone_mission/presentation/mission_planner_page.dart';
 import 'package:smart_laundry_locker/features/stores/domain/entities/store.dart';
 import 'package:smart_laundry_locker/features/stores/presentation/pages/stores_page.dart';
 import 'package:smart_laundry_locker/features/stores/presentation/pages/store_detail_page.dart';
@@ -114,6 +115,7 @@ class AppRouter {
   static const String storeDetail = '/stores/detail';
   static const String storeLockers = '/stores/lockers';
   static const String directions = '/directions';
+  static const String droneMissionPlanner = '/drone/mission-planner';
 
   static final GlobalKey<NavigatorState> navigatorKey =
       GlobalKey<NavigatorState>();
@@ -548,6 +550,11 @@ class AppRouter {
             subtitle: map['subtitle'] as String?,
           );
         },
+      ),
+      GoRoute(
+        path: droneMissionPlanner,
+        name: 'drone_mission_planner',
+        builder: (context, state) => const MissionPlannerPage(),
       ),
     ],
   );
