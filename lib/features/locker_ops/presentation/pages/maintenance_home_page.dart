@@ -1331,6 +1331,44 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
     return '${two(d.day)}/${two(d.month)}/${d.year}';
   }
 
+  // Entry card for a drone tool (Mission Planner / Flight Data).
+  Widget _droneToolCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return OpsCard(
+      onTap: onTap,
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E5A8A).withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: const Color(0xFF1E5A8A)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 2),
+                Text(subtitle,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
+        ],
+      ),
+    );
+  }
+
   // ---- Tab 5: đội drone (thiết bị bay vật lý, khác ô tủ cellType=DRONE) ----
   Widget _buildDroneFleet() {
     return RefreshIndicator(
@@ -1345,35 +1383,18 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
                 'có telemetry thật từ drone.',
           ),
           const SizedBox(height: 12),
-          OpsCard(
+          _droneToolCard(
+            icon: Icons.map_outlined,
+            title: 'Lập kế hoạch bay (Mission Planner)',
+            subtitle: 'Vẽ waypoint, đặt độ cao/lệnh, xuất file mission',
             onTap: () => context.push(AppRouter.droneMissionPlanner),
-            child: Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E5A8A).withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.map_outlined, color: Color(0xFF1E5A8A)),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Lập kế hoạch bay (Mission Planner)',
-                          style: TextStyle(fontWeight: FontWeight.w700)),
-                      SizedBox(height: 2),
-                      Text('Vẽ waypoint, đặt độ cao/lệnh, xuất file mission',
-                          style: TextStyle(fontSize: 12, color: Colors.grey)),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
-              ],
-            ),
+          ),
+          const SizedBox(height: 10),
+          _droneToolCard(
+            icon: Icons.flight_takeoff,
+            title: 'Telemetry & điều khiển (Flight Data)',
+            subtitle: 'Kết nối MAVLink, xem vị trí/HUD live, gửi lệnh bay',
+            onTap: () => context.push(AppRouter.droneFlightData),
           ),
           const SizedBox(height: 12),
           if (_drones.isEmpty)
