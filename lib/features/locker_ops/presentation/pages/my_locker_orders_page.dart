@@ -111,41 +111,6 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
     }
   }
 
-  /// Mô phỏng mở tủ qua IoT (xem `LockerOpsService.unlock`): chờ tới ~20s nếu
-  /// thiết bị/simulator không phản hồi, nên hiện snackbar "đang mở" trước.
-  Future<void> _unlock(int lockerId, int boxId, String pinCode) async {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        duration: Duration(seconds: 30),
-        content: Row(
-          children: [
-            SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.white,
-              ),
-            ),
-            SizedBox(width: 12),
-            Text('Đang mở tủ...'),
-          ],
-        ),
-      ),
-    );
-    try {
-      final result = await _service.unlock(lockerId, boxId, pinCode);
-      final accepted = result['accepted'] == true;
-      _snack(
-        accepted
-            ? 'Đã mở tủ — bạn có thể lấy/bỏ đồ.'
-            : (result['message']?.toString() ?? 'Không mở được tủ, vui lòng thử lại.'),
-      );
-    } catch (e) {
-      _snack(LockerOpsService.errorMessage(e));
-    }
-  }
 
   Future<void> _delegateDialog(int orderId) async {
     final phoneCtrl = TextEditingController();
@@ -399,10 +364,6 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
           child: _DetailSheet(
             order: order,
-            onUnlock: (lockerId, boxId, pinCode) async {
-              Navigator.pop(ctx);
-              await _unlock(lockerId, boxId, pinCode);
-            },
             onReorder: (id) async {
               Navigator.pop(ctx);
               await _runAction(
@@ -904,7 +865,6 @@ double? _asDouble(dynamic value) {
 class _DetailSheet extends StatelessWidget {
   const _DetailSheet({
     required this.order,
-    required this.onUnlock,
     required this.onReorder,
     required this.onConfirmDrop,
     required this.onComplete,
@@ -918,7 +878,6 @@ class _DetailSheet extends StatelessWidget {
   });
 
   final Map<String, dynamic> order;
-  final void Function(int lockerId, int boxId, String pinCode) onUnlock;
   final void Function(int orderId) onReorder;
   final void Function(int orderId) onConfirmDrop;
   final void Function(int orderId) onComplete;
@@ -946,12 +905,6 @@ class _DetailSheet extends StatelessWidget {
         extraFee != null &&
         (extraFee is num ? extraFee > 0 : num.tryParse('$extraFee') != null);
 
-    final pinCode = order['pinCode'] as String?;
-    final canUnlock =
-        boxId != null &&
-        pinCode != null &&
-        status != 'COMPLETED' &&
-        status != 'CANCELED';
 
     final paymentStatus =
         (order['paymentStatus'] as String? ?? 'UNPAID').toUpperCase();
@@ -967,17 +920,6 @@ class _DetailSheet extends StatelessWidget {
           icon: LucideIcons.creditCard,
           primary: true,
           onTap: () => onPay(id),
-        ),
-      if (canUnlock)
-        OpsSheetAction(
-          label: 'Mở tủ',
-          icon: LucideIcons.lockOpen,
-          primary: true,
-          onTap: () => onUnlock(
-            (order['lockerId'] as num).toInt(),
-            boxId,
-            pinCode,
-          ),
         ),
       if (status == 'COMPLETED' || status == 'CANCELED')
         OpsSheetAction(
