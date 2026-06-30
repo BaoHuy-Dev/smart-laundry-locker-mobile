@@ -54,7 +54,9 @@ class _NotificationListPageState extends State<NotificationListPage> {
     if (payload == null) return;
 
     switch (payload.actionType) {
+      // Noti đơn hàng + noti trạng thái giao hàng (drone) -> mở chi tiết đơn.
       case 'OPEN_ORDER_DETAIL':
+      case 'ORDER_STATUS_CHANGED':
         if (payload.referenceId != null) {
           context.push(AppRouter.orderDetail, extra: payload.referenceId);
         }
@@ -380,6 +382,8 @@ class _NotificationListPageState extends State<NotificationListPage> {
     switch (actionType) {
       case 'OPEN_ORDER_DETAIL':
         return LucideIcons.package;
+      case 'ORDER_STATUS_CHANGED':
+        return LucideIcons.truck; // trạng thái giao hàng (drone)
       case 'OPEN_PROMOTION_TAB':
         return LucideIcons.tag;
       default:

@@ -7,10 +7,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
+import 'package:smart_laundry_locker/features/notifications/domain/entities/delivery_notification.dart';
 import 'package:go_router/go_router.dart';
 
 /// Top-level background message handler
@@ -36,6 +38,10 @@ class FirebaseMessagingService {
 
   bool _initialized = false;
 
+  /// Lưu lại ApiClient (sau khi đăng nhập) để có thể tự đăng ký lại token khi
+  /// FCM xoay vòng token (onTokenRefresh) mà không cần truyền lại từ UI.
+  ApiClient? _apiClient;
+
   Future<void> init() async {
     if (_initialized) return;
 
@@ -57,8 +63,19 @@ class FirebaseMessagingService {
     await _localNotificationsPlugin.initialize(
       settings: initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
-        // Handle notification tap
+        // Bấm vào banner local (lúc app foreground): parse JSON payload rồi
+        // deep-link như khi bấm noti hệ thống.
         debugPrint('Notification tapped: ${response.payload}');
+        final raw = response.payload;
+        if (raw == null || raw.isEmpty) return;
+        try {
+          final data = jsonDecode(raw);
+          if (data is Map) {
+            _handleTapData(Map<String, dynamic>.from(data));
+          }
+        } catch (e) {
+          debugPrint('Cannot parse notification payload: $e');
+        }
       },
     );
 
@@ -119,6 +136,10 @@ class FirebaseMessagingService {
       _handleMessageOpenedApp(initialMessage);
     }
 
+    // 7. Xử lý token bị xoay vòng (refresh): đăng ký lại token mới lên backend
+    //    để thiết bị không bị "mất" khỏi danh sách nhận noti.
+    _firebaseMessaging.onTokenRefresh.listen(_onTokenRefresh);
+
     _initialized = true;
   }
 
@@ -134,12 +155,31 @@ class FirebaseMessagingService {
     }
   }
 
-  /// Sync device token to backend using general API client
+  /// Sync device token to backend using general API client.
+  /// Lưu lại [apiClient] để dùng cho onTokenRefresh về sau.
   Future<void> updateBackendDeviceToken(ApiClient apiClient) async {
-    try {
-      final token = await getToken();
-      if (token == null) return;
+    _apiClient = apiClient;
+    final token = await getToken();
+    if (token != null) {
+      await _registerToken(token);
+    }
+  }
 
+  /// Khi FCM xoay vòng token: đăng ký lại token mới (nếu đã có ApiClient sau
+  /// đăng nhập).
+  void _onTokenRefresh(String token) {
+    debugPrint("FCM token refreshed");
+    if (_apiClient != null) {
+      unawaited(_registerToken(token));
+    }
+  }
+
+  /// Gửi token (kèm deviceType/deviceId ổn định) lên backend để đăng ký nhận
+  /// noti cho user hiện tại (backend lấy userId từ JWT).
+  Future<void> _registerToken(String token) async {
+    final apiClient = _apiClient;
+    if (apiClient == null) return;
+    try {
       final prefs = await SharedPreferences.getInstance();
       String? deviceId = prefs.getString('aisl_app_device_id');
       if (deviceId == null) {
@@ -175,6 +215,7 @@ class FirebaseMessagingService {
     }
 
     final type = message.data['type'];
+    final delivery = DeliveryNotification.fromData(message.data);
 
     // Push to stream so listeners (like NotificationProvider) can refresh
     _messageStreamController.add(message);
@@ -185,8 +226,9 @@ class FirebaseMessagingService {
 
     if (type == 'dispatch_order') {
       _showIncomingOrderDialog(message.data);
-    } else {
-      // General notification fallback -> Snack bar
+    } else if (delivery == null) {
+      // Noti giao hàng đã hiển thị banner local ở trên rồi -> không toast trùng.
+      // Các noti khác: fallback toast tiêu đề.
       final title =
           message.notification?.title ??
           message.data['title'] as String? ??
@@ -196,16 +238,21 @@ class FirebaseMessagingService {
   }
 
   Future<void> _showLocalNotification(RemoteMessage message) async {
+    // Với noti giao hàng (data-only), lấy title/body theo status nếu thiếu.
+    final delivery = DeliveryNotification.fromData(message.data);
+
     // Prefer the FCM notification object; fall back to data fields
     // (data-only messages from the backend will not have a notification object)
     final title =
         message.notification?.title ??
         message.data['title'] as String? ??
+        delivery?.displayTitle ??
         'Thông báo';
     final body =
         message.notification?.body ??
         message.data['content'] as String? ??
         message.data['body'] as String? ??
+        delivery?.displayBody ??
         '';
 
     if (title.isEmpty && body.isEmpty) return;
@@ -240,19 +287,34 @@ class FirebaseMessagingService {
       title: title,
       body: body,
       notificationDetails: platformDetails,
-      payload: message.data.toString(),
+      // Payload dạng JSON để khi bấm vào banner foreground có thể parse lại
+      // data (orderId/status...) và deep-link đúng màn.
+      payload: jsonEncode(message.data),
     );
   }
 
   void _handleMessageOpenedApp(RemoteMessage message) {
     debugPrint("Message opened app: ${message.data}");
-    final type = message.data['type'];
+    _handleTapData(message.data);
+  }
+
+  /// Điều hướng khi người dùng bấm vào noti (background/terminated qua
+  /// onMessageOpenedApp/getInitialMessage, hoặc foreground qua local-notif).
+  ///
+  /// Ưu tiên: noti giao hàng (có `orderId`) -> mở thẳng chi tiết đơn; đơn giao
+  /// việc courier -> màn giao hàng; còn lại -> màn Thông báo.
+  void _handleTapData(Map<String, dynamic> data) {
+    final delivery = DeliveryNotification.fromData(data);
+    final type = data['type'];
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final context = AppRouter.navigatorKey.currentContext;
       if (context == null) return;
 
-      if (type == 'dispatch_order') {
+      if (delivery != null) {
+        // Deep-link tới chi tiết đơn theo orderId (route nhận String orderId).
+        context.push(AppRouter.orderDetail, extra: delivery.orderId);
+      } else if (type == 'dispatch_order') {
         context.go(AppRouter.activeDelivery);
       } else {
         context.go(AppRouter.notifications);
