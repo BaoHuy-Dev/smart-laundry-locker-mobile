@@ -643,8 +643,7 @@ class _CellGrid extends StatelessWidget {
                         child: cell != null
                             ? _CellTile(
                                 cell: cell,
-                                onTap: cell['status'] == 'AVAILABLE' &&
-                                        cell['cellType'] != 'DRONE'
+                                onTap: cell['status'] == 'AVAILABLE'
                                     ? () => onCellTap(cell)
                                     : null,
                               )

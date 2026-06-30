@@ -383,6 +383,7 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
   void _openDetail(Map<String, dynamic> order) {
     showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.white,
       showDragHandle: true,
