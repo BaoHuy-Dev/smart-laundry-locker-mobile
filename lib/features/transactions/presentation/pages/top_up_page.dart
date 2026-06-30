@@ -347,6 +347,7 @@ class TopUpWebViewPage extends StatefulWidget {
 class _TopUpWebViewPageState extends State<TopUpWebViewPage> {
   late final WebViewController _controller;
   bool _isLoading = true;
+  bool _popped = false;
 
   @override
   void initState() {
@@ -355,12 +356,23 @@ class _TopUpWebViewPageState extends State<TopUpWebViewPage> {
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageFinished: (url) async {
-            setState(() => _isLoading = false);
-            if (url.contains('/payments/vnpay/callback')) {
-              await Future<void>.delayed(const Duration(milliseconds: 600));
-              if (mounted) Navigator.of(context).pop(true);
+          onPageStarted: (_) => setState(() => _isLoading = true),
+          onPageFinished: (_) => setState(() => _isLoading = false),
+          onNavigationRequest: (request) {
+            final url = request.url;
+            if ((url.contains('/payments/vnpay/callback') ||
+                    url.contains('/payments/vnpay/return')) &&
+                !_popped) {
+              _popped = true;
+              final uri = Uri.tryParse(url);
+              final isSuccess =
+                  uri?.queryParameters['vnp_ResponseCode'] == '00';
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) Navigator.of(context).pop(isSuccess);
+              });
+              return NavigationDecision.prevent;
             }
+            return NavigationDecision.navigate;
           },
         ),
       )
