@@ -274,6 +274,14 @@ class LockerOpsService {
   Future<Map<String, dynamic>> myRatingAverage() =>
       _map('GET', '/api/maintenance/my-rating-average');
 
+  /// Box-health cho bảo trì: trạng thái logic (theo đơn) đặt cạnh trạng thái
+  /// phần cứng cửa cabinet báo lên (GAP 2). Mỗi phần tử:
+  /// `{boxId, boxNumber, cellType, logicalStatus, hwState, lastReportedAt,
+  /// doorOpen, needsAttention}`. `needsAttention` = cửa đang mở nhưng ô không
+  /// `OCCUPIED` (nghi cửa kẹt/quên đóng).
+  Future<List<Map<String, dynamic>>> boxHealth(int lockerId) =>
+      _list('/api/maintenance/lockers/$lockerId/box-health');
+
   // ---- Drone fleet (maintenance) ----
   // Pin/trạng thái bay hiện chưa có telemetry thật, KTV nhập tay qua các
   // endpoint dưới đây (xem locker-service V10__drone_units.sql).

@@ -36,6 +36,8 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
   int? _selectedLockerId;
   Map<String, dynamic>? _layout;
   bool _layoutLoading = false;
+  // Box-health (GAP 2): trạng thái phần cứng cửa từ iot-service cho tủ đang chọn.
+  List<Map<String, dynamic>> _boxHealth = [];
 
   List<Map<String, dynamic>> get _lockerOptions => _lockers
       .where((locker) => _asInt(locker['id']) != null)
@@ -113,11 +115,19 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
     setState(() {
       _selectedLockerId = lockerId;
       _layoutLoading = true;
+      _boxHealth = [];
     });
     try {
       final layout = await _service.layout(lockerId);
       if (!mounted) return;
       setState(() => _layout = layout);
+      // Box-health phần cứng (GAP 2) — best-effort, không vỡ trang nếu BE chưa deploy.
+      try {
+        final health = await _service.boxHealth(lockerId);
+        if (mounted && _selectedLockerId == lockerId) {
+          setState(() => _boxHealth = health);
+        }
+      } catch (_) {}
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -310,7 +320,149 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
                 ],
               ),
             ),
+            const SizedBox(height: 12),
+            _boxHealthCard(),
           ],
+        ],
+      ),
+    );
+  }
+
+  /// Box-health (GAP 2): trạng thái phần cứng cửa (cabinet báo qua IoT) đặt cạnh
+  /// trạng thái logic theo đơn; nổi bật ô "cần chú ý" (cửa mở trên ô không có đồ).
+  Widget _boxHealthCard() {
+    final health = _boxHealth;
+    final attention =
+        health.where((b) => b['needsAttention'] == true).toList();
+    return OpsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.sensor_door_outlined, size: 18, color: opsPrimary),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Tình trạng phần cứng ô',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                ),
+              ),
+              if (attention.isNotEmpty)
+                _MiniPill(
+                  icon: Icons.warning_amber_rounded,
+                  text: '${attention.length} cần chú ý',
+                  color: const Color(0xFFDC2626),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (health.isEmpty)
+            const OpsBanner(
+              tone: OpsBannerTone.info,
+              icon: Icons.info_outline,
+              text:
+                  'Chưa có dữ liệu cảm biến cửa cho tủ này (cabinet chưa báo hoặc dịch vụ IoT chưa bật).',
+            )
+          else ...[
+            if (attention.isNotEmpty) ...[
+              OpsBanner(
+                tone: OpsBannerTone.danger,
+                icon: Icons.error_outline,
+                text:
+                    '${attention.length} ô có cửa đang MỞ nhưng không ở trạng thái "có đồ" — nên kiểm tra (cửa kẹt/quên đóng).',
+              ),
+              const SizedBox(height: 10),
+            ],
+            for (final b in health) _boxHealthRow(b),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _boxHealthRow(Map<String, dynamic> b) {
+    final boxNumber = b['boxNumber'];
+    final logical = b['logicalStatus']?.toString();
+    final hw = b['hwState']?.toString();
+    final doorOpen = b['doorOpen'] == true;
+    final needsAttention = b['needsAttention'] == true;
+    final reported = b['lastReportedAt'];
+    final Color accent = needsAttention
+        ? const Color(0xFFDC2626)
+        : hw == null
+            ? const Color(0xFF6B7280)
+            : doorOpen
+                ? const Color(0xFFD97706)
+                : const Color(0xFF16A34A);
+    final String doorText = hw == null
+        ? 'Chưa có tín hiệu cửa'
+        : doorOpen
+            ? 'Cửa đang MỞ'
+            : 'Cửa đóng';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: needsAttention ? accent.withValues(alpha: 0.06) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: needsAttention
+              ? accent.withValues(alpha: 0.35)
+              : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '${boxNumber ?? '?'}',
+              style: TextStyle(fontWeight: FontWeight.w800, color: accent),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      doorOpen ? Icons.sensor_door : Icons.meeting_room_outlined,
+                      size: 15,
+                      color: accent,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      doorText,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: accent,
+                      ),
+                    ),
+                  ],
+                ),
+                if (reported != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      'Báo lúc ${fmtDateTime(reported)}',
+                      style: const TextStyle(fontSize: 11, color: opsMutedText),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          StatusChip(logical),
         ],
       ),
     );
