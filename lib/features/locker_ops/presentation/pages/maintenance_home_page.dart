@@ -27,6 +27,8 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
   List<Map<String, dynamic>> _myReports = [];
   List<Map<String, dynamic>> _schedules = [];
   List<Map<String, dynamic>> _drones = [];
+  // Cảnh báo phần cứng toàn cục (GAP 2): ô cửa-mở-bất-thường trên mọi tủ.
+  List<Map<String, dynamic>> _anomalies = [];
   bool _loading = true;
   String? _myUserId;
   Map<String, dynamic>? _ratingAverage;
@@ -86,6 +88,11 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
       try {
         final drones = await _service.droneUnits();
         if (mounted) setState(() => _drones = drones);
+      } catch (_) {}
+      // Cảnh báo phần cứng toàn cục (GAP 2) — best-effort, không vỡ trang nếu BE/IoT chưa có.
+      try {
+        final anomalies = await _service.boxAnomalies();
+        if (mounted) setState(() => _anomalies = anomalies);
       } catch (_) {}
       final validSelected = lockers.any(
         (locker) => _asInt(locker['id']) == _selectedLockerId,
@@ -1165,6 +1172,89 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
     if (mounted) await _load();
   }
 
+  /// Cảnh báo phần cứng toàn cục (GAP 2): mọi ô cửa-mở-bất-thường trên tất cả
+  /// tủ, để KTV thấy ngay ở đầu tab Sự cố mà không phải chọn từng tủ. Ẩn khi
+  /// không có ô nào bất thường.
+  Widget _boxAnomaliesSection() {
+    final anomalies = _anomalies;
+    if (anomalies.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const OpsSectionLabel(
+          'Cảnh báo phần cứng (cửa mở bất thường)',
+          icon: Icons.sensor_door_outlined,
+        ),
+        OpsBanner(
+          tone: OpsBannerTone.danger,
+          icon: Icons.error_outline,
+          text:
+              '${anomalies.length} ô có cửa đang MỞ nhưng không có đồ — nên kiểm tra (cửa kẹt/quên đóng).',
+        ),
+        const SizedBox(height: 10),
+        for (final a in anomalies)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: OpsCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.sensor_door, color: Color(0xFFD97706)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${a['lockerName'] ?? 'Tủ ${a['lockerId']}'} · Ô #${a['boxNumber']} (${a['cellType']})',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      StatusChip(a['logicalStatus']?.toString()),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded,
+                          size: 15, color: Color(0xFFD97706)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          a['lastReportedAt'] != null
+                              ? 'Cửa MỞ · báo lúc ${fmtDateTime(a['lastReportedAt'])}'
+                              : 'Cửa MỞ',
+                          style: const TextStyle(
+                              fontSize: 12.5, color: opsMutedText),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (a['lockerLatitude'] != null ||
+                      a['lockerAddress'] != null) ...[
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: () => _openDirections(a),
+                        icon: const Icon(Icons.directions_outlined,
+                            size: 16, color: opsPrimary),
+                        label: const Text('Chỉ đường',
+                            style: TextStyle(color: opsPrimary)),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
   Widget _buildQueue() {
     return RefreshIndicator(
       onRefresh: _load,
@@ -1173,6 +1263,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
         children: [
           _buildShiftSummary(),
           const SizedBox(height: 16),
+          _boxAnomaliesSection(),
           if (_faults.isNotEmpty) ...[
             const OpsSectionLabel('Ô đang lỗi vật lý', icon: Icons.warning_amber_rounded),
             for (final f in _faults)
