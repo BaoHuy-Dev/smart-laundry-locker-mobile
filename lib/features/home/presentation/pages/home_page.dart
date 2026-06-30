@@ -164,160 +164,244 @@ class _HomePageState extends ConsumerState<HomePage>
     final name = (profile?.fullName.trim().isNotEmpty ?? false)
         ? profile!.fullName
         : 'Người dùng';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Theme-adaptive colours
+    final bgGradient = isDark
+        ? const [Color(0xFF061A30), Color(0xFF0A2845), Color(0xFF0D3055)]
+        : const [Color(0xFFFFFFFF), Color(0xFFEBF5FF), Color(0xFFCBE8F5)];
+    final textColor = isDark ? const Color(0xFFF1F5F9) : AislBrand.navy;
+    final subColor = isDark
+        ? const Color(0xFF94A3B8)
+        : AislBrand.navy.withValues(alpha: 0.65);
+    final circleA = isDark
+        ? Colors.white.withValues(alpha: 0.04)
+        : AislBrand.cyan.withValues(alpha: 0.18);
+    final circleB = isDark
+        ? Colors.white.withValues(alpha: 0.03)
+        : AislBrand.navy.withValues(alpha: 0.06);
+    final accentDot = isDark ? const Color(0xFF38BDF8) : AislBrand.cyan;
+    final cardBg = isDark
+        ? Colors.white.withValues(alpha: 0.07)
+        : AislBrand.navy.withValues(alpha: 0.06);
+    final cardBorder = isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : AislBrand.navy.withValues(alpha: 0.10);
+    final walletIconBg = isDark
+        ? const Color(0xFF38BDF8).withValues(alpha: 0.15)
+        : AislBrand.cyan.withValues(alpha: 0.20);
+    final walletIconColor = isDark ? const Color(0xFF38BDF8) : AislBrand.navy;
+    final walletLabelColor = isDark
+        ? const Color(0xFF94A3B8)
+        : AislBrand.navy.withValues(alpha: 0.60);
+    final btnBg = isDark ? const Color(0xFF38BDF8) : AislBrand.navy;
+    final btnText = isDark ? const Color(0xFF061A30) : Colors.white;
+    final shadowColor =
+        isDark ? Colors.black.withValues(alpha: 0.4) : const Color(0x1A000000);
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: AislBrand.softHeaderGradient,
+          colors: bgGradient,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
         boxShadow: [
-          BoxShadow(
-            color: Color(0x1A000000),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
+          BoxShadow(color: shadowColor, blurRadius: 12, offset: const Offset(0, 4)),
         ],
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // ── Row 1: Avatar / name / bell ──────────────────────────
-              Row(
-                children: [
-                  BrandAvatar(
-                    imageUrl: profile?.avatarUrl,
-                    name: name,
-                    size: 48,
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Hi $name!',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: AislBrand.navy,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _greeting(),
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: AislBrand.navy.withValues(alpha: 0.75),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  _buildBell(context),
-                ],
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
+        child: Stack(
+          children: [
+            // ── Decorative circles (background) ──────────────────────────
+            Positioned(
+              top: -40,
+              right: -40,
+              child: Container(
+                width: 160,
+                height: 160,
+                decoration: BoxDecoration(color: circleA, shape: BoxShape.circle),
               ),
-              // ── Row 2: Số dư ví (tạm ẩn — backend chưa có wallet service) ──
-              if (FeatureFlags.walletEnabled) const SizedBox(height: 16),
-              if (FeatureFlags.walletEnabled)
-                Consumer<WalletProvider>(
-                builder: (context, wallet, _) => GestureDetector(
-                  onTap: () async {
-                    await context.push(AppRouter.topUp);
-                    if (context.mounted) wallet.getWalletBalance();
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AislBrand.navy.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: AislBrand.navy.withValues(alpha: 0.12),
-                      ),
-                    ),
-                    child: Row(
+            ),
+            Positioned(
+              top: 20,
+              right: 60,
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(color: circleB, shape: BoxShape.circle),
+              ),
+            ),
+            Positioned(
+              bottom: -30,
+              left: -20,
+              child: Container(
+                width: 110,
+                height: 110,
+                decoration: BoxDecoration(color: circleB, shape: BoxShape.circle),
+              ),
+            ),
+            // ── Content ───────────────────────────────────────────────────
+            SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 22),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Row 1: Avatar / greeting / bell
+                    Row(
                       children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: AislBrand.navy.withValues(alpha: 0.10),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            LucideIcons.wallet,
-                            color: AislBrand.navy,
-                            size: 18,
-                          ),
+                        BrandAvatar(
+                          imageUrl: profile?.avatarUrl,
+                          name: name,
+                          size: 48,
                         ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Số dư ví',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AislBrand.navy.withValues(alpha: 0.65),
-                                fontWeight: FontWeight.w500,
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Hi $name!',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  color: textColor,
+                                ),
                               ),
-                            ),
-                            Text(
-                              CurrencyFormatter.formatVnd(wallet.balance),
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: AislBrand.navy,
+                              const SizedBox(height: 3),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: accentDot,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    _greeting(),
+                                    style: TextStyle(fontSize: 13, color: subColor),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AislBrand.navy,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Text(
-                            'Nạp tiền',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            ],
                           ),
                         ),
+                        _buildBell(context, isDark: isDark),
                       ],
                     ),
-                  ),
+
+                    // Row 2: Wallet card
+                    if (FeatureFlags.walletEnabled) ...[
+                      const SizedBox(height: 16),
+                      Consumer<WalletProvider>(
+                        builder: (context, wallet, _) => GestureDetector(
+                          onTap: () async {
+                            await context.push(AppRouter.topUp);
+                            if (context.mounted) wallet.getWalletBalance();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: cardBg,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: cardBorder),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: walletIconBg,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    LucideIcons.wallet,
+                                    color: walletIconColor,
+                                    size: 18,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Số dư ví',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: walletLabelColor,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    Text(
+                                      CurrencyFormatter.formatVnd(wallet.balance),
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                        color: textColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: btnBg,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    'Nạp tiền',
+                                    style: TextStyle(
+                                      color: btnText,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
 
-  Widget _buildBell(BuildContext context) {
+  Widget _buildBell(BuildContext context, {bool isDark = false}) {
+    final bellBg = isDark
+        ? Colors.white.withValues(alpha: 0.10)
+        : Colors.white.withValues(alpha: 0.75);
+    final bellBorder = isDark
+        ? Colors.white.withValues(alpha: 0.15)
+        : AislBrand.navy.withValues(alpha: 0.10);
+    final bellIcon = isDark ? const Color(0xFFF1F5F9) : AislBrand.navy;
+
     return Consumer<NotificationProvider>(
       builder: (context, provider, _) {
         final count = provider.unreadCount;
@@ -328,14 +412,14 @@ class _HomePageState extends ConsumerState<HomePage>
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.7),
+              color: bellBg,
               shape: BoxShape.circle,
-              border: Border.all(color: AislBrand.navy.withValues(alpha: 0.1)),
+              border: Border.all(color: bellBorder),
             ),
             child: Stack(
               alignment: Alignment.center,
               children: [
-                const Icon(LucideIcons.bell, color: AislBrand.navy, size: 24),
+                Icon(LucideIcons.bell, color: bellIcon, size: 24),
                 if (count > 0)
                   Positioned(
                     top: 6,
