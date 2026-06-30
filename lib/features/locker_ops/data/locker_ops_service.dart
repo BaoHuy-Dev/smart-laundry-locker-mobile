@@ -282,6 +282,13 @@ class LockerOpsService {
   Future<List<Map<String, dynamic>>> boxHealth(int lockerId) =>
       _list('/api/maintenance/lockers/$lockerId/box-health');
 
+  /// Tổng quan ca trực: mọi ô trên TẤT CẢ tủ đang có cửa phần cứng MỞ nhưng
+  /// không `OCCUPIED` (nghi cửa kẹt/quên đóng). Mỗi phần tử kèm metadata locker
+  /// (`lockerName/lockerAddress/lockerLatitude/lockerLongitude` để chỉ đường) +
+  /// `boxId/boxNumber/cellType/logicalStatus/hwState/lastReportedAt`.
+  Future<List<Map<String, dynamic>>> boxAnomalies() =>
+      _list('/api/maintenance/box-anomalies');
+
   // ---- Drone fleet (maintenance) ----
   // Pin/trạng thái bay hiện chưa có telemetry thật, KTV nhập tay qua các
   // endpoint dưới đây (xem locker-service V10__drone_units.sql).
