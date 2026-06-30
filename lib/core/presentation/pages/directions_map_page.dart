@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -40,14 +41,75 @@ class _DirectionsMapPageState extends State<DirectionsMapPage> {
   bool _loading = true;
   String? _hint;
 
+  bool _isNavigating = false;
+  double? _remainingMeters;
+  StreamSubscription<Position>? _positionSub;
+
   @override
   void initState() {
     super.initState();
     _init();
   }
 
+  @override
+  void dispose() {
+    _positionSub?.cancel();
+    super.dispose();
+  }
+
   Future<void> _init() async {
     setState(() => _loading = true);
+    final me = await _currentLocation();
+    if (!mounted) return;
+    setState(() => _me = me);
+    if (me != null) {
+      await _fetchRoute(me, widget.destination);
+      _fitBounds(me, widget.destination);
+    } else {
+      setState(
+        () => _hint = 'Không lấy được vị trí của bạn — chỉ hiển thị tủ.',
+      );
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  void _startNavigation() {
+    if (_me == null) return;
+    setState(() {
+      _isNavigating = true;
+      _remainingMeters = _distanceMeters;
+    });
+    _mapController.move(_me!, 16);
+    _positionSub = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+      ),
+    ).listen((pos) {
+      if (!mounted) return;
+      final newMe = LatLng(pos.latitude, pos.longitude);
+      const calc = Distance();
+      final remaining = calc(newMe, widget.destination);
+      setState(() {
+        _me = newMe;
+        _remainingMeters = remaining;
+      });
+      _mapController.move(newMe, _mapController.camera.zoom.clamp(15.0, 18.0));
+    });
+  }
+
+  void _stopNavigation() {
+    _positionSub?.cancel();
+    _positionSub = null;
+    setState(() => _isNavigating = false);
+    if (_me != null) _fitBounds(_me!, widget.destination);
+  }
+
+  Future<void> _retryLocation() async {
+    setState(() {
+      _loading = true;
+      _hint = null;
+    });
     final me = await _currentLocation();
     if (!mounted) return;
     setState(() => _me = me);
@@ -313,6 +375,21 @@ class _DirectionsMapPageState extends State<DirectionsMapPage> {
               ),
             ),
 
+          // ── Re-center FAB ─────────────────────────────────────────────────
+          if (_me != null && !_isNavigating)
+            Positioned(
+              right: 14,
+              bottom: 220 + bottomPad,
+              child: _MapFab(
+                onTap: () => _mapController.move(_me!, 16),
+                child: const Icon(
+                  LucideIcons.locate,
+                  color: AISLShadcnTheme.navyPrimary,
+                  size: 20,
+                ),
+              ),
+            ),
+
           // ── Bottom info card ───────────────────────────────────────────────
           Align(
             alignment: Alignment.bottomCenter,
@@ -330,11 +407,11 @@ class _DirectionsMapPageState extends State<DirectionsMapPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.10),
+            color: Color(0x1A000000),
             blurRadius: 16,
-            offset: const Offset(0, 6),
+            offset: Offset(0, 6),
           ),
         ],
       ),
@@ -353,43 +430,106 @@ class _DirectionsMapPageState extends State<DirectionsMapPage> {
               style: const TextStyle(fontSize: 13, color: Colors.grey),
             ),
           ],
-          if (_distanceMeters != null && _durationSeconds != null) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(
-                  LucideIcons.route,
-                  size: 16,
-                  color: AISLShadcnTheme.navyAccent,
-                ),
-                const SizedBox(width: 6),
-                Text(
+          const SizedBox(height: 8),
+
+          // ── Route info / hint ────────────────────────────────────────────
+          if (_isNavigating && _remainingMeters != null)
+            _RouteInfoRow(
+              icon: LucideIcons.navigation,
+              iconColor: Colors.green,
+              text: _remainingMeters! >= 1000
+                  ? '${(_remainingMeters! / 1000).toStringAsFixed(1)} km còn lại'
+                  : '${_remainingMeters!.round()} m còn lại',
+            )
+          else if (_distanceMeters != null && _durationSeconds != null)
+            _RouteInfoRow(
+              icon: LucideIcons.route,
+              iconColor: AISLShadcnTheme.navyAccent,
+              text:
                   '${(_distanceMeters! / 1000).toStringAsFixed(1)} km'
                   '  ·  ~${(_durationSeconds! / 60).round()} phút',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+            )
+          else if (_hint != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                _hint!,
+                style: const TextStyle(fontSize: 12, color: Colors.orange),
+              ),
+            ),
+
+          const SizedBox(height: 12),
+
+          // ── Primary action button ────────────────────────────────────────
+          if (_isNavigating)
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _stopNavigation,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.red.shade400,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    icon: const Icon(Icons.stop_rounded, size: 18),
+                    label: const Text('Dừng dẫn đường'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _MapFab(
+                  onTap: () => _mapController.move(_me!, 16),
+                  child: const Icon(
+                    LucideIcons.locate,
+                    color: AISLShadcnTheme.navyPrimary,
+                    size: 20,
+                  ),
                 ),
               ],
+            )
+          else ...[
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _me != null ? _startNavigation : _retryLocation,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AISLShadcnTheme.navyPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                icon: Icon(
+                  _me != null
+                      ? LucideIcons.navigation
+                      : LucideIcons.locateFixed,
+                  size: 18,
+                ),
+                label: Text(
+                  _me != null ? 'Bắt đầu dẫn đường' : 'Lấy vị trí của bạn',
+                ),
+              ),
             ),
-          ] else if (_hint != null) ...[
-            const SizedBox(height: 6),
-            Text(
-              _hint!,
-              style: const TextStyle(fontSize: 12, color: Colors.orange),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _openExternal,
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: Colors.grey.shade300),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                ),
+                icon: Icon(
+                  Icons.open_in_new,
+                  size: 15,
+                  color: Colors.grey.shade500,
+                ),
+                label: Text(
+                  'Mở trên Google Maps',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
             ),
           ],
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: _openExternal,
-              style: FilledButton.styleFrom(
-                backgroundColor: AISLShadcnTheme.navyPrimary,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              icon: const Icon(LucideIcons.navigation, size: 18),
-              label: const Text('Mở dẫn đường trên Google Maps'),
-            ),
-          ),
         ],
       ),
     );
@@ -427,6 +567,29 @@ class _DirectionsMapPageState extends State<DirectionsMapPage> {
       points.add(LatLng(lat / 1e5, lng / 1e5));
     }
     return points;
+  }
+}
+
+class _RouteInfoRow extends StatelessWidget {
+  const _RouteInfoRow({
+    required this.icon,
+    required this.iconColor,
+    required this.text,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: iconColor),
+        const SizedBox(width: 6),
+        Text(text, style: const TextStyle(fontWeight: FontWeight.w600)),
+      ],
+    );
   }
 }
 
