@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
+import 'package:smart_laundry_locker/features/drone_delivery/data/drone_delivery_store.dart';
+import 'package:smart_laundry_locker/features/drone_delivery/domain/entities/drone_order.dart';
 import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/utils/locker_maps.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/locker_picker.dart';
@@ -1616,41 +1618,208 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
   Widget _buildDroneFleet() {
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(
-        padding: const EdgeInsets.all(12),
-        children: [
-          const OpsBanner(
-            tone: OpsBannerTone.info,
-            icon: Icons.flight_outlined,
-            text: 'Pin và trạng thái bay do kỹ thuật viên cập nhật tay — chưa '
-                'có telemetry thật từ drone.',
+      child: ListenableBuilder(
+        listenable: DroneDeliveryStore.instance,
+        builder: (context, _) {
+          final pending = DroneDeliveryStore.instance.pendingOrders;
+          return ListView(
+            padding: const EdgeInsets.all(12),
+            children: [
+              // ── Đơn hàng drone chờ điều phối ────────────────────────────
+              if (pending.isNotEmpty) ...[
+                OpsSectionLabel(
+                  'Chờ điều phối (${pending.length})',
+                  icon: Icons.inbox_rounded,
+                ),
+                const SizedBox(height: 8),
+                for (final order in pending) _pendingOrderCard(order),
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 8),
+              ],
+
+              const OpsBanner(
+                tone: OpsBannerTone.info,
+                icon: Icons.flight_outlined,
+                text: 'Pin và trạng thái bay do kỹ thuật viên cập nhật tay — '
+                    'chưa có telemetry thật từ drone.',
+              ),
+              const SizedBox(height: 12),
+              _droneToolCard(
+                icon: Icons.map_outlined,
+                title: 'Lập kế hoạch bay (Mission Planner)',
+                subtitle: 'Vẽ waypoint, đặt độ cao/lệnh, xuất file mission',
+                onTap: () => context.push(AppRouter.droneMissionPlanner),
+              ),
+              const SizedBox(height: 10),
+              _droneToolCard(
+                icon: Icons.flight_takeoff,
+                title: 'Telemetry & điều khiển (Flight Data)',
+                subtitle: 'Kết nối MAVLink, xem vị trí/HUD live, gửi lệnh bay',
+                onTap: () => context.push(AppRouter.droneFlightData),
+              ),
+              const SizedBox(height: 12),
+              if (_drones.isEmpty)
+                const OpsEmptyState(
+                  icon: Icons.flight_outlined,
+                  title: 'Chưa có drone nào',
+                  subtitle:
+                      'Đội drone sẽ hiện ở đây khi được thêm vào hệ thống.',
+                )
+              else
+                for (final d in _drones) _droneCard(d),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _pendingOrderCard(DroneOrder order) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFF6366F1).withValues(alpha: 0.35),
           ),
-          const SizedBox(height: 12),
-          _droneToolCard(
-            icon: Icons.map_outlined,
-            title: 'Lập kế hoạch bay (Mission Planner)',
-            subtitle: 'Vẽ waypoint, đặt độ cao/lệnh, xuất file mission',
-            onTap: () => context.push(AppRouter.droneMissionPlanner),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF6366F1).withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF2FF),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.flight,
+                    color: Color(0xFF6366F1),
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        order.lockerName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: opsDark,
+                        ),
+                      ),
+                      Text(
+                        'Ô #${order.boxNumber} · ${_formatTime(order.createdAt)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                FilledButton.icon(
+                  onPressed: () => _confirmDispatch(order),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF6366F1),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: const Icon(Icons.send_rounded, size: 15),
+                  label: const Text(
+                    'Điều phối',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+            if (order.description != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Hàng: ${order.description}',
+                style: const TextStyle(fontSize: 12, color: Colors.black54),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatTime(DateTime t) {
+    final now = DateTime.now();
+    final diff = now.difference(t);
+    if (diff.inMinutes < 1) return 'Vừa xong';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} phút trước';
+    return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _confirmDispatch(DroneOrder order) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.flight, color: Color(0xFF6366F1)),
+            SizedBox(width: 8),
+            Text('Điều phối drone'),
+          ],
+        ),
+        content: Text(
+          'Xác nhận điều phối drone tới ô #${order.boxNumber} '
+          'tại ${order.lockerName}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
           ),
-          const SizedBox(height: 10),
-          _droneToolCard(
-            icon: Icons.flight_takeoff,
-            title: 'Telemetry & điều khiển (Flight Data)',
-            subtitle: 'Kết nối MAVLink, xem vị trí/HUD live, gửi lệnh bay',
-            onTap: () => context.push(AppRouter.droneFlightData),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF6366F1),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Điều phối ngay'),
           ),
-          const SizedBox(height: 12),
-          if (_drones.isEmpty)
-            const OpsEmptyState(
-              icon: Icons.flight_outlined,
-              title: 'Chưa có drone nào',
-              subtitle: 'Đội drone sẽ hiện ở đây khi được thêm vào hệ thống.',
-            )
-          else
-            for (final d in _drones) _droneCard(d),
         ],
       ),
     );
+    if (ok == true) {
+      DroneDeliveryStore.instance.dispatch(order.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Drone đã được điều phối!'),
+            backgroundColor: Color(0xFF6366F1),
+          ),
+        );
+      }
+    }
   }
 
   Widget _droneCard(Map<String, dynamic> drone) {
