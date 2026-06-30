@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
@@ -7,6 +6,7 @@ import 'package:smart_laundry_locker/core/network/api_client.dart';
 import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:smart_laundry_locker/features/transactions/presentation/providers/transaction_injection.dart';
 import 'package:smart_laundry_locker/features/transactions/presentation/providers/transaction_provider.dart';
+import 'package:smart_laundry_locker/features/transactions/presentation/widgets/transaction_card.dart';
 import 'package:smart_laundry_locker/features/wallet/presentation/providers/wallet_provider.dart';
 import 'package:smart_laundry_locker/core/utils/currency_formatter.dart';
 
@@ -270,87 +270,10 @@ class _TransactionsSliverList extends StatelessWidget {
         return SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           sliver: SliverList(
-            delegate: SliverChildBuilderDelegate((context, index) {
-              final tx = transactions[index];
-              final isIncome = tx.type == 'TOP_UP' || tx.type == 'DEPOSIT';
-              final amountColor = isIncome
-                  ? const Color(0xFF2E7D32)
-                  : const Color(0xFFD32F2F);
-              final icon = isIncome
-                  ? Icons.south_west_rounded
-                  : Icons.north_east_rounded;
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade100, width: 1),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.02),
-                        blurRadius: 6,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.all(16),
-                    leading: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: const BoxDecoration(
-                        color: AISLShadcnTheme.navySurface,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(icon, color: amountColor, size: 22),
-                    ),
-                    title: Text(
-                      tx.description,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 17,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    subtitle: Text(
-                      DateFormat('dd/MM/yyyy HH:mm').format(tx.createdAt),
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                    trailing: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '${isIncome ? '+' : '-'}${NumberFormat.decimalPattern('vi_VN').format(tx.amount)}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: amountColor,
-                            fontSize: 17,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          NumberFormat.decimalPattern(
-                            'vi_VN',
-                          ).format(tx.balanceAfter),
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }, childCount: transactions.length),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => TransactionCard(transaction: transactions[index]),
+              childCount: transactions.length,
+            ),
           ),
         );
       },
