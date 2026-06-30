@@ -16,7 +16,6 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
 import 'package:smart_laundry_locker/core/services/courier_mode_provider.dart';
 import 'package:smart_laundry_locker/shared/widgets/unauthenticated_placeholder.dart';
-import 'customer/customer_order_detail_page.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
 import 'package:smart_laundry_locker/core/services/app_event_bus.dart';
@@ -1342,14 +1341,7 @@ class _OrderCard extends StatelessWidget {
     final isRental = order.isPersonalRental;
 
     return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          CupertinoPageRoute<dynamic>(
-            builder: (_) =>
-                CustomerOrderDetailPage(orderId: order.id, order: order),
-          ),
-        );
-      },
+      onTap: () => context.push(AppRouter.orderDetail, extra: order),
       child: Container(
         decoration: BoxDecoration(
           color: context.cardBg,
