@@ -111,4 +111,30 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     );
     return _extractData(response);
   }
+
+  @override
+  Future<void> sendPasswordResetOtp({required String email}) async {
+    await _apiClient.post<Map<String, dynamic>>(
+      '/api/auth/forgot-password',
+      data: {'email': email},
+    );
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    await _apiClient.post<Map<String, dynamic>>(
+      '/api/auth/reset-password',
+      data: {
+        'email': email,
+        'otp': otp,
+        'newPassword': newPassword,
+        'confirmPassword': confirmPassword,
+      },
+    );
+  }
 }

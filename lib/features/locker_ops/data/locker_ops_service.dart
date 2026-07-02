@@ -215,6 +215,16 @@ class LockerOpsService {
     },
   );
 
+  /// Manager đổi trạng thái đơn (trước đây chỉ Admin làm được).
+  Future<Map<String, dynamic>> managerSetOrderStatus(
+    int orderId,
+    String status,
+  ) => _map(
+    'PATCH',
+    '/api/manage/orders/$orderId/status',
+    body: {'status': status},
+  );
+
   // ---- Maintenance ----
   Future<List<Map<String, dynamic>>> faults() =>
       _list('/api/maintenance/faults');

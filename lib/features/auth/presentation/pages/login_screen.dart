@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
+import 'package:smart_laundry_locker/core/routing/app_router.dart';
 import 'package:smart_laundry_locker/core/routing/role_routes.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
 import 'package:smart_laundry_locker/features/auth/presentation/providers/auth_injection.dart';
@@ -425,9 +426,7 @@ class _LoginScreenState extends State<LoginScreen>
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
-            onPressed: () => SmartDialog.showToast(
-              'Vui lòng liên hệ hỗ trợ để đặt lại mật khẩu.',
-            ),
+            onPressed: () => context.push(AppRouter.forgotPassword),
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 8),
               minimumSize: Size.zero,

@@ -38,4 +38,13 @@ abstract class AuthRepository {
     required String userId,
     required List<Uint8List> imagesBytes,
   });
+
+  Future<Either<Failure, bool>> sendPasswordResetOtp({required String email});
+
+  Future<Either<Failure, bool>> resetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+    required String confirmPassword,
+  });
 }

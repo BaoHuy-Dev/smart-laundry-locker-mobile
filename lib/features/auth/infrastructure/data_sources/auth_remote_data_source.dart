@@ -20,4 +20,13 @@ abstract class AuthRemoteDataSource {
     required String userId,
     required List<String> imagesBase64,
   });
+
+  Future<void> sendPasswordResetOtp({required String email});
+
+  Future<void> resetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+    required String confirmPassword,
+  });
 }
