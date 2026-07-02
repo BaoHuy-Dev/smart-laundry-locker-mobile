@@ -1,5 +1,6 @@
 import 'package:smart_laundry_locker/core/network/api_client.dart';
 import 'package:smart_laundry_locker/features/auth/application/use_cases/confirm_qr_login_use_case.dart';
+import 'package:smart_laundry_locker/features/auth/application/use_cases/forgot_password_use_case.dart';
 import 'package:smart_laundry_locker/features/auth/application/use_cases/login_use_case.dart';
 import 'package:smart_laundry_locker/features/auth/application/use_cases/login_with_face_use_case.dart';
 import 'package:smart_laundry_locker/features/auth/application/use_cases/register_face_use_case.dart';
@@ -11,6 +12,7 @@ import 'package:smart_laundry_locker/features/auth/domain/repositories/auth_repo
 import 'package:smart_laundry_locker/features/auth/infrastructure/data_sources/auth_remote_data_source_impl.dart';
 import 'package:smart_laundry_locker/features/auth/infrastructure/repositories/auth_repository_impl.dart';
 import 'package:smart_laundry_locker/features/auth/presentation/providers/face_registration_provider.dart';
+import 'package:smart_laundry_locker/features/auth/presentation/providers/forgot_password_provider.dart';
 import 'package:smart_laundry_locker/features/auth/presentation/providers/login_provider.dart';
 import 'package:smart_laundry_locker/features/auth/presentation/providers/register_provider.dart';
 import 'package:smart_laundry_locker/features/auth/presentation/providers/verify_otp_provider.dart';
@@ -70,6 +72,13 @@ class AuthInjection {
   static LoginWithFaceUseCase provideLoginWithFaceUseCase(ApiClient apiClient) {
     final repository = provideAuthRepository(apiClient);
     return LoginWithFaceUseCase(repository);
+  }
+
+  static ForgotPasswordProvider provideForgotPasswordProvider(
+    ApiClient apiClient,
+  ) {
+    final repository = provideAuthRepository(apiClient);
+    return ForgotPasswordProvider(useCase: ForgotPasswordUseCase(repository));
   }
 
   static VerifyOtpProvider provideVerifyOtpProvider(ApiClient apiClient) {
