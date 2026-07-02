@@ -319,6 +319,30 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
     await _doCheckout(orderId, method);
   }
 
+  /// Gửi lệnh mở ô của đơn xuống cabinet qua backend IoT
+  /// (mobile → POST /api/iot/unlock → iot-service → MQTT → cabinet mở cửa).
+  Future<void> _openLockerFlow(Map<String, dynamic> order) async {
+    final lockerId = _asInt(order['lockerId']);
+    final boxId = _asInt(order['sendBoxId'] ?? order['receiveBoxId']);
+    final pin = order['pinCode'] as String?;
+    if (lockerId == null || boxId == null || pin == null || pin.isEmpty) {
+      _snack('Đơn chưa có thông tin ô/PIN để mở tủ.');
+      return;
+    }
+    try {
+      final res = await _service.unlock(lockerId, boxId, pin);
+      final opened = res['opened'] == true ||
+          res['success'] == true ||
+          '${res['status']}'.toUpperCase() == 'OPENED';
+      _snack(opened
+          ? 'Đã mở ô $boxId — cửa tủ đang mở, mời bạn thao tác.'
+          : 'Đã gửi lệnh mở ô $boxId tới tủ.');
+      await _load();
+    } catch (e) {
+      _snack(LockerOpsService.errorMessage(e));
+    }
+  }
+
   Future<void> _doCheckout(int orderId, String method) async {
     try {
       final res = await _service.checkout(
@@ -412,6 +436,10 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
             onPay: (_) async {
               Navigator.pop(ctx);
               await _payDialog(order);
+            },
+            onOpenLocker: () {
+              Navigator.pop(ctx);
+              _openLockerFlow(order);
             },
           ),
         ),
@@ -875,6 +903,7 @@ class _DetailSheet extends StatelessWidget {
     required this.onCancel,
     required this.onDirections,
     required this.onPay,
+    required this.onOpenLocker,
   });
 
   final Map<String, dynamic> order;
@@ -888,6 +917,7 @@ class _DetailSheet extends StatelessWidget {
   final void Function(int orderId) onCancel;
   final VoidCallback onDirections;
   final void Function(int orderId) onPay;
+  final VoidCallback onOpenLocker;
 
   @override
   Widget build(BuildContext context) {
@@ -920,6 +950,15 @@ class _DetailSheet extends StatelessWidget {
           icon: LucideIcons.creditCard,
           primary: true,
           onTap: () => onPay(id),
+        ),
+      if (boxId != null &&
+          order['pinCode'] != null &&
+          status != 'COMPLETED' &&
+          status != 'CANCELED')
+        OpsSheetAction(
+          label: 'Mở tủ',
+          icon: LucideIcons.doorOpen,
+          onTap: onOpenLocker,
         ),
       if (status == 'COMPLETED' || status == 'CANCELED')
         OpsSheetAction(
