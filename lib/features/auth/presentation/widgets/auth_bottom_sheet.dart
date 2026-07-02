@@ -365,7 +365,7 @@ class _AuthBottomSheetState extends State<AuthBottomSheet> {
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
-              onPressed: () {},
+              onPressed: () => context.push(AppRouter.forgotPassword),
               child: const Text(
                 'Quên mật khẩu?',
                 style: const TextStyle(

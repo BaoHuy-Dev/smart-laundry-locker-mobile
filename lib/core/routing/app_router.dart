@@ -1,6 +1,7 @@
 import 'package:smart_laundry_locker/core/routing/main_navigation_wrapper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
+import 'package:smart_laundry_locker/features/auth/presentation/pages/forgot_password_page.dart';
 import 'package:smart_laundry_locker/features/auth/presentation/pages/login_screen.dart';
 import 'package:smart_laundry_locker/features/auth/presentation/pages/otp_page.dart';
 import 'package:smart_laundry_locker/features/auth/presentation/pages/splash_screen.dart';
@@ -71,6 +72,7 @@ class AppRouter {
   static const String splash = '/';
   static const String onboarding = '/onboarding';
   static const String otp = '/otp';
+  static const String forgotPassword = '/forgot-password';
   static const String home = '/home';
   static const String lockers = '/lockers';
   static const String lockerMap = '/locker-map';
@@ -155,6 +157,10 @@ class AppRouter {
             email: params?['email'] as String?,
           );
         },
+      ),
+      GoRoute(
+        path: forgotPassword,
+        builder: (context, state) => const ForgotPasswordPage(),
       ),
       GoRoute(
         path: '/profile/detail',
