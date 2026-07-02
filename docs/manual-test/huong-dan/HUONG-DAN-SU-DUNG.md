@@ -118,7 +118,89 @@ Tương tự Gửi hàng nhưng chọn **Thuê tủ** ở Bước 2:
 
 ---
 
-## 5. Ghi chú kỹ thuật — Chuỗi Mobile → Backend → IoT
+## 5. Quên mật khẩu — đặt lại bằng OTP email
+
+Nếu quên mật khẩu, bạn tự đặt lại ngay trong app (không cần liên hệ hỗ trợ):
+
+### Bước 1 — Mở luồng đặt lại
+
+Ở màn hình đăng nhập, bấm **"Quên mật khẩu?"** (góc phải, dưới ô Mật khẩu):
+
+![Màn đăng nhập](img/08-dang-nhap-quen-mat-khau.png)
+
+### Bước 2 — Nhập email nhận mã OTP
+
+Nhập **email đã đăng ký tài khoản** rồi bấm **Gửi mã OTP**:
+
+![Nhập email](img/09-quen-mat-khau-nhap-email.png)
+
+### Bước 3 — Nhập OTP + mật khẩu mới
+
+Hệ thống gửi **mã OTP 6 chữ số** về email của bạn (hết hạn sau **5 phút**).
+Nhập OTP, đặt **mật khẩu mới** (tối thiểu 6 ký tự) và nhập lại lần nữa, rồi bấm
+**Đặt lại mật khẩu**. Không nhận được mã? Bấm **Gửi lại mã OTP**.
+
+![Nhập OTP và mật khẩu mới](img/10-quen-mat-khau-otp.png)
+
+### Bước 4 — Đăng nhập bằng mật khẩu mới
+
+App báo *"Đặt lại mật khẩu thành công"* và quay về màn đăng nhập — đăng nhập
+bằng **mật khẩu mới** như bình thường:
+
+![Đăng nhập lại thành công](img/11-quen-mat-khau-thanh-cong.png)
+
+> 🔒 Sau khi đổi mật khẩu, mọi phiên đăng nhập cũ trên thiết bị khác bị đăng
+> xuất (thu hồi token) để bảo vệ tài khoản.
+
+---
+
+## 6. Quá hạn lấy hàng — đồ được chuyển vào kho
+
+Mỗi đơn có **hạn lấy hàng** (gửi hàng: 48h; thuê tủ: theo số giờ thuê). Quá hạn:
+
+1. Hệ thống **nhắc qua thông báo** và bắt đầu tính **phí quá hạn** theo giờ
+   (có mức trần).
+2. Nếu quá hạn **quá 24 giờ**, hệ thống tự động: chốt phí quá hạn vào đơn,
+   chuyển đơn sang **Quá hạn**, **chuyển đồ vào kho lưu trữ** và **giải phóng ô
+   tủ** cho khách khác (mã PIN cũ hết hiệu lực). Bạn nhận được thông báo:
+
+![Thông báo đồ chuyển vào kho](img/14-thong-bao-chuyen-kho.png)
+
+Trong danh sách đơn, đơn quá hạn hiển thị nhãn **Quá hạn** màu đỏ kèm cảnh báo
+phí (ví dụ dưới đây: phí thuê 5.000đ + phí quá hạn 2.500đ = 7.500đ):
+
+![Đơn quá hạn](img/15-don-qua-han.png)
+
+> 📦 **Nhận lại đồ:** liên hệ nhân viên tại điểm đặt tủ — nhân viên trao trả đồ
+> từ kho và hoàn tất đơn (thanh toán nốt phí quá hạn nếu chưa trả).
+
+---
+
+## 7. Dành cho Quản lý (Manager) — thao tác đơn hàng
+
+Tài khoản **MANAGER** đăng nhập sẽ vào màn **Quản lý vận hành** (Thống kê ·
+Sơ đồ tủ · Đơn hàng). Tab **Đơn hàng** giờ cho phép **đổi trạng thái đơn**
+(trước đây chỉ xem):
+
+![Tab đơn hàng của Manager](img/12-manager-tab-don-hang.png)
+
+**Chạm vào một đơn** → bottom sheet hiện thông tin đơn + các trạng thái:
+*Chờ bỏ đồ · Đang trong tủ · Chờ lấy · Quá hạn · Hoàn tất · Đã hủy*.
+Chọn trạng thái mới rồi bấm **Xác nhận**:
+
+![Đổi trạng thái đơn](img/13-manager-doi-trang-thai.png)
+
+App báo kết quả và cập nhật ngay danh sách (đơn ví dụ chuyển từ *Chờ bỏ đồ*
+sang *Đang trong tủ*):
+
+![Đã đổi trạng thái](img/16-manager-da-doi-trang-thai.png)
+
+> 👤 Mỗi lần Manager đổi trạng thái đều được **ghi vào lịch sử đơn** (ai đổi,
+> lúc nào) để đối soát về sau. Khách hàng nhận thông báo khi trạng thái đổi.
+
+---
+
+## 8. Ghi chú kỹ thuật — Chuỗi Mobile → Backend → IoT
 
 Nút **"Mở tủ"** không chỉ hiển thị PIN mà thực sự điều khiển tủ khoá:
 
@@ -141,6 +223,21 @@ thật** (không phải mô phỏng phía app):
 
 Nghĩa là: khi bạn bấm **Mở tủ** trên điện thoại, backend gọi xuống tủ và **tủ trả
 lời "đã mở cửa"** — đúng luồng vận hành thật của tủ khoá thông minh.
+
+Không chỉ lệnh mở tủ — **mọi thay đổi trạng thái ô** (giữ chỗ, có đồ, giải
+phóng) đều được backend **đồng bộ xuống tủ** để màn hình tủ luôn khớp hệ thống.
+Ví dụ nhật ký tủ khi job đối soát/quá hạn của backend giải phóng ô:
+
+```
+[SIM] SYNC: cabinet display updated -> locker=1 box=5 state=AVAILABLE   (đơn quá hạn → nhả ô)
+[SIM] SYNC: cabinet display updated -> locker=1 box=8 state=AVAILABLE   (job đối soát nhả ô mồ côi)
+[SIM] HW state -> cabinet/1/locker/6/status: box=6 OPEN                 (bấm "Mở tủ" → cửa mở)
+```
+
+Hệ thống còn có các **job tự động chạy nền** giữ tủ luôn "sạch":
+- Tự hủy đơn bỏ dở sau 24h và nhả ô (mỗi 15 phút).
+- Chuyển đơn quá hạn >24h vào kho + nhả ô (mỗi giờ).
+- Đối soát trạng thái ô ↔ đơn hai chiều, tự sửa lệch (mỗi giờ).
 
 > Ảnh chụp trong tài liệu này được thực hiện trên môi trường chạy đầy đủ:
 > ứng dụng mobile ↔ backend (Docker) ↔ tủ khoá IoT (qua MQTT).
