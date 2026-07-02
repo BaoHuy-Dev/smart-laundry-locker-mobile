@@ -390,6 +390,7 @@ class _ManagerHomePageState extends State<ManagerHomePage>
       'INITIALIZED',
       'STORING',
       'RETURNED',
+      'EXPIRED',
       'COMPLETED',
       'CANCELED',
     ];
@@ -434,6 +435,7 @@ class _ManagerHomePageState extends State<ManagerHomePage>
                   ),
                   child: ListTile(
                     dense: true,
+                    onTap: () => _orderStatusSheet(o),
                     title: Text(
                       '${typeLabel(o['type'] as String?)} · ${o['orderCode'] ?? ''}',
                       style: const TextStyle(
@@ -453,6 +455,117 @@ class _ManagerHomePageState extends State<ManagerHomePage>
           ),
         ),
       ],
+    );
+  }
+
+  /// Đổi trạng thái đơn ở mức Manager — trước đây tab này read-only và chỉ
+  /// Admin thao tác được (gap điểm 6 file 04).
+  Future<void> _orderStatusSheet(Map<String, dynamic> o) async {
+    final orderId = (o['id'] as num?)?.toInt();
+    if (orderId == null) return;
+
+    const statuses = [
+      'INITIALIZED',
+      'STORING',
+      'RETURNED',
+      'EXPIRED',
+      'COMPLETED',
+      'CANCELED',
+    ];
+    var selected = o['status']?.toString() ?? 'INITIALIZED';
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (sheetCtx, setLocal) => SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${typeLabel(o['type'] as String?)} · ${o['orderCode'] ?? '#$orderId'}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    color: opsDark,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'KH #${o['userId']} · tủ ${o['lockerId'] ?? '-'} · ${o['totalPrice'] ?? 0}đ',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Đổi trạng thái',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final s in statuses)
+                      ChoiceChip(
+                        label: Text(statusLabel(s)),
+                        selected: selected == s,
+                        onSelected: (_) => setLocal(() => selected = s),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: opsPrimary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () async {
+                      Navigator.pop(sheetCtx);
+                      try {
+                        await _service.managerSetOrderStatus(
+                          orderId,
+                          selected,
+                        );
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Đã đổi trạng thái đơn ${o['orderCode'] ?? '#$orderId'} → ${statusLabel(selected)}',
+                            ),
+                          ),
+                        );
+                        await _loadAll();
+                      } catch (e) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(LockerOpsService.errorMessage(e)),
+                          ),
+                        );
+                      }
+                    },
+                    child: const Text('Xác nhận'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
