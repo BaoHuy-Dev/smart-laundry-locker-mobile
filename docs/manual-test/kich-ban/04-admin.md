@@ -7,8 +7,9 @@
 
 ## Bước 1 — Dashboard tổng quan
 
-Sau đăng nhập vào **Quản trị hệ thống**, 6 tab: **Tổng quan · Người dùng · Cửa
-hàng · Đơn hàng · Khuyến mãi · Drone**.
+Sau đăng nhập vào **Quản trị hệ thống**, thanh tab cuộn ngang gồm 10 tab:
+**Tổng quan · Người dùng · Cửa hàng · Đơn hàng · Khuyến mãi · Drone · Thanh toán ·
+Phản hồi · Thông báo · Lịch** (cân bằng đầy đủ với các mục quản trị bên web).
 
 Tab **Tổng quan**: thẻ KPI (Tổng đơn / Người dùng / Cửa hàng / DT hôm nay),
 bảng **Đơn theo trạng thái** (COMPLETED/STORING/RETURNED/PROCESSING/CANCELED/PENDING)
@@ -25,9 +26,13 @@ Tab **Người dùng**: tổng số user, ô tìm kiếm + lọc, danh sách use
 
 ## Bước 3 — Đổi role một tài khoản
 
-Tìm user cần đổi → chạm thẻ → **bottom sheet hành động**: **Đổi role** / **Khoá tài khoản**.
+Tìm user cần đổi → chạm thẻ → **bottom sheet hành động**: **Đổi role** / **Điều
+chỉnh ví** / **Khoá tài khoản**.
 
 ![Hành động trên user](img/04-03-hanh-dong-user.png)
+
+> **Điều chỉnh ví** (đồng bộ với web): mở hộp thoại xem số dư hiện tại, nhập số
+> tiền + lý do rồi **Cộng tiền / Trừ tiền** — gọi `GET/POST /api/admin/wallet/{userId}`.
 
 Bấm **Đổi role** → hộp thoại chọn role: **CUSTOMER / MANAGER / MAINTENANCE / STAFF
 / TECHNICIAN / ADMIN**. Chọn **TECHNICIAN** rồi bấm **Xác nhận**:
@@ -57,3 +62,19 @@ nút **Thêm mới** và biểu tượng xóa từng mã.
 ![Quản lý khuyến mãi](img/04-07-khuyen-mai.png)
 
 > Mã tạo ở đây dùng được khi khách nhập ở màn Gửi hàng/Thuê tủ.
+
+## Bước 6 — Drone, Thanh toán, Phản hồi, Thông báo, Lịch (cân bằng với web)
+
+Các tab bổ sung để Admin mobile ngang chức năng với trang quản trị web:
+
+- **Drone**: đội drone gắn bãi đáp tủ — thống kê IDLE/sạc/lỗi, thêm/sửa/ngừng,
+  đổi trạng thái + pin (`/api/admin/drones`, `/api/maintenance/drones/{id}/*`).
+- **Thanh toán**: danh sách giao dịch (mã đơn, số tiền, phương thức, trạng thái),
+  lọc theo trạng thái, chạm để **đổi trạng thái** (`PUT /api/admin/payments/{id}/status`).
+- **Phản hồi**: đánh giá của khách (sao + nội dung), lọc chưa/đã xử lý; chạm để
+  **Trả lời** (`POST /api/admin/feedback/{id}/reply`) hoặc **đánh dấu đã xử lý**
+  (`PATCH /api/admin/feedback/{id}/status`).
+- **Thông báo**: danh sách thông báo + nút **Gửi thông báo** broadcast tới toàn bộ
+  user (`POST /api/admin/notifications/broadcast`).
+- **Lịch**: xem trạng thái scheduler + **chạy tay** 3 job (tự huỷ đơn quá hạn / nhả
+  ô quá hạn / nhắc lấy hàng) qua `POST /api/admin/scheduler/{auto-cancel|release-boxes|pickup-reminders}`.
