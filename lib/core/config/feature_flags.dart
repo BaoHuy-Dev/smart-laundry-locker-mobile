@@ -36,4 +36,10 @@ class FeatureFlags {
   /// Backend chưa có AI service → `/api/auth/ai/registered/{userId}`,
   /// `/api/auth/ai/register`, `/api/auth/ai/verify` trả 500.
   static const bool faceRecognitionEnabled = false;
+
+  /// Theo dõi đơn giao bằng drone cho NGƯỜI NHẬN (Phase 1: chỉ push
+  /// notification + timeline, chưa có live map).
+  /// Backend chưa có → `GET /api/orders/{orderId}/drone-delivery` 404. Khi tắt,
+  /// datasource trả mock để timeline chạy được mà không gọi endpoint chết.
+  static const bool droneDeliveryEnabled = false;
 }
