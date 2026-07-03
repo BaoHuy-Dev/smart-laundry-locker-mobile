@@ -6,6 +6,39 @@
 
 ## Files changed
 
+### 2026-07-03 — Theo dõi giao drone cho NGƯỜI NHẬN qua push notification (Phase 1) (branch `feat/mobile-delivery-push-notifications`)
+
+Feature mới `lib/features/drone_delivery/` đủ 4 layer, mirror `logistics_send`. Phase 1 **chỉ push notification + timeline**, CHƯA có live map/websocket. Không đụng `drone_telemetry`/`drone_mission` (phía pilot/MAVLink).
+
+Domain + application:
+
+- `lib/features/drone_delivery/domain/entities/drone_delivery_stage.dart` — **tạo mới**: enum 6 mốc (`dispatched → approaching → arrived → delivered → delayed → failed`) + `unknown`; `fromRaw()`, `timeline`, `order`, `icon` (lucide), `color` (giữ semantic: success=green, delayed=amber, failed=red), `title`/`body(eta)`
+- `lib/features/drone_delivery/domain/entities/drone_delivery_status.dart` — **tạo mới**: entity `{ status, deliveryId, orderId, orderCode, droneCode, etaMinutes, updatedAt }` + getter `stage` (mirror `DispatchStatusEntity`)
+- `lib/features/drone_delivery/domain/repositories/drone_delivery_repository.dart` — **tạo mới**: contract `getDeliveryStatus(orderId)` → `Either<Failure, DroneDeliveryStatus>`
+- `lib/features/drone_delivery/application/use_cases/get_drone_delivery_status_use_case.dart` — **tạo mới**: mirror `GetDispatchStatusUseCase`
+
+Infrastructure:
+
+- `lib/features/drone_delivery/infrastructure/models/drone_delivery_response.dart` (+ `.g.dart` sinh bằng build_runner) — **tạo mới**: `@JsonSerializable`, `fromJson` chịu nesting `data`, `toEntity()`
+- `lib/features/drone_delivery/infrastructure/data_sources/drone_delivery_remote_datasource.dart` — **tạo mới**: `GET /api/orders/{orderId}/drone-delivery`; guard bằng flag `droneDeliveryEnabled` → trả **mock** khi tắt (KHÔNG gọi endpoint chết)
+- `lib/features/drone_delivery/infrastructure/repositories/drone_delivery_repository_impl.dart` — **tạo mới**: try/catch → `Either<Failure, …>` (mirror `LogisticsSendRepositoryImpl`)
+
+FCM router (mở rộng, KHÔNG viết lại):
+
+- `lib/core/services/firebase_messaging_service.dart` — thêm set `droneDeliveryTypes` (6 type `drone_*`); `_handleForegroundMessage` không toast trùng; `_handleTapData` → `context.go(AppRouter.droneDeliveryTracking, extra: orderId)`. Tái dùng `_showLocalNotification` + channel `aisl_high_importance_channel`.
+
+Presentation:
+
+- `lib/features/drone_delivery/presentation/providers/drone_delivery_providers.dart` — **tạo mới**: Riverpod 3; `getDroneDeliveryStatusUseCaseProvider` + `droneDeliveryFcmTickProvider` (StreamProvider lọc FCM theo orderId) + `droneDeliveryStatusProvider` (FutureProvider.family, refetch khi có mốc mới — mirror `NotificationProvider`)
+- `lib/features/drone_delivery/presentation/pages/drone_delivery_tracking_page.dart` — **tạo mới**: `DroneDeliveryTrackingPage(orderId)`, timeline 4 mốc + header card + banner delayed/failed + pull-to-refresh
+- `lib/features/drone_delivery/presentation/widgets/drone_delivery_timeline.dart` — **tạo mới**: timeline dọc, mốc hiện tại nổi bật
+- `lib/features/drone_delivery/presentation/widgets/drone_approaching_sheet.dart` — **tạo mới**: sheet nhắc ra nhận khi `drone_approaching` (mirror `finding_courier_sheet`)
+
+Core wiring:
+
+- `lib/core/config/feature_flags.dart` — thêm `droneDeliveryEnabled = false`
+- `lib/core/routing/app_router.dart` — thêm hằng `droneDeliveryTracking = '/drone-delivery'` + `GoRoute` (top-level, ngoài ShellRoute) nhận `orderId` qua `extra`
+
 ### 2026-06-15 — UX revamp lưới ô tủ + DRONE cell type (branch `feat/mobile-user-ui-revamp`)
 
 Routing và home:
@@ -82,6 +115,7 @@ Docs:
 | Choose locker | Merged | Uses `/api/stores`, `/api/lockers`, `/api/lockers/{lockerId}/boxes/available`. Nay thêm `/api/lockers?storeId=X` và `/api/lockers/{id}/layout`. |
 | Payment | Merged | Creates payment via `/api/payments` and opens payment URL/deeplink if returned. |
 | Track status | Merged | Refreshes order status via `/api/orders/{id}/status`. |
+| Theo dõi giao drone (người nhận) | **Merged (2026-07-03)** | Feature `drone_delivery`, Phase 1 push-only. FCM 6 type `drone_*` → deep-link `DroneDeliveryTrackingPage(orderId)` (timeline). Fetch trạng thái `GET /api/orders/{orderId}/drone-delivery` **đang tắt sau flag `droneDeliveryEnabled` + mock** (backend chưa có endpoint). Phase 2 (live map/STOMP) chỉ cần thêm `{lat,lng,heading}` — contract hiện đã tương thích. |
 | Order history | Service ready | `UserOrderService.getMyOrders()` added. Existing Flutter `OrderPage` not replaced to protect courier/customer switching. |
 | Notifications | Service ready | USER notification service added. Existing notification page not replaced. |
 | Profile | Service ready | USER profile service added. Existing profile UI not replaced. |
@@ -143,6 +177,7 @@ Connected through new USER services:
 - `/api/services`: Flutter service selection calls this, but backend route/controller was not confirmed in the current microservice tree.
 - Full promotion/voucher picker: old mobile uses promotion and loyalty services; only raw promotion code passthrough was merged.
 - Shared register/OTP UI integration: requires a focused change because current Flutter auth screens are shared by all roles.
+- `GET /api/orders/{orderId}/drone-delivery`: mobile đã sẵn sàng tiêu thụ (feature `drone_delivery`) nhưng backend chưa có endpoint → đang tắt sau flag `droneDeliveryEnabled` + mock. Bật cờ khi backend triển khai. Backend cũng cần gửi FCM data payload `{ type: drone_*, title, content, orderId, deliveryId, status, eta }`.
 
 ## Checks
 
