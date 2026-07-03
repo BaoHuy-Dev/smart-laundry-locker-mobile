@@ -421,6 +421,21 @@ class LockerOpsService {
           int userId, List<String> roles) =>
       _map('PUT', '/api/admin/users/$userId/roles', body: {'roles': roles});
 
+  /// Số dư ví nội bộ của một user (admin xem để điều chỉnh).
+  Future<Map<String, dynamic>> adminWallet(int userId) =>
+      _map('GET', '/api/admin/wallet/$userId');
+
+  /// Điều chỉnh số dư ví của user. [amount] có dấu:
+  /// dương = cộng tiền, âm = trừ tiền. [reason] tuỳ chọn để ghi audit.
+  Future<Map<String, dynamic>> adminAdjustWallet(
+    int userId,
+    num amount, {
+    String? reason,
+  }) => _map('POST', '/api/admin/wallet/$userId/adjust', body: {
+        'amount': amount,
+        if (reason != null && reason.isNotEmpty) 'reason': reason,
+      });
+
   Future<List<Map<String, dynamic>>> adminStores() =>
       _list('/api/admin/stores');
 

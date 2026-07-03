@@ -25,9 +25,13 @@ Tab **Người dùng**: tổng số user, ô tìm kiếm + lọc, danh sách use
 
 ## Bước 3 — Đổi role một tài khoản
 
-Tìm user cần đổi → chạm thẻ → **bottom sheet hành động**: **Đổi role** / **Khoá tài khoản**.
+Tìm user cần đổi → chạm thẻ → **bottom sheet hành động**: **Đổi role** / **Điều
+chỉnh ví** / **Khoá tài khoản**.
 
 ![Hành động trên user](img/04-03-hanh-dong-user.png)
+
+> **Điều chỉnh ví** (đồng bộ với web): mở hộp thoại xem số dư hiện tại, nhập số
+> tiền + lý do rồi **Cộng tiền / Trừ tiền** — gọi `GET/POST /api/admin/wallet/{userId}`.
 
 Bấm **Đổi role** → hộp thoại chọn role: **CUSTOMER / MANAGER / MAINTENANCE / STAFF
 / TECHNICIAN / ADMIN**. Chọn **TECHNICIAN** rồi bấm **Xác nhận**:

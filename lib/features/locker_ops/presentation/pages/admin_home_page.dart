@@ -767,6 +767,12 @@ class _AdminHomePageState extends State<AdminHomePage>
                   const Color(0xFF7C3AED),
                   () => _changeRoleFlow(u),
                 ),
+                tile(
+                  Icons.account_balance_wallet_outlined,
+                  'Điều chỉnh ví',
+                  const Color(0xFF2563EB),
+                  () => _adjustWalletFlow(u),
+                ),
                 if (isActive)
                   tile(
                     Icons.block,
@@ -857,6 +863,169 @@ class _AdminHomePageState extends State<AdminHomePage>
       'Đã đổi role thành $result',
       reloadTab: 1,
     );
+  }
+
+  /// Điều chỉnh ví nội bộ của user (cộng/trừ tiền) — đồng bộ với web WalletModal.
+  Future<void> _adjustWalletFlow(Map<String, dynamic> u) async {
+    final userId = _asInt(u['id']);
+    if (userId == null) return;
+    final userName = u['fullName']?.toString() ??
+        u['email']?.toString() ??
+        'Người dùng #$userId';
+
+    num? balance;
+    String? loadError;
+    try {
+      final w = await _service.adminWallet(userId);
+      balance = (w['balance'] as num?) ?? 0;
+    } catch (e) {
+      loadError = LockerOpsService.errorMessage(e);
+    }
+    if (!mounted) return;
+
+    final amountCtrl = TextEditingController();
+    final reasonCtrl = TextEditingController();
+    var busy = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          Future<void> adjust(int sign) async {
+            final value = num.tryParse(amountCtrl.text.trim());
+            if (value == null || value <= 0) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                const SnackBar(content: Text('Nhập số tiền hợp lệ (> 0)')),
+              );
+              return;
+            }
+            setLocal(() => busy = true);
+            try {
+              final res = await _service.adminAdjustWallet(
+                userId,
+                sign * value,
+                reason: reasonCtrl.text.trim(),
+              );
+              balance = (res['balance'] as num?) ?? balance;
+              amountCtrl.clear();
+              reasonCtrl.clear();
+              if (ctx.mounted) {
+                setLocal(() => busy = false);
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Đã ${sign > 0 ? 'cộng' : 'trừ'} tiền · số dư ${_formatVnd(balance ?? 0)}',
+                    ),
+                  ),
+                );
+              }
+            } catch (e) {
+              if (ctx.mounted) {
+                setLocal(() => busy = false);
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(content: Text(LockerOpsService.errorMessage(e))),
+                );
+              }
+            }
+          }
+
+          return AlertDialog(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                const Icon(Icons.account_balance_wallet_outlined,
+                    size: 20, color: Color(0xFF2563EB)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('Ví · $userName',
+                      style: const TextStyle(fontSize: 16)),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text('Số dư hiện tại',
+                          style:
+                              TextStyle(fontSize: 12, color: opsMutedText)),
+                      const SizedBox(height: 4),
+                      Text(
+                        loadError != null ? '—' : _formatVnd(balance ?? 0),
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: opsDark,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (loadError != null) ...[
+                  const SizedBox(height: 8),
+                  Text(loadError,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFFDC2626))),
+                ],
+                const SizedBox(height: 12),
+                TextField(
+                  controller: amountCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Số tiền điều chỉnh',
+                    hintText: '50000',
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: reasonCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Lý do (tuỳ chọn)',
+                    hintText: 'Hoàn tiền / khuyến mãi…',
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: busy ? null : () => Navigator.pop(ctx),
+                child: const Text('Đóng'),
+              ),
+              OutlinedButton.icon(
+                onPressed: busy ? null : () => adjust(-1),
+                icon: const Icon(Icons.remove, size: 16, color: Color(0xFFDC2626)),
+                label: const Text('Trừ tiền',
+                    style: TextStyle(color: Color(0xFFDC2626))),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: busy ? null : () => adjust(1),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Cộng tiền'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    amountCtrl.dispose();
+    reasonCtrl.dispose();
   }
 
   // ── Tab 2: Stores ───────────────────────────────────────────────────────────
@@ -1802,6 +1971,17 @@ class _AdminHomePageState extends State<AdminHomePage>
     if (map == null) return null;
     final v = map[key];
     return v != null ? '$v' : null;
+  }
+
+  /// Định dạng tiền VND với dấu chấm phân nhóm nghìn, ví dụ 50000 → "50.000 đ".
+  String _formatVnd(num v) {
+    final s = v.round().abs().toString();
+    final buf = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write('.');
+      buf.write(s[i]);
+    }
+    return '${v < 0 ? '-' : ''}$buf đ';
   }
 
   // ── Tab 5: Drones ──────────────────────────────────────────────────────────
