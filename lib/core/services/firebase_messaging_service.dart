@@ -1,8 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
-import 'package:smart_laundry_locker/features/courier_dispatch/presentation/widgets/incoming_order_sheet.dart';
-import 'package:smart_laundry_locker/core/services/app_messenger_service.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -214,7 +212,6 @@ class FirebaseMessagingService {
       );
     }
 
-    final type = message.data['type'];
     final delivery = DeliveryNotification.fromData(message.data);
 
     // Push to stream so listeners (like NotificationProvider) can refresh
@@ -224,9 +221,7 @@ class FirebaseMessagingService {
     // messages and pure data-only messages from the backend)
     _showLocalNotification(message);
 
-    if (type == 'dispatch_order') {
-      _showIncomingOrderDialog(message.data);
-    } else if (delivery == null) {
+    if (delivery == null) {
       // Noti giao hàng đã hiển thị banner local ở trên rồi -> không toast trùng.
       // Các noti khác: fallback toast tiêu đề.
       final title =
@@ -301,11 +296,10 @@ class FirebaseMessagingService {
   /// Điều hướng khi người dùng bấm vào noti (background/terminated qua
   /// onMessageOpenedApp/getInitialMessage, hoặc foreground qua local-notif).
   ///
-  /// Ưu tiên: noti giao hàng (có `orderId`) -> mở thẳng chi tiết đơn; đơn giao
-  /// việc courier -> màn giao hàng; còn lại -> màn Thông báo.
+  /// Ưu tiên: noti giao hàng (có `orderId`) -> mở thẳng chi tiết đơn;
+  /// còn lại -> màn Thông báo.
   void _handleTapData(Map<String, dynamic> data) {
     final delivery = DeliveryNotification.fromData(data);
-    final type = data['type'];
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final context = AppRouter.navigatorKey.currentContext;
@@ -314,34 +308,10 @@ class FirebaseMessagingService {
       if (delivery != null) {
         // Deep-link tới chi tiết đơn theo orderId (route nhận String orderId).
         context.push(AppRouter.orderDetail, extra: delivery.orderId);
-      } else if (type == 'dispatch_order') {
-        context.go(AppRouter.activeDelivery);
       } else {
         context.go(AppRouter.notifications);
       }
     });
   }
 
-  void _showIncomingOrderDialog(Map<String, dynamic> data) {
-    final context = AppMessengerService.scaffoldMessengerKey.currentContext;
-    if (context == null) return;
-
-    showCupertinoModalPopup<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return IncomingOrderSheet(
-          dispatchData: data,
-          onAccept: () {
-            SmartDialog.showToast('Đã nhận đơn hàng!');
-            final ctx = AppRouter.navigatorKey.currentContext;
-            if (ctx != null) ctx.go(AppRouter.activeDelivery);
-          },
-          onDecline: () {
-            SmartDialog.showToast('Đã từ chối đơn hàng');
-          },
-        );
-      },
-    );
-  }
 }

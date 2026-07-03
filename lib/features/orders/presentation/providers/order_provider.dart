@@ -1,10 +1,8 @@
 import 'package:smart_laundry_locker/features/orders/application/use_cases/get_my_orders_use_case.dart';
 import 'package:smart_laundry_locker/features/orders/application/use_cases/get_order_detail_use_case.dart';
-import 'package:smart_laundry_locker/features/orders/application/use_cases/get_courier_order_detail_use_case.dart';
 import 'package:smart_laundry_locker/features/orders/application/use_cases/get_active_orders_use_case.dart';
 import 'package:smart_laundry_locker/features/orders/application/use_cases/pay_overdue_fee_use_case.dart';
 import 'package:smart_laundry_locker/features/orders/application/use_cases/recreate_access_code_use_case.dart';
-import 'package:smart_laundry_locker/features/logistics_send/application/use_cases/customer_cancel_order_use_case.dart';
 import 'package:smart_laundry_locker/features/orders/domain/entities/order.dart';
 import 'package:smart_laundry_locker/features/orders/domain/entities/order_detail.dart';
 import 'package:smart_laundry_locker/core/domain/entities/pagination.dart';
@@ -17,8 +15,6 @@ class OrderProvider extends ChangeNotifier {
   final GetActiveOrdersUseCase _getActiveOrdersUseCase;
   final PayOverdueFeeUseCase _payOverdueFeeUseCase;
   final RecreateAccessCodeUseCase _recreateAccessCodeUseCase;
-  final GetCourierOrderDetailUseCase _getCourierOrderDetailUseCase;
-  final CustomerCancelOrderUseCase _customerCancelOrderUseCase;
 
   OrderProvider({
     required GetMyOrdersUseCase getMyOrdersUseCase,
@@ -26,15 +22,11 @@ class OrderProvider extends ChangeNotifier {
     required GetActiveOrdersUseCase getActiveOrdersUseCase,
     required PayOverdueFeeUseCase payOverdueFeeUseCase,
     required RecreateAccessCodeUseCase recreateAccessCodeUseCase,
-    required GetCourierOrderDetailUseCase getCourierOrderDetailUseCase,
-    required CustomerCancelOrderUseCase customerCancelOrderUseCase,
   }) : _getMyOrdersUseCase = getMyOrdersUseCase,
        _getOrderDetailUseCase = getOrderDetailUseCase,
        _getActiveOrdersUseCase = getActiveOrdersUseCase,
        _payOverdueFeeUseCase = payOverdueFeeUseCase,
-       _recreateAccessCodeUseCase = recreateAccessCodeUseCase,
-       _getCourierOrderDetailUseCase = getCourierOrderDetailUseCase,
-       _customerCancelOrderUseCase = customerCancelOrderUseCase;
+       _recreateAccessCodeUseCase = recreateAccessCodeUseCase;
 
   bool _isDisposed = false;
 
@@ -225,30 +217,6 @@ class OrderProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Lấy chi tiết order cho courier
-  Future<void> fetchCourierOrderDetail(String id) async {
-    _isLoadingDetail = true;
-    _detailError = null;
-    _selectedOrder = null;
-    _orderDetails = [];
-    notifyListeners();
-
-    final result = await _getCourierOrderDetailUseCase(id);
-
-    result.fold(
-      (failure) {
-        _detailError = failure.message;
-      },
-      (orderWithDetails) {
-        _selectedOrder = orderWithDetails.order;
-        _orderDetails = orderWithDetails.orderDetails;
-      },
-    );
-
-    _isLoadingDetail = false;
-    notifyListeners();
-  }
-
   /// Lấy active orders
   Future<void> fetchActiveOrders() async {
     _isLoading = true;
@@ -318,33 +286,6 @@ class OrderProvider extends ChangeNotifier {
 
     _isLoading = false;
     notifyListeners();
-    return isSuccess;
-  }
-
-  /// Khách hàng hủy đơn hàng (chỉ dành cho logistics)
-  Future<bool> cancelOrderAsCustomer(String orderId) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    final result = await _customerCancelOrderUseCase(orderId);
-
-    bool isSuccess = false;
-    result.fold(
-      (failure) {
-        _error = failure.message;
-      },
-      (success) {
-        isSuccess = success;
-      },
-    );
-
-    _isLoading = false;
-    notifyListeners();
-
-    if (isSuccess) {
-      await fetchOrderDetail(orderId);
-    }
     return isSuccess;
   }
 
