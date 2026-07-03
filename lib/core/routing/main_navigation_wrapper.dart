@@ -22,6 +22,28 @@ class MainNavigationWrapper extends StatefulWidget {
 }
 
 class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
+  bool _navVisible = true;
+
+  void _onScroll(ScrollNotification notification) {
+    if (notification is ScrollUpdateNotification) {
+      final delta = notification.scrollDelta ?? 0;
+      // Always show when at top
+      if (notification.metrics.pixels <= 10) {
+        if (!_navVisible) setState(() => _navVisible = true);
+        return;
+      }
+      if (delta > 4 && _navVisible) {
+        setState(() => _navVisible = false);
+      } else if (delta < -4 && !_navVisible) {
+        setState(() => _navVisible = true);
+      }
+    } else if (notification is ScrollEndNotification) {
+      if (notification.metrics.pixels <= 10 && !_navVisible) {
+        setState(() => _navVisible = true);
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -93,8 +115,21 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      body: widget.child,
-      bottomNavigationBar: CustomBottomNavigationBar(
+      body: NotificationListener<ScrollNotification>(
+        onNotification: (n) {
+          _onScroll(n);
+          return false;
+        },
+        child: widget.child,
+      ),
+      bottomNavigationBar: AnimatedSlide(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeInOut,
+        offset: _navVisible ? Offset.zero : const Offset(0, 1),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 220),
+          opacity: _navVisible ? 1.0 : 0.0,
+          child: CustomBottomNavigationBar(
         currentIndex: _calculateSelectedIndex(context),
         onTap: _onItemTapped,
         items: const [
@@ -130,6 +165,8 @@ class _MainNavigationWrapperState extends State<MainNavigationWrapper> {
             route: AppRouter.profile,
           ),
         ],
+          ),
+        ),
       ),
     );
   }

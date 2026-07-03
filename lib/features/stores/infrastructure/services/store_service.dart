@@ -1,5 +1,5 @@
 import 'package:smart_laundry_locker/features/stores/domain/entities/store.dart';
-import 'package:smart_laundry_locker/features/user_laundry/infrastructure/services/user_gateway_client.dart';
+import 'package:smart_laundry_locker/core/network/user_gateway_client.dart';
 
 /// Read-only gateway client for the public store catalogue.
 ///

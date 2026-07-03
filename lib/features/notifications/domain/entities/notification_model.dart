@@ -58,6 +58,7 @@ class NotificationModel {
   }
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) {
+    final rawTitle = (json['title'] ?? 'Thông báo').toString();
     final bodyContent =
         (json['body'] ?? json['content'] ?? json['message'] ?? '').toString();
 
@@ -77,8 +78,8 @@ class NotificationModel {
     return NotificationModel(
       id: (json['id'] ?? json['notificationId'] ?? '').toString(),
       userId: json['userId']?.toString(),
-      title: (json['title'] ?? 'Thông báo').toString(),
-      body: bodyContent,
+      title: _translateTitle(rawTitle),
+      body: _translateBody(bodyContent),
       dataPayload: payload.isNotEmpty
           ? NotificationDataPayload.fromJson(payload)
           : null,
@@ -86,6 +87,135 @@ class NotificationModel {
       createdAt: DateTime.parse(createdAtStr).toLocal(),
       updatedAt: DateTime.parse(updatedAtStr).toLocal(),
     );
+  }
+
+  // ── Translation helpers ───────────────────────────────────────────────────
+
+  static const _titleMap = <String, String>{
+    'Rental expired': 'Đơn thuê đã hết hạn',
+    'Pickup overdue': 'Quá hạn lấy hàng',
+    'Rental extended': 'Gia hạn thuê thành công',
+    'Parcel waiting for you': 'Có bưu kiện đang chờ bạn',
+    'Parcel stored': 'Đã lưu bưu kiện',
+    'Order delegated': 'Ủy quyền lấy hàng',
+    'Order confirmed': 'Đơn hàng đã xác nhận',
+    'Order cancelled': 'Đơn hàng đã bị hủy',
+    'Order canceled': 'Đơn hàng đã bị hủy',
+    'Payment successful': 'Thanh toán thành công',
+    'Payment failed': 'Thanh toán thất bại',
+    'New order': 'Đơn hàng mới',
+    'Order initialized': 'Đơn hàng đã tạo',
+    'Order storing': 'Đang lưu trữ',
+    'Order ready': 'Sẵn sàng lấy hàng',
+    'Order completed': 'Đơn hàng hoàn tất',
+    'Order returned': 'Đã trả lại',
+  };
+
+  static String _translateTitle(String title) =>
+      _titleMap[title] ?? _translateDynamicTitle(title);
+
+  // Handles "Order <status>" patterns not in the static map
+  static String _translateDynamicTitle(String title) {
+    final orderStatusMatch = RegExp(
+      r'^Order\s+(\w+)$',
+      caseSensitive: false,
+    ).firstMatch(title);
+    if (orderStatusMatch != null) {
+      final status = orderStatusMatch.group(1)!.toLowerCase();
+      final vn = _statusVn(status);
+      return 'Đơn hàng — $vn';
+    }
+    return title;
+  }
+
+  static String _translateBody(String body) {
+    // "Rental ORD-xxx expired at <ISO>. Overtime fee applies."
+    body = body.replaceAllMapped(
+      RegExp(
+        r'Rental (ORD-\S+) expired at (\S+)\. Overtime fee applies\.',
+      ),
+      (m) =>
+          'Đơn thuê ${m[1]} đã hết hạn lúc ${_fmtIso(m[2]!)}. Phí quá giờ sẽ được áp dụng.',
+    );
+
+    // "Order ORD-xxx passed its pickup deadline <ISO>. Overtime fee applies."
+    body = body.replaceAllMapped(
+      RegExp(
+        r'Order (ORD-\S+) passed its pickup deadline (\S+)\. Overtime fee applies\.',
+      ),
+      (m) =>
+          'Đơn ${m[1]} đã quá hạn lấy hàng lúc ${_fmtIso(m[2]!)}. Phí quá giờ sẽ được áp dụng.',
+    );
+
+    // "Parcel ORD-xxx is still waiting. Overtime fee applies."
+    body = body.replaceAllMapped(
+      RegExp(r'Parcel (ORD-\S+) is still waiting\. Overtime fee applies\.'),
+      (m) =>
+          'Bưu kiện ${m[1]} vẫn đang chờ lấy. Phí quá giờ sẽ được áp dụng.',
+    );
+
+    // "Rental ORD-xxx extended until <ISO>"
+    body = body.replaceAllMapped(
+      RegExp(r'Rental (ORD-\S+) extended until (\S+)'),
+      (m) => 'Đơn thuê ${m[1]} đã được gia hạn đến ${_fmtIso(m[2]!)}.',
+    );
+
+    // "Parcel ORD-xxx is waiting in locker <id>"
+    body = body.replaceAllMapped(
+      RegExp(r'Parcel (ORD-\S+) is waiting in locker (\S+)'),
+      (m) => 'Bưu kiện ${m[1]} đang chờ tại tủ ${m[2]}.',
+    );
+
+    // "Parcel ORD-xxx stored. Receiver <phone>..."
+    body = body.replaceAllMapped(
+      RegExp(r'Parcel (ORD-\S+) stored\. Receiver (\S+)'),
+      (m) => 'Đã lưu bưu kiện ${m[1]}. Người nhận: ${m[2]}.',
+    );
+
+    // "Order ORD-xxx pickup delegated to <phone>"
+    body = body.replaceAllMapped(
+      RegExp(r'Order (ORD-\S+) pickup delegated to (\S+)'),
+      (m) => 'Đơn ${m[1]} đã được ủy quyền lấy cho ${m[2]}.',
+    );
+
+    // "Order ORD-xxx changed from <STATUS> to <STATUS>"
+    body = body.replaceAllMapped(
+      RegExp(r'Order (ORD-\S+) changed from (\w+) to (\w+)'),
+      (m) =>
+          'Đơn ${m[1]} chuyển trạng thái từ ${_statusVn(m[2]!.toLowerCase())} sang ${_statusVn(m[3]!.toLowerCase())}.',
+    );
+
+    return body;
+  }
+
+  static String _statusVn(String status) {
+    const map = <String, String>{
+      'initialized': 'Đã tạo',
+      'storing': 'Đang lưu trữ',
+      'ready': 'Sẵn sàng lấy',
+      'completed': 'Hoàn tất',
+      'canceled': 'Đã hủy',
+      'cancelled': 'Đã hủy',
+      'returned': 'Đã trả',
+      'pending': 'Chờ xử lý',
+      'active': 'Đang hoạt động',
+      'expired': 'Hết hạn',
+      'overdue': 'Quá hạn',
+    };
+    return map[status] ?? status;
+  }
+
+  static String _fmtIso(String iso) {
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      final hh = dt.hour.toString().padLeft(2, '0');
+      final mm = dt.minute.toString().padLeft(2, '0');
+      final dd = dt.day.toString().padLeft(2, '0');
+      final mo = dt.month.toString().padLeft(2, '0');
+      return '$hh:$mm $dd/$mo/${dt.year}';
+    } catch (_) {
+      return iso;
+    }
   }
 }
 

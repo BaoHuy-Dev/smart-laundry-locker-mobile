@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
 import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
+import 'package:smart_laundry_locker/features/transactions/domain/entities/transaction.dart';
 import 'package:smart_laundry_locker/features/transactions/presentation/providers/transaction_injection.dart';
 import 'package:smart_laundry_locker/features/transactions/presentation/providers/transaction_provider.dart';
 import 'package:smart_laundry_locker/features/wallet/presentation/providers/wallet_provider.dart';
@@ -118,7 +119,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
                               color: Colors.white,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
+                                  color: Colors.black.withValues(alpha: 0.05),
                                   blurRadius: 10,
                                   offset: const Offset(0, 4),
                                 ),
@@ -228,10 +229,6 @@ class _TransactionsSliverList extends StatelessWidget {
       builder: (context, provider, child) {
         final transactions = provider.transactions;
 
-        debugPrint(
-          '[TX][list] build() total=${transactions.length} loading=${provider.isLoading}',
-        );
-
         if (provider.isLoading && transactions.isEmpty) {
           return const SliverFillRemaining(
             hasScrollBody: false,
@@ -267,93 +264,144 @@ class _TransactionsSliverList extends StatelessWidget {
           );
         }
 
-        return SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate((context, index) {
-              final tx = transactions[index];
-              final isIncome = tx.type == 'TOP_UP' || tx.type == 'DEPOSIT';
-              final amountColor = isIncome
-                  ? const Color(0xFF2E7D32)
-                  : const Color(0xFFD32F2F);
-              final icon = isIncome
-                  ? Icons.south_west_rounded
-                  : Icons.north_east_rounded;
+        // Group by date
+        final grouped = <String, List<Transaction>>{};
+        for (final tx in transactions) {
+          final key = DateFormat('dd/MM/yyyy').format(tx.createdAt.toLocal());
+          (grouped[key] ??= []).add(tx);
+        }
 
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade100, width: 1),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.02),
-                        blurRadius: 6,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.all(16),
-                    leading: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: const BoxDecoration(
-                        color: AISLShadcnTheme.navySurface,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(icon, color: amountColor, size: 22),
-                    ),
-                    title: Text(
-                      tx.description,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 17,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    subtitle: Text(
-                      DateFormat('dd/MM/yyyy HH:mm').format(tx.createdAt),
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
-                    trailing: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '${isIncome ? '+' : '-'}${NumberFormat.decimalPattern('vi_VN').format(tx.amount)}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: amountColor,
-                            fontSize: 17,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          NumberFormat.decimalPattern(
-                            'vi_VN',
-                          ).format(tx.balanceAfter),
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }, childCount: transactions.length),
+        // Flatten: [dateString, Transaction, Transaction, dateString, ...]
+        final items = <dynamic>[];
+        for (final entry in grouped.entries) {
+          items.add(entry.key);
+          items.addAll(entry.value);
+        }
+
+        return SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final item = items[index];
+              if (item is String) return _DateHeader(date: item);
+              return _MBStyleTransactionItem(transaction: item as Transaction);
+            },
+            childCount: items.length,
           ),
         );
       },
+    );
+  }
+}
+
+class _DateHeader extends StatelessWidget {
+  final String date;
+  const _DateHeader({required this.date});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+      child: Text(
+        date,
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 14,
+          color: Colors.black87,
+        ),
+      ),
+    );
+  }
+}
+
+class _MBStyleTransactionItem extends StatelessWidget {
+  final Transaction transaction;
+  const _MBStyleTransactionItem({required this.transaction});
+
+  @override
+  Widget build(BuildContext context) {
+    final isIncome =
+        transaction.type == 'TOP_UP' || transaction.type == 'DEPOSIT';
+    final dotColor =
+        isIncome ? const Color(0xFF4CAF50) : const Color(0xFFE65100);
+    final amountSign = isIncome ? '+' : '-';
+    final time =
+        DateFormat('HH:mm').format(transaction.createdAt.toLocal());
+
+    final amountFmt = NumberFormat.currency(
+      locale: 'vi_VN',
+      symbol: 'đ',
+      decimalDigits: 0,
+    ).format(transaction.amount);
+    final balanceFmt = NumberFormat.currency(
+      locale: 'vi_VN',
+      symbol: 'đ',
+      decimalDigits: 0,
+    ).format(transaction.balanceAfter);
+
+    final walletShort = transaction.walletId.length > 6
+        ? '${transaction.walletId.substring(0, 6)}xxx'
+        : transaction.walletId;
+
+    final title = isIncome ? 'Thông báo nạp tiền ví' : 'Thông báo biến động số dư';
+    final content =
+        'VI $walletShort|GD: $amountSign$amountFmt|SD: $balanceFmt|ND: ${transaction.description}';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: Colors.grey.shade100),
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  content,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade600,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  time,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: dotColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            width: 10,
+            height: 10,
+            margin: const EdgeInsets.only(top: 4),
+            decoration: BoxDecoration(
+              color: dotColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

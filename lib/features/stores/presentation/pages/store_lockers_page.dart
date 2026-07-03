@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:smart_laundry_locker/core/presentation/pages/directions_map_page.dart';
+import 'package:smart_laundry_locker/features/drone_delivery/presentation/widgets/drone_booking_sheet.dart';
 import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/rent_locker_page.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/send_parcel_page.dart';
@@ -119,6 +120,9 @@ class _StoreLockerGridPageState extends State<StoreLockerGridPage> {
           storeName: widget.store.name,
           service: _service,
           initiallyExpanded: _lockers.length == 1,
+          storeLatLng: widget.store.hasLocation
+              ? LatLng(widget.store.latitude!, widget.store.longitude!)
+              : const LatLng(10.762622, 106.660172),
         ),
       ),
     );
@@ -245,12 +249,14 @@ class _LockerCard extends StatefulWidget {
     required this.locker,
     required this.storeName,
     required this.service,
+    required this.storeLatLng,
     this.initiallyExpanded = false,
   });
 
   final Map<String, dynamic> locker;
   final String storeName;
   final LockerOpsService service;
+  final LatLng storeLatLng;
   final bool initiallyExpanded;
 
   @override
@@ -530,6 +536,21 @@ class _LockerCardState extends State<_LockerCard> {
   }
 
   void _showBookingSheet(BuildContext ctx, Map<String, dynamic> cell) {
+    // DRONE cells use a dedicated booking flow
+    if ((cell['cellType'] as String?)?.toUpperCase() == 'DRONE') {
+      showModalBottomSheet<void>(
+        context: ctx,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => DroneBookingSheet(
+          cell: cell,
+          lockerName: _lockerName,
+          origin: widget.storeLatLng,
+        ),
+      );
+      return;
+    }
+
     final cellType = _cellTypeForBooking(cell);
     showModalBottomSheet<void>(
       context: ctx,
@@ -622,8 +643,7 @@ class _CellGrid extends StatelessWidget {
                         child: cell != null
                             ? _CellTile(
                                 cell: cell,
-                                onTap: cell['status'] == 'AVAILABLE' &&
-                                        cell['cellType'] != 'DRONE'
+                                onTap: cell['status'] == 'AVAILABLE'
                                     ? () => onCellTap(cell)
                                     : null,
                               )

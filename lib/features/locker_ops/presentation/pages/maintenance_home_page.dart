@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
+import 'package:smart_laundry_locker/features/drone_delivery/data/drone_delivery_store.dart';
+import 'package:smart_laundry_locker/features/drone_delivery/domain/entities/drone_order.dart';
 import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/utils/locker_maps.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/locker_picker.dart';
@@ -27,6 +29,8 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
   List<Map<String, dynamic>> _myReports = [];
   List<Map<String, dynamic>> _schedules = [];
   List<Map<String, dynamic>> _drones = [];
+  // Cảnh báo phần cứng toàn cục (GAP 2): ô cửa-mở-bất-thường trên mọi tủ.
+  List<Map<String, dynamic>> _anomalies = [];
   bool _loading = true;
   String? _myUserId;
   Map<String, dynamic>? _ratingAverage;
@@ -36,6 +40,8 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
   int? _selectedLockerId;
   Map<String, dynamic>? _layout;
   bool _layoutLoading = false;
+  // Box-health (GAP 2): trạng thái phần cứng cửa từ iot-service cho tủ đang chọn.
+  List<Map<String, dynamic>> _boxHealth = [];
 
   List<Map<String, dynamic>> get _lockerOptions => _lockers
       .where((locker) => _asInt(locker['id']) != null)
@@ -85,6 +91,11 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
         final drones = await _service.droneUnits();
         if (mounted) setState(() => _drones = drones);
       } catch (_) {}
+      // Cảnh báo phần cứng toàn cục (GAP 2) — best-effort, không vỡ trang nếu BE/IoT chưa có.
+      try {
+        final anomalies = await _service.boxAnomalies();
+        if (mounted) setState(() => _anomalies = anomalies);
+      } catch (_) {}
       final validSelected = lockers.any(
         (locker) => _asInt(locker['id']) == _selectedLockerId,
       );
@@ -113,11 +124,19 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
     setState(() {
       _selectedLockerId = lockerId;
       _layoutLoading = true;
+      _boxHealth = [];
     });
     try {
       final layout = await _service.layout(lockerId);
       if (!mounted) return;
       setState(() => _layout = layout);
+      // Box-health phần cứng (GAP 2) — best-effort, không vỡ trang nếu BE chưa deploy.
+      try {
+        final health = await _service.boxHealth(lockerId);
+        if (mounted && _selectedLockerId == lockerId) {
+          setState(() => _boxHealth = health);
+        }
+      } catch (_) {}
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -310,7 +329,149 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
                 ],
               ),
             ),
+            const SizedBox(height: 12),
+            _boxHealthCard(),
           ],
+        ],
+      ),
+    );
+  }
+
+  /// Box-health (GAP 2): trạng thái phần cứng cửa (cabinet báo qua IoT) đặt cạnh
+  /// trạng thái logic theo đơn; nổi bật ô "cần chú ý" (cửa mở trên ô không có đồ).
+  Widget _boxHealthCard() {
+    final health = _boxHealth;
+    final attention =
+        health.where((b) => b['needsAttention'] == true).toList();
+    return OpsCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.sensor_door_outlined, size: 18, color: opsPrimary),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Tình trạng phần cứng ô',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                ),
+              ),
+              if (attention.isNotEmpty)
+                _MiniPill(
+                  icon: Icons.warning_amber_rounded,
+                  text: '${attention.length} cần chú ý',
+                  color: const Color(0xFFDC2626),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (health.isEmpty)
+            const OpsBanner(
+              tone: OpsBannerTone.info,
+              icon: Icons.info_outline,
+              text:
+                  'Chưa có dữ liệu cảm biến cửa cho tủ này (cabinet chưa báo hoặc dịch vụ IoT chưa bật).',
+            )
+          else ...[
+            if (attention.isNotEmpty) ...[
+              OpsBanner(
+                tone: OpsBannerTone.danger,
+                icon: Icons.error_outline,
+                text:
+                    '${attention.length} ô có cửa đang MỞ nhưng không ở trạng thái "có đồ" — nên kiểm tra (cửa kẹt/quên đóng).',
+              ),
+              const SizedBox(height: 10),
+            ],
+            for (final b in health) _boxHealthRow(b),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _boxHealthRow(Map<String, dynamic> b) {
+    final boxNumber = b['boxNumber'];
+    final logical = b['logicalStatus']?.toString();
+    final hw = b['hwState']?.toString();
+    final doorOpen = b['doorOpen'] == true;
+    final needsAttention = b['needsAttention'] == true;
+    final reported = b['lastReportedAt'];
+    final Color accent = needsAttention
+        ? const Color(0xFFDC2626)
+        : hw == null
+            ? const Color(0xFF6B7280)
+            : doorOpen
+                ? const Color(0xFFD97706)
+                : const Color(0xFF16A34A);
+    final String doorText = hw == null
+        ? 'Chưa có tín hiệu cửa'
+        : doorOpen
+            ? 'Cửa đang MỞ'
+            : 'Cửa đóng';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: needsAttention ? accent.withValues(alpha: 0.06) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: needsAttention
+              ? accent.withValues(alpha: 0.35)
+              : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '${boxNumber ?? '?'}',
+              style: TextStyle(fontWeight: FontWeight.w800, color: accent),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      doorOpen ? Icons.sensor_door : Icons.meeting_room_outlined,
+                      size: 15,
+                      color: accent,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      doorText,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: accent,
+                      ),
+                    ),
+                  ],
+                ),
+                if (reported != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      'Báo lúc ${fmtDateTime(reported)}',
+                      style: const TextStyle(fontSize: 11, color: opsMutedText),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          StatusChip(logical),
         ],
       ),
     );
@@ -1013,6 +1174,89 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
     if (mounted) await _load();
   }
 
+  /// Cảnh báo phần cứng toàn cục (GAP 2): mọi ô cửa-mở-bất-thường trên tất cả
+  /// tủ, để KTV thấy ngay ở đầu tab Sự cố mà không phải chọn từng tủ. Ẩn khi
+  /// không có ô nào bất thường.
+  Widget _boxAnomaliesSection() {
+    final anomalies = _anomalies;
+    if (anomalies.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const OpsSectionLabel(
+          'Cảnh báo phần cứng (cửa mở bất thường)',
+          icon: Icons.sensor_door_outlined,
+        ),
+        OpsBanner(
+          tone: OpsBannerTone.danger,
+          icon: Icons.error_outline,
+          text:
+              '${anomalies.length} ô có cửa đang MỞ nhưng không có đồ — nên kiểm tra (cửa kẹt/quên đóng).',
+        ),
+        const SizedBox(height: 10),
+        for (final a in anomalies)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: OpsCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.sensor_door, color: Color(0xFFD97706)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${a['lockerName'] ?? 'Tủ ${a['lockerId']}'} · Ô #${a['boxNumber']} (${a['cellType']})',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      StatusChip(a['logicalStatus']?.toString()),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded,
+                          size: 15, color: Color(0xFFD97706)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          a['lastReportedAt'] != null
+                              ? 'Cửa MỞ · báo lúc ${fmtDateTime(a['lastReportedAt'])}'
+                              : 'Cửa MỞ',
+                          style: const TextStyle(
+                              fontSize: 12.5, color: opsMutedText),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (a['lockerLatitude'] != null ||
+                      a['lockerAddress'] != null) ...[
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: () => _openDirections(a),
+                        icon: const Icon(Icons.directions_outlined,
+                            size: 16, color: opsPrimary),
+                        label: const Text('Chỉ đường',
+                            style: TextStyle(color: opsPrimary)),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
   Widget _buildQueue() {
     return RefreshIndicator(
       onRefresh: _load,
@@ -1021,6 +1265,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
         children: [
           _buildShiftSummary(),
           const SizedBox(height: 16),
+          _boxAnomaliesSection(),
           if (_faults.isNotEmpty) ...[
             const OpsSectionLabel('Ô đang lỗi vật lý', icon: Icons.warning_amber_rounded),
             for (final f in _faults)
@@ -1373,41 +1618,208 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage>
   Widget _buildDroneFleet() {
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(
-        padding: const EdgeInsets.all(12),
-        children: [
-          const OpsBanner(
-            tone: OpsBannerTone.info,
-            icon: Icons.flight_outlined,
-            text: 'Pin và trạng thái bay do kỹ thuật viên cập nhật tay — chưa '
-                'có telemetry thật từ drone.',
+      child: ListenableBuilder(
+        listenable: DroneDeliveryStore.instance,
+        builder: (context, _) {
+          final pending = DroneDeliveryStore.instance.pendingOrders;
+          return ListView(
+            padding: const EdgeInsets.all(12),
+            children: [
+              // ── Đơn hàng drone chờ điều phối ────────────────────────────
+              if (pending.isNotEmpty) ...[
+                OpsSectionLabel(
+                  'Chờ điều phối (${pending.length})',
+                  icon: Icons.inbox_rounded,
+                ),
+                const SizedBox(height: 8),
+                for (final order in pending) _pendingOrderCard(order),
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 8),
+              ],
+
+              const OpsBanner(
+                tone: OpsBannerTone.info,
+                icon: Icons.flight_outlined,
+                text: 'Pin và trạng thái bay do kỹ thuật viên cập nhật tay — '
+                    'chưa có telemetry thật từ drone.',
+              ),
+              const SizedBox(height: 12),
+              _droneToolCard(
+                icon: Icons.map_outlined,
+                title: 'Lập kế hoạch bay (Mission Planner)',
+                subtitle: 'Vẽ waypoint, đặt độ cao/lệnh, xuất file mission',
+                onTap: () => context.push(AppRouter.droneMissionPlanner),
+              ),
+              const SizedBox(height: 10),
+              _droneToolCard(
+                icon: Icons.flight_takeoff,
+                title: 'Telemetry & điều khiển (Flight Data)',
+                subtitle: 'Kết nối MAVLink, xem vị trí/HUD live, gửi lệnh bay',
+                onTap: () => context.push(AppRouter.droneFlightData),
+              ),
+              const SizedBox(height: 12),
+              if (_drones.isEmpty)
+                const OpsEmptyState(
+                  icon: Icons.flight_outlined,
+                  title: 'Chưa có drone nào',
+                  subtitle:
+                      'Đội drone sẽ hiện ở đây khi được thêm vào hệ thống.',
+                )
+              else
+                for (final d in _drones) _droneCard(d),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _pendingOrderCard(DroneOrder order) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFF6366F1).withValues(alpha: 0.35),
           ),
-          const SizedBox(height: 12),
-          _droneToolCard(
-            icon: Icons.map_outlined,
-            title: 'Lập kế hoạch bay (Mission Planner)',
-            subtitle: 'Vẽ waypoint, đặt độ cao/lệnh, xuất file mission',
-            onTap: () => context.push(AppRouter.droneMissionPlanner),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF6366F1).withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF2FF),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.flight,
+                    color: Color(0xFF6366F1),
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        order.lockerName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: opsDark,
+                        ),
+                      ),
+                      Text(
+                        'Ô #${order.boxNumber} · ${_formatTime(order.createdAt)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                FilledButton.icon(
+                  onPressed: () => _confirmDispatch(order),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF6366F1),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: const Icon(Icons.send_rounded, size: 15),
+                  label: const Text(
+                    'Điều phối',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+            if (order.description != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Hàng: ${order.description}',
+                style: const TextStyle(fontSize: 12, color: Colors.black54),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatTime(DateTime t) {
+    final now = DateTime.now();
+    final diff = now.difference(t);
+    if (diff.inMinutes < 1) return 'Vừa xong';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} phút trước';
+    return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _confirmDispatch(DroneOrder order) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.flight, color: Color(0xFF6366F1)),
+            SizedBox(width: 8),
+            Text('Điều phối drone'),
+          ],
+        ),
+        content: Text(
+          'Xác nhận điều phối drone tới ô #${order.boxNumber} '
+          'tại ${order.lockerName}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
           ),
-          const SizedBox(height: 10),
-          _droneToolCard(
-            icon: Icons.flight_takeoff,
-            title: 'Telemetry & điều khiển (Flight Data)',
-            subtitle: 'Kết nối MAVLink, xem vị trí/HUD live, gửi lệnh bay',
-            onTap: () => context.push(AppRouter.droneFlightData),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF6366F1),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Điều phối ngay'),
           ),
-          const SizedBox(height: 12),
-          if (_drones.isEmpty)
-            const OpsEmptyState(
-              icon: Icons.flight_outlined,
-              title: 'Chưa có drone nào',
-              subtitle: 'Đội drone sẽ hiện ở đây khi được thêm vào hệ thống.',
-            )
-          else
-            for (final d in _drones) _droneCard(d),
         ],
       ),
     );
+    if (ok == true) {
+      DroneDeliveryStore.instance.dispatch(order.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Drone đã được điều phối!'),
+            backgroundColor: Color(0xFF6366F1),
+          ),
+        );
+      }
+    }
   }
 
   Widget _droneCard(Map<String, dynamic> drone) {

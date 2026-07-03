@@ -316,6 +316,70 @@ class AuthRepositoryImpl implements AuthRepository {
       return Left(UnknownFailure(e.toString()));
     }
   }
+
+  @override
+  Future<Either<Failure, bool>> sendPasswordResetOtp({
+    required String email,
+  }) async {
+    try {
+      await _remoteDataSource.sendPasswordResetOtp(email: email);
+      return const Right(true);
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } catch (e) {
+      return Left(_mapPasswordResetBackendFailure(e));
+    }
+  }
+
+  @override
+  Future<Either<Failure, bool>> resetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    try {
+      await _remoteDataSource.resetPassword(
+        email: email,
+        otp: otp,
+        newPassword: newPassword,
+        confirmPassword: confirmPassword,
+      );
+      return const Right(true);
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } catch (e) {
+      return Left(_mapPasswordResetBackendFailure(e));
+    }
+  }
+}
+
+Failure _mapPasswordResetBackendFailure(Object error) {
+  final message = switch (error) {
+    ServerException e => e.message,
+    ValidationException e => e.message,
+    NotFoundException e => e.message,
+    AuthenticationException e => e.message,
+    AuthorizationException e => e.message,
+    _ => error.toString(),
+  };
+  final m = message.toLowerCase().trim();
+  if (m.contains('user not found') || m.contains('not found')) {
+    return const ValidationFailure(
+      'Email chưa được đăng ký tài khoản. Vui lòng kiểm tra lại.',
+    );
+  }
+  if (m.contains('otp')) {
+    return const ValidationFailure('Mã OTP không hợp lệ hoặc đã hết hạn.');
+  }
+  if (m.contains('do not match') || m.contains('mismatch')) {
+    return const ValidationFailure('Mật khẩu nhập lại không khớp.');
+  }
+  return ServerFailure(
+    message.isNotEmpty
+        ? message
+        : 'Không thể đặt lại mật khẩu. Vui lòng thử lại.',
+  );
 }
 
 Failure _mapQrConfirmBackendMessage(String message) {

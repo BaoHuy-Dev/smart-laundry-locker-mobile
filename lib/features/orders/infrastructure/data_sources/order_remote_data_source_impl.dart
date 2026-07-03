@@ -1,7 +1,6 @@
 import 'package:smart_laundry_locker/core/network/api_client.dart';
 import 'package:smart_laundry_locker/features/orders/infrastructure/data_sources/order_remote_data_source.dart';
 import 'package:smart_laundry_locker/features/orders/infrastructure/models/order_model.dart';
-import 'package:smart_laundry_locker/features/orders/infrastructure/models/responses/courier_orders_response.dart';
 import 'package:smart_laundry_locker/features/orders/infrastructure/models/responses/orders_response.dart';
 import 'package:dio/dio.dart';
 
@@ -102,70 +101,6 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
   }
 
   @override
-  Future<CourierOrderHistoryResponse> getCourierOrderHistory({
-    int page = 1,
-    int limit = 20,
-  }) async {
-    final response = await _apiClient.get<dynamic>(
-      '/courier/orders/history',
-      queryParameters: {'page': page, 'limit': limit},
-    );
-    final data = _extractData(response);
-    final dynamic listRaw = data['orders'] ?? data['items'] ?? data['history'];
-    final list = (listRaw as List<dynamic>? ?? const [])
-        .map((e) => CourierOrderItem.fromJson(e as Map<String, dynamic>))
-        .toList();
-    return CourierOrderHistoryResponse(items: list);
-  }
-
-  @override
-  Future<CourierTodayStatsResponse> getCourierTodayStats() async {
-    final response = await _apiClient.get<dynamic>('/courier/stats/today');
-    final data = _extractData(response);
-
-    int parseInt(dynamic raw) {
-      if (raw is int) return raw;
-      if (raw is num) return raw.toInt();
-      if (raw is String) return int.tryParse(raw) ?? 0;
-      return 0;
-    }
-
-    final completed = parseInt(
-      data['completedToday'] ??
-          data['completedJobsToday'] ??
-          data['completed'] ??
-          0,
-    );
-    final delivering = parseInt(
-      data['deliveringToday'] ??
-          data['activeDeliveries'] ??
-          data['delivering'] ??
-          0,
-    );
-    return CourierTodayStatsResponse(
-      completedToday: completed,
-      deliveringToday: delivering,
-    );
-  }
-
-  @override
-  Future<CourierMeResponse> getCourierOrders({
-    int page = 1,
-    int limit = 10,
-    String? status,
-  }) async {
-    final response = await _apiClient.get<dynamic>(
-      '/orders/courier/me',
-      queryParameters: {
-        'page': page,
-        'limit': limit,
-        if (status != null && status.isNotEmpty) 'status': status,
-      },
-    );
-    return CourierMeResponse.fromJson(_extractData(response));
-  }
-
-  @override
   Future<bool> recreateAccessCode(String orderDetailId) async {
     final response = await _apiClient.post<dynamic>(
       '/orders/recreate-access-code',
@@ -177,24 +112,4 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
     return response.statusCode == 200 || response.statusCode == 201;
   }
 
-  @override
-  Future<OrderDetailResponse> getCourierOrderDetail(String id) async {
-    final response = await _apiClient.get<dynamic>(
-      '/orders/courier/detail/$id',
-    );
-    return OrderDetailResponse.fromJson(_extractData(response));
-  }
-
-  @override
-  Future<OrderModel> courierCancelOrder({
-    required String orderId,
-    required String reason,
-  }) async {
-    final response = await _apiClient.post<dynamic>(
-      '/logistics/courier/cancel',
-      data: {'orderId': orderId, 'reason': reason},
-    );
-    final data = _extractData(response);
-    return OrderModel.fromJson(data);
-  }
 }

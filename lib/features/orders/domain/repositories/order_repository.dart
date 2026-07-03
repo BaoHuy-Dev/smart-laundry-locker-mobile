@@ -1,8 +1,6 @@
 import 'package:smart_laundry_locker/features/orders/domain/entities/order.dart';
 import 'package:smart_laundry_locker/features/orders/domain/entities/order_detail.dart';
 import 'package:smart_laundry_locker/core/domain/entities/pagination.dart';
-import 'package:smart_laundry_locker/features/orders/domain/entities/courier_order.dart';
-import 'package:smart_laundry_locker/features/orders/domain/entities/courier_today_stats.dart';
 import 'package:dartz/dartz.dart' hide Order;
 import 'package:smart_laundry_locker/core/errors/failures.dart';
 
@@ -35,39 +33,9 @@ abstract class OrderRepository {
   /// API: POST /orders/pay-fee
   Future<Either<Failure, double>> payOverdueFee(String orderId);
 
-  /// Lịch sử đơn giao của courier
-  /// API: GET /courier/history
-  Future<Either<Failure, List<CourierOrder>>> getCourierOrderHistory({
-    int page = 1,
-    int limit = 20,
-  });
-
-  /// Thống kê đơn courier trong hôm nay
-  /// API: GET /courier/stats/today
-  Future<Either<Failure, CourierTodayStats>> getCourierTodayStats();
-
-  /// Lấy danh sách đơn hàng đã nhận/hủy/hoàn thành của courier hiện tại
-  /// API: GET /orders/courier/me
-  Future<Either<Failure, PaginatedResult<OrderWithDetails>>> getCourierMe({
-    int page = 1,
-    int limit = 10,
-    String? status,
-  });
-
   /// Tạo mới mã mở tủ kiosk (OWNER)
   /// API: POST /orders/recreate-access-code
   Future<Either<Failure, bool>> recreateAccessCode(String orderDetailId);
-
-  /// Lấy chi tiết đơn hàng cho courier
-  /// API: GET /orders/courier/detail/:id
-  Future<Either<Failure, OrderWithDetails>> getCourierOrderDetail(String id);
-
-  /// Courier hủy đơn hàng
-  /// API: POST /orders/courier/cancel
-  Future<Either<Failure, Order>> courierCancelOrder({
-    required String orderId,
-    required String reason,
-  });
 }
 
 class OrderWithDetails {

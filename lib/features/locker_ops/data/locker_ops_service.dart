@@ -215,6 +215,16 @@ class LockerOpsService {
     },
   );
 
+  /// Manager đổi trạng thái đơn (trước đây chỉ Admin làm được).
+  Future<Map<String, dynamic>> managerSetOrderStatus(
+    int orderId,
+    String status,
+  ) => _map(
+    'PATCH',
+    '/api/manage/orders/$orderId/status',
+    body: {'status': status},
+  );
+
   // ---- Maintenance ----
   Future<List<Map<String, dynamic>>> faults() =>
       _list('/api/maintenance/faults');
@@ -273,6 +283,21 @@ class LockerOpsService {
   /// Điểm đánh giá trung bình KTV nhận được từ các report mình xử lý.
   Future<Map<String, dynamic>> myRatingAverage() =>
       _map('GET', '/api/maintenance/my-rating-average');
+
+  /// Box-health cho bảo trì: trạng thái logic (theo đơn) đặt cạnh trạng thái
+  /// phần cứng cửa cabinet báo lên (GAP 2). Mỗi phần tử:
+  /// `{boxId, boxNumber, cellType, logicalStatus, hwState, lastReportedAt,
+  /// doorOpen, needsAttention}`. `needsAttention` = cửa đang mở nhưng ô không
+  /// `OCCUPIED` (nghi cửa kẹt/quên đóng).
+  Future<List<Map<String, dynamic>>> boxHealth(int lockerId) =>
+      _list('/api/maintenance/lockers/$lockerId/box-health');
+
+  /// Tổng quan ca trực: mọi ô trên TẤT CẢ tủ đang có cửa phần cứng MỞ nhưng
+  /// không `OCCUPIED` (nghi cửa kẹt/quên đóng). Mỗi phần tử kèm metadata locker
+  /// (`lockerName/lockerAddress/lockerLatitude/lockerLongitude` để chỉ đường) +
+  /// `boxId/boxNumber/cellType/logicalStatus/hwState/lastReportedAt`.
+  Future<List<Map<String, dynamic>>> boxAnomalies() =>
+      _list('/api/maintenance/box-anomalies');
 
   // ---- Drone fleet (maintenance) ----
   // Pin/trạng thái bay hiện chưa có telemetry thật, KTV nhập tay qua các
