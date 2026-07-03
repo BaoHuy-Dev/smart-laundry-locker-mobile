@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'dart:async';
@@ -24,6 +24,20 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 class FirebaseMessagingService {
   FirebaseMessagingService._();
   static final FirebaseMessagingService instance = FirebaseMessagingService._();
+
+  /// 6 loại push của luồng giao hàng bằng drone (Phase 1). Tap vào bất kỳ loại
+  /// nào đều deep-link tới trang theo dõi drone theo `orderId` trong data.
+  static const Set<String> droneDeliveryTypes = {
+    'drone_dispatched',
+    'drone_approaching',
+    'drone_arrived',
+    'drone_delivered',
+    'drone_delayed',
+    'drone_failed',
+  };
+
+  static bool _isDroneDeliveryType(Object? type) =>
+      type is String && droneDeliveryTypes.contains(type);
 
   FirebaseMessaging get _firebaseMessaging => FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotificationsPlugin =
@@ -221,9 +235,9 @@ class FirebaseMessagingService {
     // messages and pure data-only messages from the backend)
     _showLocalNotification(message);
 
-    if (delivery == null) {
-      // Noti giao hàng đã hiển thị banner local ở trên rồi -> không toast trùng.
-      // Các noti khác: fallback toast tiêu đề.
+    if (!_isDroneDeliveryType(type) && delivery == null) {
+      // Noti giao hàng (kể cả drone_*) đã hiển thị banner local ở trên rồi ->
+      // không toast trùng. Các noti khác: fallback toast tiêu đề.
       final title =
           message.notification?.title ??
           message.data['title'] as String? ??
@@ -296,8 +310,8 @@ class FirebaseMessagingService {
   /// Điều hướng khi người dùng bấm vào noti (background/terminated qua
   /// onMessageOpenedApp/getInitialMessage, hoặc foreground qua local-notif).
   ///
-  /// Ưu tiên: noti giao hàng (có `orderId`) -> mở thẳng chi tiết đơn;
-  /// còn lại -> màn Thông báo.
+  /// Ưu tiên: noti giao drone (`type` = drone_*) -> trang theo dõi timeline;
+  /// noti giao hàng khác (có `orderId`) -> chi tiết đơn; còn lại -> Thông báo.
   void _handleTapData(Map<String, dynamic> data) {
     final delivery = DeliveryNotification.fromData(data);
 
@@ -305,7 +319,11 @@ class FirebaseMessagingService {
       final context = AppRouter.navigatorKey.currentContext;
       if (context == null) return;
 
-      if (delivery != null) {
+      if (_isDroneDeliveryType(type)) {
+        // Luồng giao drone (Phase 1): mở trang theo dõi timeline theo orderId.
+        final orderId = data['orderId']?.toString() ?? '';
+        context.go(AppRouter.droneDeliveryTracking, extra: orderId);
+      } else if (delivery != null) {
         // Deep-link tới chi tiết đơn theo orderId (route nhận String orderId).
         context.push(AppRouter.orderDetail, extra: delivery.orderId);
       } else {
@@ -313,5 +331,4 @@ class FirebaseMessagingService {
       }
     });
   }
-
 }

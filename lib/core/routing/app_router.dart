@@ -47,6 +47,7 @@ import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/my_l
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/my_reports_page.dart';
 import 'package:smart_laundry_locker/features/drone_mission/presentation/mission_planner_page.dart';
 import 'package:smart_laundry_locker/features/drone_telemetry/presentation/flight_data_page.dart';
+import 'package:smart_laundry_locker/features/drone_delivery/presentation/pages/drone_delivery_tracking_page.dart';
 import 'package:smart_laundry_locker/features/stores/domain/entities/store.dart';
 import 'package:smart_laundry_locker/features/stores/presentation/pages/stores_page.dart';
 import 'package:smart_laundry_locker/features/stores/presentation/pages/store_detail_page.dart';
@@ -96,6 +97,7 @@ class AppRouter {
   static const String directions = '/directions';
   static const String droneMissionPlanner = '/drone/mission-planner';
   static const String droneFlightData = '/drone/flight-data';
+  static const String droneDeliveryTracking = '/drone-delivery';
 
   static final GlobalKey<NavigatorState> navigatorKey =
       GlobalKey<NavigatorState>();
@@ -424,6 +426,19 @@ class AppRouter {
         path: droneFlightData,
         name: 'drone_flight_data',
         builder: (context, state) => const FlightDataPage(),
+      ),
+      GoRoute(
+        path: droneDeliveryTracking,
+        name: 'drone_delivery_tracking',
+        builder: (context, state) {
+          // Deep-link từ FCM: `extra` là orderId (String); fallback query param.
+          final extra = state.extra;
+          final orderId =
+              (extra is String ? extra : null) ??
+              state.uri.queryParameters['orderId'] ??
+              '';
+          return DroneDeliveryTrackingPage(orderId: orderId);
+        },
       ),
     ],
   );
