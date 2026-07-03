@@ -11,7 +11,6 @@ import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:smart_laundry_locker/core/services/token_service.dart';
 
 class ProfileDetailPage extends StatefulWidget {
   const ProfileDetailPage({super.key});
@@ -24,7 +23,6 @@ class _ProfileDetailPageState extends State<ProfileDetailPage> {
   late ProfileProvider _profileProvider;
   bool _showEmail = false;
   bool _showPhone = false;
-  List<String> _userRoles = [];
 
   @override
   void initState() {
@@ -34,12 +32,6 @@ class _ProfileDetailPageState extends State<ProfileDetailPage> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _profileProvider.loadProfile();
-      final roles = await TokenService.getCurrentRoles();
-      if (mounted) {
-        setState(() {
-          _userRoles = roles;
-        });
-      }
     });
   }
 
@@ -134,12 +126,6 @@ class _ProfileDetailPageState extends State<ProfileDetailPage> {
               if (profile == null) {
                 return const Center(child: Text('Không có dữ liệu'));
               }
-
-              final bool isCourier =
-                  profile.isVerified &&
-                  profile.status == UserStatus.ACTIVE &&
-                  (_userRoles.contains('COURIER') ||
-                      _userRoles.contains('STAFF'));
 
               final String statusLabel = profile.status == UserStatus.ACTIVE
                   ? 'Trạng thái tài khoản: Đang hoạt động'
@@ -350,89 +336,6 @@ class _ProfileDetailPageState extends State<ProfileDetailPage> {
 
                     const SizedBox(height: 24),
 
-                    // Thông tin tài xế
-                    Opacity(
-                      opacity: isCourier ? 1.0 : 0.5,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: isCourier
-                            ? () {
-                                context.push(
-                                  AppRouter.courierDetail,
-                                  extra: profile.id,
-                                );
-                              }
-                            : null,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: AppColors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 14,
-                                offset: const Offset(0, 6),
-                              ),
-                            ],
-                            border: Border.all(
-                              color: AppColors.grey200,
-                              width: 1.2,
-                            ),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 16,
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                LucideIcons.truck,
-                                size: 26,
-                                color: isCourier
-                                    ? AppColors.primary
-                                    : AppColors.onSurfaceVariant,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Thông tin tài xế',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w700,
-                                        color: isCourier
-                                            ? AppColors.onBackground
-                                            : AppColors.grey600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Chỉ dành cho đối tác tài xế',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: AppColors.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Icon(
-                                LucideIcons.chevronRight,
-                                size: 22,
-                                color: isCourier
-                                    ? AppColors.onSurfaceVariant
-                                    : AppColors.grey500,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
 
                     if (provider.error != null) ...[
                       const SizedBox(height: 16),

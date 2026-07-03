@@ -329,15 +329,17 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
       _snack('Đơn chưa có thông tin ô/PIN để mở tủ.');
       return;
     }
+    _snack('Đang gửi lệnh mở ô $boxId tới tủ...');
     try {
+      // Backend chờ phản hồi phần cứng qua MQTT rồi mới trả: accepted=true
+      // nghĩa là cabinet đã xác nhận MỞ CỬA thật (không phải chỉ nhận lệnh).
       final res = await _service.unlock(lockerId, boxId, pin);
-      final opened = res['opened'] == true ||
-          res['success'] == true ||
-          '${res['status']}'.toUpperCase() == 'OPENED';
-      _snack(opened
-          ? 'Đã mở ô $boxId — cửa tủ đang mở, mời bạn thao tác.'
-          : 'Đã gửi lệnh mở ô $boxId tới tủ.');
-      await _load();
+      final accepted = res['accepted'] == true;
+      final msg = res['message']?.toString();
+      _snack(accepted
+          ? 'Tủ đã mở ô $boxId — mời bạn thao tác rồi đóng cửa.'
+          : 'Không mở được ô $boxId${msg != null && msg.isNotEmpty ? ': $msg' : ''}');
+      if (accepted) await _load();
     } catch (e) {
       _snack(LockerOpsService.errorMessage(e));
     }
@@ -497,12 +499,6 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
                     label: 'Gửi hàng',
                     selected: _typeFilter == 'SEND',
                     onTap: () => setState(() => _typeFilter = 'SEND'),
-                  ),
-                  const SizedBox(width: 8),
-                  _TypeChip(
-                    label: 'Giặt ủi',
-                    selected: _typeFilter == 'LAUNDRY',
-                    onTap: () => setState(() => _typeFilter = 'LAUNDRY'),
                   ),
                 ],
               ),
@@ -925,7 +921,6 @@ class _DetailSheet extends StatelessWidget {
     final status = order['status'] as String? ?? '';
     final type = (order['type'] as String? ?? '').toUpperCase();
     final isRental = type == 'RENTAL';
-    final isLaundry = type == 'LAUNDRY';
     final boxId = (order['sendBoxId'] ?? order['receiveBoxId']) as int?;
     final deadline = order['pickupDeadline'];
     final overdue =
@@ -974,8 +969,7 @@ class _DetailSheet extends StatelessWidget {
           primary: true,
           onTap: () => onConfirmDrop(id),
         ),
-      if (status == 'RETURNED' ||
-          (status == 'STORING' && !isRental && !isLaundry))
+      if (status == 'RETURNED' || (status == 'STORING' && !isRental))
         OpsSheetAction(
           label: 'Tôi đã lấy đồ — hoàn tất',
           icon: LucideIcons.circleCheck,

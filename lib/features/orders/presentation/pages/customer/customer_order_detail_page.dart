@@ -19,6 +19,7 @@ import 'package:smart_laundry_locker/features/maintenance/presentation/pages/cre
 import 'package:smart_laundry_locker/features/delegations/presentation/pages/search_delegatee_page.dart';
 import 'package:smart_laundry_locker/shared/widgets/app_bar.dart';
 import 'package:flutter/material.dart';
+import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
 import 'package:smart_laundry_locker/features/orders/presentation/widgets/pulsing_report_icon.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -1060,18 +1061,22 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
   }
 
   Future<void> _handleCancelOrder(BuildContext context, String orderId) async {
+    // Hủy đơn qua order-service thật (PUT /api/orders/{id}/cancel) — luồng
+    // logistics/courier cũ đã gỡ khỏi dự án.
+    final id = int.tryParse(orderId);
+    if (id == null) {
+      SmartDialog.showToast('Mã đơn không hợp lệ');
+      return;
+    }
     SmartDialog.showLoading<void>(msg: 'Đang hủy đơn hàng...');
-    final success = await _provider.cancelOrderAsCustomer(orderId);
-    SmartDialog.dismiss<void>();
-
-    if (success) {
+    try {
+      await LockerOpsService().cancelOrder(id);
+      SmartDialog.dismiss<void>();
       SmartDialog.showToast('Đã hủy đơn hàng thành công');
-      // Refresh to update status and hide buttons
       await _provider.fetchOrderDetail(orderId);
-    } else {
-      SmartDialog.showToast(
-        'Lỗi: ${_provider.error ?? "Không thể hủy đơn hàng"}',
-      );
+    } catch (e) {
+      SmartDialog.dismiss<void>();
+      SmartDialog.showToast(LockerOpsService.errorMessage(e));
     }
   }
 

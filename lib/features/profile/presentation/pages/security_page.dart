@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:smart_laundry_locker/core/constants/app_colors.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
+import 'package:smart_laundry_locker/core/services/biometric_service.dart';
 import 'package:smart_laundry_locker/features/profile/presentation/providers/profile_injection.dart';
 import 'package:smart_laundry_locker/features/profile/presentation/providers/security_provider.dart';
 import 'package:flutter/material.dart';
@@ -24,11 +25,53 @@ class _SecurityPageState extends State<SecurityPage> {
   bool _obscurePassword = true;
   bool _isLoadingProfile = true;
 
+  // Khóa ứng dụng bằng sinh trắc học thiết bị (vân tay/khuôn mặt OS).
+  bool _bioSupported = false;
+  bool _bioEnabled = false;
+
   @override
   void initState() {
     super.initState();
     _securityProvider = ProfileInjection.provideSecurityProvider(ApiClient());
     _loadCurrentUserEmail();
+    _loadBiometricState();
+  }
+
+  Future<void> _loadBiometricState() async {
+    final supported = await BiometricService.isSupported();
+    final enabled = await BiometricService.isEnabled();
+    if (!mounted) return;
+    setState(() {
+      _bioSupported = supported;
+      _bioEnabled = enabled;
+    });
+  }
+
+  Future<void> _toggleBiometric(bool value) async {
+    if (!_bioSupported) {
+      SmartDialog.showToast(
+        'Thiết bị chưa đăng ký vân tay/khuôn mặt trong cài đặt hệ thống.',
+      );
+      return;
+    }
+    if (value) {
+      // Bắt xác thực thành công một lần trước khi bật để tránh tự khóa nhầm.
+      final ok = await BiometricService.authenticate(
+        reason: 'Xác thực để bật khóa ứng dụng',
+      );
+      if (!ok) {
+        SmartDialog.showToast('Xác thực không thành công');
+        return;
+      }
+    }
+    await BiometricService.setEnabled(value);
+    if (!mounted) return;
+    setState(() => _bioEnabled = value);
+    SmartDialog.showToast(
+      value
+          ? 'Đã bật khóa ứng dụng bằng sinh trắc học'
+          : 'Đã tắt khóa ứng dụng bằng sinh trắc học',
+    );
   }
 
   Future<void> _loadCurrentUserEmail() async {
@@ -313,6 +356,40 @@ class _SecurityPageState extends State<SecurityPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const SizedBox(height: 8),
+                    // ── Khóa ứng dụng bằng sinh trắc học ──────────────────
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: AppColors.success.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: SwitchListTile(
+                        value: _bioEnabled,
+                        onChanged: _toggleBiometric,
+                        activeColor: AppColors.success,
+                        secondary: const Icon(
+                          Icons.fingerprint,
+                          color: AppColors.success,
+                          size: 28,
+                        ),
+                        title: const Text(
+                          'Khóa ứng dụng bằng sinh trắc học',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        subtitle: Text(
+                          _bioSupported
+                              ? 'Yêu cầu vân tay/khuôn mặt mỗi khi mở app.'
+                              : 'Thiết bị chưa đăng ký sinh trắc học.',
+                          style: const TextStyle(fontSize: 12.5),
+                        ),
+                      ),
+                    ),
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(

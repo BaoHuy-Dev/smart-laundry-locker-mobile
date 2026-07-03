@@ -12,22 +12,16 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
-import 'package:smart_laundry_locker/core/services/courier_mode_provider.dart';
-import 'package:smart_laundry_locker/core/services/app_initial_tab_service.dart';
 import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:smart_laundry_locker/core/theme/theme_provider.dart';
-import 'package:smart_laundry_locker/features/courier_dispatch/presentation/providers/courier_dispatch_injection.dart';
-import 'package:smart_laundry_locker/features/courier_dispatch/presentation/providers/courier_dispatch_provider.dart';
 import 'package:smart_laundry_locker/features/profile/presentation/mixins/profile_image_actions_mixin.dart';
-import 'package:smart_laundry_locker/features/profile/presentation/pages/staff_application_page.dart';
 import 'package:smart_laundry_locker/features/profile/presentation/widgets/profile_header.dart';
 import 'package:smart_laundry_locker/features/profile/presentation/widgets/profile_menu_item.dart';
-import 'package:smart_laundry_locker/features/staff_application/presentation/providers/staff_application_injection.dart';
-import 'package:smart_laundry_locker/features/staff_application/presentation/providers/staff_application_provider.dart';
 import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -53,9 +47,6 @@ class _ProfilePageState extends State<ProfilePage>
   bool _isLoggedIn = false;
   late ProfileProvider _profileProvider;
   late DelegationProvider _delegationProvider;
-  late StaffApplicationProvider _staffApplicationProvider;
-  late CourierDispatchProvider _courierDispatchProvider;
-  bool _isCourierModeSwitching = false;
 
   @override
   void initState() {
@@ -65,80 +56,10 @@ class _ProfilePageState extends State<ProfilePage>
     _delegationProvider = DelegationInjection.provideDelegationProvider(
       apiClient,
     );
-    _staffApplicationProvider = StaffApplicationInjection.provideProvider(
-      apiClient,
-    );
-    _courierDispatchProvider =
-        CourierDispatchInjection.provideCourierDispatchProvider();
     TokenService.authState.addListener(_onAuthStateChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadUserProfile();
     });
-  }
-
-  Future<void> _switchCourierModeWithReload(bool nextValue) async {
-    if (_isCourierModeSwitching) return;
-
-    final courierModeProvider = context.read<CourierModeProvider>();
-    final prevValue = courierModeProvider.isCourierModeActive;
-
-    setState(() {
-      _isCourierModeSwitching = true;
-    });
-
-    try {
-      try {
-        await AppInitialTabService.setInitialTab(4);
-      } catch (e) {
-        debugPrint('setInitialTab failed: $e');
-      }
-
-      SmartDialog.showLoading<void>(msg: 'Đang chuyển đổi giao diện...');
-      await Future<void>.delayed(const Duration(milliseconds: 1500));
-      if (!mounted) return;
-
-      String? syncError;
-      try {
-        if (!nextValue) {
-          await _courierDispatchProvider.goOffline();
-        } else {
-          await _courierDispatchProvider.toggleOnlineStatus(true);
-        }
-        syncError = _courierDispatchProvider.error;
-      } catch (e) {
-        syncError = e.toString();
-        debugPrint('courier location sync failed: $e');
-      }
-
-      await courierModeProvider.setCourierModeActive(nextValue);
-
-      if (!mounted) return;
-
-      if (syncError != null && syncError.isNotEmpty) {
-        _showProfileSnackBar(
-          'Đã chuyển giao diện, nhưng chưa đồng bộ trạng thái online/offline với server.',
-        );
-      }
-    } catch (e) {
-      debugPrint('switchCourierModeWithReload failed: $e');
-      if (mounted) {
-        try {
-          await courierModeProvider.setCourierModeActive(prevValue);
-        } catch (e2) {
-          debugPrint('revert courierMode failed: $e2');
-        }
-      }
-      if (mounted) {
-        _showProfileSnackBar('Không thể chuyển đổi chế độ. Vui lòng thử lại.');
-      }
-    } finally {
-      SmartDialog.dismiss<void>();
-      if (mounted) {
-        setState(() {
-          _isCourierModeSwitching = false;
-        });
-      }
-    }
   }
 
   void _onAuthStateChanged() {
@@ -158,35 +79,7 @@ class _ProfilePageState extends State<ProfilePage>
   void dispose() {
     TokenService.authState.removeListener(_onAuthStateChanged);
     _delegationProvider.dispose();
-    _staffApplicationProvider.dispose();
     super.dispose();
-  }
-
-  bool _hasRole(String role) {
-    final rolesRaw = _userData?['roles'];
-    if (rolesRaw is! List) return false;
-    return rolesRaw.any((r) => r.toString().toUpperCase() == role);
-  }
-
-  String? _effectiveStaffStatus(StaffApplicationProvider provider) {
-    final dynamic statusFromUser = _userData?['staffStatus'];
-    if (statusFromUser != null) {
-      return statusFromUser.toString().toUpperCase();
-    }
-    final app = provider.application;
-    return app?.status.name.toUpperCase();
-  }
-
-  bool _isApprovedCourier(StaffApplicationProvider provider) {
-    final status = _effectiveStaffStatus(provider);
-    return status == 'APPROVED' ||
-        _hasRole('TECHNICIAN') ||
-        _hasRole('COURIER');
-  }
-
-  bool _isPendingCourier(StaffApplicationProvider provider) {
-    final status = _effectiveStaffStatus(provider);
-    return status == 'PENDING';
   }
 
   Future<void> _loadUserProfile({bool forceRefresh = false}) async {
@@ -242,12 +135,6 @@ class _ProfilePageState extends State<ProfilePage>
       }
       _isLoading = false;
     });
-
-    // Load staff application status for Profile UI
-    final userId = _userData?['id'] as String?;
-    if (userId != null && userId.isNotEmpty) {
-      await _staffApplicationProvider.loadStatus(userId);
-    }
   }
 
   @override
@@ -289,7 +176,6 @@ class _ProfilePageState extends State<ProfilePage>
       body: MultiProvider(
         providers: [
           ChangeNotifierProvider.value(value: _delegationProvider),
-          ChangeNotifierProvider.value(value: _staffApplicationProvider),
         ],
         child: Column(
           children: [
@@ -349,7 +235,6 @@ class _ProfilePageState extends State<ProfilePage>
           _buildMenuGroup(
             title: 'Tài khoản',
             items: [
-              _buildCourierModeSwitcher(),
               ProfileMenuItem(
                 icon: LucideIcons.user,
                 title: 'Thông tin cá nhân',
@@ -499,90 +384,6 @@ class _ProfilePageState extends State<ProfilePage>
                     color: Colors.black54,
                   ),
                 ),
-              Consumer<StaffApplicationProvider>(
-                builder: (context, provider, child) {
-                  final app = provider.application;
-                  final bool isApprovedCourier = _isApprovedCourier(provider);
-                  final bool isPendingCourier = _isPendingCourier(provider);
-
-                  // Courier: ẩn mục chuyển sang giao diện courier ở phần "Quản lý"
-                  // (đã có card Switch "Chế độ Người giao hàng" ở phía trên).
-                  if (isApprovedCourier) return const SizedBox.shrink();
-
-                  // PENDING: thay bằng container không cho nhấn
-                  if (isPendingCourier) {
-                    return Container(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE7F0F8),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFB7D0E6)),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            LucideIcons.clock,
-                            size: 18,
-                            color: const Color(0xFF12355B),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'Đang chờ duyệt hồ sơ...',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFF0A2342),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  // REJECTED: hiển thị nút + dòng lý do đỏ
-                  if (app != null && app.status.name == 'REJECTED') {
-                    final reason = (app.reviewNote ?? '').trim();
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        ProfileMenuItem(
-                          icon: LucideIcons.truck,
-                          title: 'Đăng ký trở thành Nhân viên',
-                          onTap: _handleNavigateToCourierRegistration,
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(56, 0, 16, 8),
-                          child: Text(
-                            reason.isEmpty
-                                ? 'Đơn trước đó bị từ chối.'
-                                : 'Đơn trước đó bị từ chối: $reason',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.red.shade700,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  }
-
-                  // Chưa nộp hoặc chưa có dữ liệu: hiển thị nút đăng ký
-                  return ProfileMenuItem(
-                    icon: LucideIcons.truck,
-                    title: 'Đăng ký trở thành Nhân viên',
-                    onTap: _handleNavigateToCourierRegistration,
-                  );
-                },
-              ),
               ProfileMenuItem(
                 icon: LucideIcons.clipboardList,
                 title: 'Báo cáo của tôi',
@@ -674,72 +475,6 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
-  Widget _buildCourierModeSwitcher() {
-    return Consumer<StaffApplicationProvider>(
-      builder: (context, staffProvider, _) {
-        final bool isApprovedCourier = _isApprovedCourier(staffProvider);
-        final bool canToggle = isApprovedCourier && !_isCourierModeSwitching;
-
-        final theme = ShadTheme.of(context);
-        const titleColor = Colors.black87;
-        const subtitleColor = Colors.black54;
-        final isCourierModeActive = context
-            .watch<CourierModeProvider>()
-            .isCourierModeActive;
-
-        return Opacity(
-          opacity: isApprovedCourier ? 1 : 0.5,
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 4,
-            ),
-            leading: Icon(
-              LucideIcons.truck,
-              color: theme.colorScheme.primary,
-              size: 24,
-            ),
-            title: Text(
-              'Chế độ người giao hàng',
-              style: TextStyle(
-                fontFamily: 'Manrope',
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: titleColor,
-              ),
-            ),
-            subtitle: isApprovedCourier
-                ? Text(
-                    'Bật để bắt đầu nhận đơn và kiếm tiền',
-                    style: TextStyle(
-                      fontFamily: 'Manrope',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: subtitleColor,
-                      height: 1.35,
-                    ),
-                  )
-                : null,
-            trailing: Transform.scale(
-              scale: 0.82,
-              alignment: Alignment.centerRight,
-              child: CupertinoSwitch(
-                value: isCourierModeActive,
-                activeColor: AISLShadcnTheme.navyPrimary,
-                onChanged: canToggle
-                    ? (v) => _switchCourierModeWithReload(v)
-                    : null,
-              ),
-            ),
-            onTap: canToggle
-                ? () => _switchCourierModeWithReload(!isCourierModeActive)
-                : null,
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildMenuGroup({required List<Widget> items, String? title}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -810,11 +545,145 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   void _handleHelp() {
-    _showProfileSnackBar('Tính năng đang được phát triển');
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Trợ giúp nhanh',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 14),
+            _helpRow(
+              LucideIcons.packagePlus,
+              'Gửi hàng',
+              'Chọn cửa hàng → chạm ô trống → Gửi hàng → thanh toán → dùng PIN/nút "Mở tủ" để bỏ hàng.',
+            ),
+            _helpRow(
+              LucideIcons.lockKeyhole,
+              'Thuê tủ giữ đồ',
+              'Chọn ô trống → Thuê tủ → chọn số giờ → thanh toán → PIN dùng nhiều lần tới hết hạn.',
+            ),
+            _helpRow(
+              LucideIcons.doorOpen,
+              'Không mở được ô?',
+              'Vào Đơn tủ → mở đơn → "Báo ô lỗi". Đội bảo trì sẽ xử lý và bạn nhận được thông báo.',
+            ),
+            _helpRow(
+              LucideIcons.wallet,
+              'Nạp ví / thanh toán',
+              'Nạp qua VNPay ở Trang chủ; khi thanh toán đơn có thể chọn Ví, VNPay, MoMo hoặc Tiền mặt.',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _helpRow(IconData icon, String title, String body) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: AISLShadcnTheme.navyPrimary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  body,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: Color(0xFF64748B),
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _handleContact() {
-    _showProfileSnackBar('Tính năng đang được phát triển');
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Liên hệ hỗ trợ',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 14),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(
+                LucideIcons.mail,
+                color: AISLShadcnTheme.navyPrimary,
+              ),
+              title: const Text('Email hỗ trợ'),
+              subtitle: const Text('huynqbse180211@fpt.edu.vn'),
+              onTap: () => launchUrl(
+                Uri.parse(
+                  'mailto:huynqbse180211@fpt.edu.vn?subject=Lockerly%20-%20Ho%20tro',
+                ),
+              ),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(
+                LucideIcons.globe,
+                color: AISLShadcnTheme.navyPrimary,
+              ),
+              title: const Text('Website'),
+              subtitle: const Text('locker-drone.tech'),
+              onTap: () => launchUrl(
+                Uri.parse('https://locker-drone.tech'),
+                mode: LaunchMode.externalApplication,
+              ),
+            ),
+            const ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(
+                LucideIcons.clock,
+                color: AISLShadcnTheme.navyPrimary,
+              ),
+              title: Text('Giờ hỗ trợ'),
+              subtitle: Text('08:00 – 22:00 hằng ngày'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _handleTerms() {
@@ -900,24 +769,6 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
-  Future<void> _handleNavigateToCourierRegistration() async {
-    if (!mounted) return;
-
-    final userId = _userData?['id'] as String?;
-    if (userId == null || userId.isEmpty) {
-      _showProfileSnackBar('Không thể lấy userId. Vui lòng thử lại.');
-      return;
-    }
-
-    final result = await Navigator.of(context, rootNavigator: true).push<bool>(
-      MaterialPageRoute(builder: (_) => const EmployeeRegistrationPage()),
-    );
-
-    if (!mounted) return;
-    if (result == true) {
-      await _staffApplicationProvider.loadStatus(userId);
-    }
-  }
 }
 
 // ── Theme picker bottom sheet ──────────────────────────────────────────────────

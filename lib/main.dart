@@ -5,7 +5,6 @@ import 'package:smart_laundry_locker/core/services/app_restart_service.dart';
 import 'package:smart_laundry_locker/core/services/token_service.dart';
 import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:smart_laundry_locker/core/services/firebase_messaging_service.dart';
-import 'package:smart_laundry_locker/core/services/courier_mode_provider.dart';
 import 'package:smart_laundry_locker/firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -14,23 +13,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
 import 'package:smart_laundry_locker/features/notifications/presentation/providers/notification_injection.dart';
 import 'package:smart_laundry_locker/features/profile/presentation/providers/profile_injection.dart';
 import 'package:smart_laundry_locker/core/network/api_client.dart';
 import 'package:smart_laundry_locker/features/wallet/presentation/providers/wallet_provider.dart';
 import 'package:smart_laundry_locker/features/qr_login/presentation/providers/qr_login_provider.dart';
-import 'package:smart_laundry_locker/features/courier_dispatch/presentation/providers/courier_dispatch_injection.dart';
-import 'package:smart_laundry_locker/features/courier_delivery/presentation/providers/courier_delivery_injection.dart';
-import 'package:smart_laundry_locker/features/courier_dispatch/presentation/providers/courier_dispatch_provider.dart';
-import 'package:smart_laundry_locker/features/courier_delivery/presentation/providers/courier_delivery_provider.dart';
-import 'package:smart_laundry_locker/features/courier_dispatch/presentation/widgets/incoming_order_sheet.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:smart_laundry_locker/features/home/presentation/providers/home_provider.dart';
 import 'package:smart_laundry_locker/features/home/data/repositories/home_repository.dart';
 import 'package:smart_laundry_locker/features/vouchers/presentation/providers/voucher_provider.dart';
 import 'package:smart_laundry_locker/core/theme/theme_provider.dart';
-import 'dart:async';
 
 class _AislToastWidget extends StatelessWidget {
   final String msg;
@@ -257,151 +249,6 @@ void main() async {
   runApp(const ProviderScope(child: RestartableApp(child: AislApp())));
 }
 
-class GlobalDispatchListener extends StatefulWidget {
-  final Widget child;
-  const GlobalDispatchListener({super.key, required this.child});
-
-  @override
-  State<GlobalDispatchListener> createState() => _GlobalDispatchListenerState();
-}
-
-class _GlobalDispatchListenerState extends State<GlobalDispatchListener> {
-  final List<StreamSubscription<dynamic>> _subscriptions = [];
-  final Set<String> _activeDispatchIds = {};
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _listenToOrders();
-    });
-  }
-
-  void _listenToOrders() {
-    if (!mounted) return;
-
-    final dispatchProvider = context.read<CourierDispatchProvider>();
-
-    // Listen for new orders
-    final orderSub = dispatchProvider.newOrderStream.listen((dispatchData) {
-      final dispatchId = dispatchData['dispatchId']?.toString();
-      if (dispatchId == null) return;
-
-      if (_activeDispatchIds.contains(dispatchId)) {
-        debugPrint('Dispatch $dispatchId already shown, skipping.');
-        return;
-      }
-
-      _activeDispatchIds.add(dispatchId);
-
-      _showIncomingOrderSheet(dispatchData, dispatchProvider, dispatchId);
-    });
-
-    // Listen for orders taken elsewhere
-    final takenSub = dispatchProvider.dispatchTakenStream.listen((data) {
-      final dispatchId = data['dispatchId']?.toString();
-      if (dispatchId != null && _activeDispatchIds.contains(dispatchId)) {
-        debugPrint('Order $dispatchId taken elsewhere. Closing sheet.');
-        final navContext = AppRouter.navigatorKey.currentContext;
-        if (navContext != null) {
-          _activeDispatchIds.remove(dispatchId);
-          Navigator.of(navContext).pop();
-        }
-      }
-    });
-
-    // Listen for orders cancelled by customer
-    final cancelledSub = dispatchProvider.dispatchCancelledStream.listen((
-      data,
-    ) {
-      final dispatchId = data['dispatchId']?.toString();
-      if (dispatchId != null && _activeDispatchIds.contains(dispatchId)) {
-        debugPrint('Order $dispatchId cancelled by customer. Closing sheet.');
-        final navContext = AppRouter.navigatorKey.currentContext;
-        if (navContext != null) {
-          _activeDispatchIds.remove(dispatchId);
-          Navigator.of(navContext).pop();
-          SmartDialog.showToast('Người gửi đã hủy đơn hàng $dispatchId');
-        }
-      }
-    });
-
-    _subscriptions.add(orderSub);
-    _subscriptions.add(takenSub);
-    _subscriptions.add(cancelledSub);
-  }
-
-  void _showIncomingOrderSheet(
-    Map<String, dynamic> dispatchData,
-    CourierDispatchProvider provider,
-    String dispatchId,
-  ) {
-    final navContext = AppRouter.navigatorKey.currentContext;
-    if (navContext == null) {
-      _activeDispatchIds.remove(dispatchId);
-      return;
-    }
-
-    showCupertinoModalPopup<void>(
-      context: navContext,
-      barrierDismissible: false,
-      useRootNavigator: true,
-      builder: (context) => IncomingOrderSheet(
-        dispatchData: dispatchData,
-        onAccept: () async {
-          final deliveryProvider = navContext.read<CourierDeliveryProvider>();
-          final success = await deliveryProvider.acceptOrder(dispatchId);
-          if (success) {
-            provider.removePendingById(dispatchId);
-            _activeDispatchIds.remove(dispatchId);
-            if (navContext.mounted) {
-              Navigator.of(navContext).pop();
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (navContext.mounted) {
-                  SmartDialog.showToast('Đã nhận đơn hàng!');
-                  navContext.push(
-                    AppRouter.activeDelivery,
-                    extra: deliveryProvider.activeOrder,
-                  );
-                  unawaited(provider.fetchActiveOrders());
-                }
-              });
-            }
-          } else {
-            SmartDialog.showToast(
-              deliveryProvider.error ?? 'Không thể nhận đơn hàng',
-            );
-          }
-        },
-        onDecline: () async {
-          final deliveryProvider = context.read<CourierDeliveryProvider>();
-          await deliveryProvider.rejectOrder(
-            dispatchId,
-            reason: 'Declined by courier',
-          );
-          provider.removePendingById(dispatchId);
-          _activeDispatchIds.remove(dispatchId);
-          SmartDialog.showToast('Đã từ chối đơn hàng');
-        },
-      ),
-    ).then((_) {
-      _activeDispatchIds.remove(dispatchId);
-    });
-  }
-
-  @override
-  void dispose() {
-    for (var sub in _subscriptions) {
-      sub.cancel();
-    }
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => widget.child;
-}
-
 class AislApp extends StatelessWidget {
   const AislApp({super.key});
 
@@ -409,7 +256,6 @@ class AislApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => CourierModeProvider()..init()),
         ChangeNotifierProvider(
           create: (_) =>
               NotificationInjection.provideNotificationProvider(ApiClient())
@@ -422,14 +268,6 @@ class AislApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => QrLoginProvider()),
         ChangeNotifierProvider(
           create: (_) => ProfileInjection.provideProfileProvider(ApiClient()),
-        ),
-        ChangeNotifierProvider(
-          create: (_) =>
-              CourierDispatchInjection.provideCourierDispatchProvider(),
-        ),
-        ChangeNotifierProvider(
-          create: (_) =>
-              CourierDeliveryInjection.provideCourierDeliveryProvider(),
         ),
         ChangeNotifierProvider(
           create: (_) =>
@@ -449,8 +287,7 @@ class AislApp extends StatelessWidget {
             darkTheme: AISLShadcnTheme.darkTheme,
             themeMode: themeMode,
             builder: (context, child) {
-              return GlobalDispatchListener(
-                child: ScaffoldMessenger(
+              return ScaffoldMessenger(
                   key: AppMessengerService.scaffoldMessengerKey,
                   child: FlutterSmartDialog.init(
                     toastBuilder: (String msg) => _AislToastWidget(msg: msg),
@@ -482,8 +319,7 @@ class AislApp extends StatelessWidget {
                         iconColor: const Color(0xFFEF4444),
                       ),
                     ),
-                  )(context, child ?? const SizedBox.shrink()),
-                ),
+                )(context, child ?? const SizedBox.shrink()),
               );
             },
           );

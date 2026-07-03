@@ -40,13 +40,6 @@ const List<_BookableService> _bookableServices = [
     color: Color(0xFF16A34A),
     route: AppRouter.sendParcel,
   ),
-  _BookableService(
-    title: 'Giặt đồ',
-    subtitle: 'Tạo đơn giặt, nhận đồ tại tủ',
-    icon: LucideIcons.washingMachine,
-    color: Color(0xFF7C3AED),
-    route: AppRouter.userLaundryOrder,
-  ),
 ];
 
 /// Opens the "Đặt dịch vụ" sheet for [location]. Selecting a service routes
@@ -217,13 +210,6 @@ class LockerUtilitiesRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _UtilityChip(
-          icon: LucideIcons.packageOpen,
-          label: 'Lấy hàng',
-          color: const Color(0xFFEA8A1E),
-          onTap: () => context.push(AppRouter.lockerOtp),
-        ),
-        const SizedBox(width: 10),
         _UtilityChip(
           icon: LucideIcons.package,
           label: 'Đơn tủ',

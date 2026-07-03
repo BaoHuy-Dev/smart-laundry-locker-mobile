@@ -48,8 +48,6 @@ class ApiConstants {
   // Orders Endpoints
   static const String ordersMyEndpoint = '/orders/me';
   static const String ordersActiveEndpoint = '/orders/my/active';
-  static const String logisticsSendEndpoint = '/logistics/send';
-  static const String logisticsPickupEndpoint = '/logistics/pickup';
   static const String ordersFixedRentEndpoint = '/orders/locker/fixed-rent';
 
   // Properties Endpoints
