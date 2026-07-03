@@ -15,7 +15,7 @@ class AdminHomePage extends StatefulWidget {
 class _AdminHomePageState extends State<AdminHomePage>
     with SingleTickerProviderStateMixin {
   final _service = LockerOpsService();
-  late final TabController _tabs = TabController(length: 6, vsync: this);
+  late final TabController _tabs = TabController(length: 10, vsync: this);
 
   // Tab 0 – Dashboard
   Map<String, dynamic>? _overview;
@@ -130,6 +130,21 @@ class _AdminHomePageState extends State<AdminHomePage>
   List<Map<String, dynamic>> _drones = [];
   String? _droneStatusFilter;
 
+  // Tab 6 – Payments
+  List<Map<String, dynamic>> _payments = [];
+  String? _paymentStatusFilter;
+
+  // Tab 7 – Feedback
+  List<Map<String, dynamic>> _feedback = [];
+  bool? _feedbackResolvedFilter; // null = all, true = resolved, false = pending
+
+  // Tab 8 – Notifications
+  List<Map<String, dynamic>> _notifications = [];
+  Map<String, dynamic>? _notifStats;
+
+  // Tab 9 – Scheduler
+  Map<String, dynamic>? _schedulerStatus;
+
   final Map<int, bool> _tabLoaded = {};
   final Map<int, bool> _tabLoading = {};
 
@@ -192,6 +207,29 @@ class _AdminHomePageState extends State<AdminHomePage>
           final d = await _service.adminDrones().catchError((_) => <Map<String, dynamic>>[]);
           if (!mounted) return;
           setState(() { _drones = d; _tabLoaded[5] = true; });
+        case 6:
+          final p = await _service.adminPayments().catchError((_) => <Map<String, dynamic>>[]);
+          if (!mounted) return;
+          setState(() { _payments = p; _tabLoaded[6] = true; });
+        case 7:
+          final f = await _service.adminFeedback().catchError((_) => <Map<String, dynamic>>[]);
+          if (!mounted) return;
+          setState(() { _feedback = f; _tabLoaded[7] = true; });
+        case 8:
+          final r = await Future.wait([
+            _service.adminNotifications().catchError((_) => <Map<String, dynamic>>[]),
+            _service.adminNotificationStats().catchError((_) => <String, dynamic>{}),
+          ]);
+          if (!mounted) return;
+          setState(() {
+            _notifications = r[0] as List<Map<String, dynamic>>;
+            _notifStats = r[1] as Map<String, dynamic>?;
+            _tabLoaded[8] = true;
+          });
+        case 9:
+          final s = await _service.adminSchedulerStatus().catchError((_) => <String, dynamic>{});
+          if (!mounted) return;
+          setState(() { _schedulerStatus = s; _tabLoaded[9] = true; });
       }
     } catch (e) {
       if (mounted) {
@@ -256,6 +294,8 @@ class _AdminHomePageState extends State<AdminHomePage>
             color: Colors.white,
             child: TabBar(
               controller: _tabs,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
               indicatorColor: opsPrimary,
               labelColor: opsDark,
               unselectedLabelColor: opsMutedText,
@@ -271,6 +311,10 @@ class _AdminHomePageState extends State<AdminHomePage>
                 Tab(text: 'Đơn hàng'),
                 Tab(text: 'Khuyến mãi'),
                 Tab(text: 'Drone'),
+                Tab(text: 'Thanh toán'),
+                Tab(text: 'Phản hồi'),
+                Tab(text: 'Thông báo'),
+                Tab(text: 'Lịch'),
               ],
             ),
           ),
@@ -284,6 +328,10 @@ class _AdminHomePageState extends State<AdminHomePage>
                 _buildOrders(),
                 _buildPromotions(),
                 _buildDrones(),
+                _buildPayments(),
+                _buildFeedback(),
+                _buildNotifications(),
+                _buildScheduler(),
               ],
             ),
           ),
@@ -2474,6 +2522,728 @@ class _AdminHomePageState extends State<AdminHomePage>
     if (d == null) return null;
     String two(int n) => n.toString().padLeft(2, '0');
     return '${two(d.day)}/${two(d.month)}/${d.year}';
+  }
+
+  // ── Tab 6: Payments ─────────────────────────────────────────────────────────
+
+  List<Map<String, dynamic>> get _filteredPayments {
+    if (_paymentStatusFilter == null) return _payments;
+    return _payments.where((p) => p['status'] == _paymentStatusFilter).toList();
+  }
+
+  Widget _buildPayments() {
+    if (_tabLoading[6] == true && _payments.isEmpty) {
+      return const Center(child: CircularProgressIndicator(color: AislBrand.navy));
+    }
+    const statuses = [null, 'PENDING', 'COMPLETED', 'FAILED', 'REFUNDED', 'CANCELED'];
+    const labels = ['Tất cả', 'Chờ', 'Hoàn thành', 'Thất bại', 'Hoàn tiền', 'Đã huỷ'];
+    final filtered = _filteredPayments;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+          child: SizedBox(
+            height: 36,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: statuses.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) => FilterChip(
+                label: Text(labels[i]),
+                selected: _paymentStatusFilter == statuses[i],
+                selectedColor: opsPrimary.withValues(alpha: 0.15),
+                checkmarkColor: opsPrimary,
+                onSelected: (_) => setState(() => _paymentStatusFilter = statuses[i]),
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () => _loadTab(6, force: true),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              children: [
+                if (filtered.isEmpty)
+                  OpsEmptyState(
+                    icon: Icons.payments_outlined,
+                    title: _payments.isEmpty
+                        ? 'Chưa có thanh toán nào'
+                        : 'Không có thanh toán khớp lọc',
+                  )
+                else
+                  for (final p in filtered) _paymentCard(p),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _paymentCard(Map<String, dynamic> p) {
+    final status = p['status']?.toString();
+    final amount = (p['amount'] as num?) ?? 0;
+    final method = p['method']?.toString() ?? '';
+    final createdAt = _fmtDate(p['createdAt']);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: OpsCard(
+        onTap: () => _paymentActions(p),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '#${p['id']} · Đơn #${p['orderId']}',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 14, color: opsDark),
+                  ),
+                ),
+                StatusChip(status),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(_formatVnd(amount),
+                style: const TextStyle(
+                    fontWeight: FontWeight.w800, fontSize: 16, color: opsPrimary)),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                if (method.isNotEmpty)
+                  _AdminPill(
+                      icon: Icons.account_balance_wallet_outlined, text: method),
+                if ((p['customerName'] ?? p['customerId']) != null)
+                  _AdminPill(
+                    icon: Icons.person_outline,
+                    text: (p['customerName'] ?? 'KH #${p['customerId']}').toString(),
+                  ),
+                if (createdAt != null)
+                  _AdminPill(icon: Icons.schedule, text: createdAt),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _paymentActions(Map<String, dynamic> p) async {
+    final id = _asInt(p['id']);
+    if (id == null) return;
+    const newStatuses = ['PENDING', 'COMPLETED', 'FAILED', 'REFUNDED', 'CANCELED'];
+    var selected = p['status']?.toString() ?? 'PENDING';
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (sheetCtx, setLocal) => SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Thanh toán #${p['id']}',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 15, color: opsDark)),
+                const SizedBox(height: 12),
+                const Text('Đổi trạng thái',
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: opsMutedText,
+                        fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final s in newStatuses)
+                      ChoiceChip(
+                        label: Text(s),
+                        selected: selected == s,
+                        onSelected: (_) => setLocal(() => selected = s),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: opsPrimary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(sheetCtx);
+                      _run(
+                        () => _service.adminSetPaymentStatus(id, selected),
+                        'Đã đổi trạng thái thanh toán #${p['id']}',
+                        reloadTab: 6,
+                      );
+                    },
+                    child: const Text('Xác nhận'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Tab 7: Feedback ─────────────────────────────────────────────────────────
+
+  List<Map<String, dynamic>> get _filteredFeedback {
+    if (_feedbackResolvedFilter == null) return _feedback;
+    return _feedback
+        .where((f) => (f['isResolved'] == true) == _feedbackResolvedFilter)
+        .toList();
+  }
+
+  Widget _buildFeedback() {
+    if (_tabLoading[7] == true && _feedback.isEmpty) {
+      return const Center(child: CircularProgressIndicator(color: AislBrand.navy));
+    }
+    const filters = [null, false, true];
+    const labels = ['Tất cả', 'Chưa xử lý', 'Đã xử lý'];
+    final filtered = _filteredFeedback;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+          child: Row(
+            children: [
+              for (var i = 0; i < filters.length; i++) ...[
+                ChoiceChip(
+                  label: Text(labels[i]),
+                  selected: _feedbackResolvedFilter == filters[i],
+                  onSelected: (_) =>
+                      setState(() => _feedbackResolvedFilter = filters[i]),
+                ),
+                const SizedBox(width: 8),
+              ],
+            ],
+          ),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () => _loadTab(7, force: true),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              children: [
+                if (filtered.isEmpty)
+                  OpsEmptyState(
+                    icon: Icons.reviews_outlined,
+                    title: _feedback.isEmpty
+                        ? 'Chưa có phản hồi nào'
+                        : 'Không có phản hồi khớp lọc',
+                  )
+                else
+                  for (final f in filtered) _feedbackCard(f),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _feedbackCard(Map<String, dynamic> f) {
+    final rating = _asInt(f['rating']) ?? 0;
+    final resolved = f['isResolved'] == true;
+    final name = f['userName']?.toString() ??
+        f['email']?.toString() ??
+        'KH #${f['userId']}';
+    final comment = f['comment']?.toString() ?? '';
+    final createdAt = _fmtDate(f['createdAt']);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: OpsCard(
+        onTap: () => _feedbackActions(f),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                for (var i = 1; i <= 5; i++)
+                  Icon(i <= rating ? Icons.star : Icons.star_border,
+                      size: 16, color: const Color(0xFFF59E0B)),
+                const Spacer(),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: (resolved
+                            ? const Color(0xFF16A34A)
+                            : const Color(0xFFF59E0B))
+                        .withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    resolved ? 'Đã xử lý' : 'Chưa xử lý',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: resolved
+                          ? const Color(0xFF16A34A)
+                          : const Color(0xFFB45309),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (comment.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(comment,
+                  style: const TextStyle(fontSize: 13, color: opsDark)),
+            ],
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                _AdminPill(icon: Icons.person_outline, text: name),
+                if (createdAt != null)
+                  _AdminPill(icon: Icons.schedule, text: createdAt),
+              ],
+            ),
+            if ((f['adminReply']?.toString() ?? '').isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text('Phản hồi: ${f['adminReply']}',
+                    style:
+                        const TextStyle(fontSize: 12, color: opsMutedText)),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _feedbackActions(Map<String, dynamic> f) async {
+    final id = _asInt(f['id']);
+    if (id == null) return;
+    final resolved = f['isResolved'] == true;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (sheetCtx) {
+        Widget tile(IconData icon, String label, Color c, VoidCallback onTap) =>
+            OpsSheetAction(
+          icon: icon,
+          label: label,
+          color: c,
+          onTap: () {
+            Navigator.pop(sheetCtx);
+            onTap();
+          },
+        );
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Phản hồi #$id',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 15, color: opsDark)),
+                const SizedBox(height: 16),
+                tile(Icons.reply, 'Trả lời', opsPrimary,
+                    () => _replyFeedbackFlow(f)),
+                if (!resolved)
+                  tile(
+                    Icons.check_circle_outline,
+                    'Đánh dấu đã xử lý',
+                    const Color(0xFF16A34A),
+                    () => _run(
+                      () => _service.adminSetFeedbackStatus(id, 'RESOLVED'),
+                      'Đã đánh dấu đã xử lý',
+                      reloadTab: 7,
+                    ),
+                  )
+                else
+                  tile(
+                    Icons.undo,
+                    'Mở lại (chưa xử lý)',
+                    const Color(0xFFF59E0B),
+                    () => _run(
+                      () => _service.adminSetFeedbackStatus(id, 'PENDING'),
+                      'Đã mở lại phản hồi',
+                      reloadTab: 7,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _replyFeedbackFlow(Map<String, dynamic> f) async {
+    final id = _asInt(f['id']);
+    if (id == null) return;
+    final ctrl = TextEditingController(text: f['adminReply']?.toString() ?? '');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Trả lời phản hồi'),
+        content: TextField(
+          controller: ctrl,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            hintText: 'Nội dung trả lời gửi tới khách…',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Hủy')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: opsPrimary, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Gửi'),
+          ),
+        ],
+      ),
+    );
+    final reply = ctrl.text.trim();
+    ctrl.dispose();
+    if (ok != true || reply.isEmpty) return;
+    await _run(
+      () => _service.adminReplyFeedback(id, reply),
+      'Đã gửi phản hồi',
+      reloadTab: 7,
+    );
+  }
+
+  // ── Tab 8: Notifications ────────────────────────────────────────────────────
+
+  Widget _buildNotifications() {
+    if (_tabLoading[8] == true && _notifications.isEmpty && _notifStats == null) {
+      return const Center(child: CircularProgressIndicator(color: AislBrand.navy));
+    }
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text('${_notifications.length} thông báo gần đây',
+                    style: const TextStyle(fontSize: 13, color: opsMutedText)),
+              ),
+              FilledButton.icon(
+                onPressed: _broadcastFlow,
+                icon: const Icon(Icons.campaign_outlined, size: 18),
+                label: const Text('Gửi thông báo'),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () => _loadTab(8, force: true),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+              children: [
+                if (_notifications.isEmpty)
+                  OpsEmptyState(
+                      icon: Icons.notifications_none,
+                      title: 'Chưa có thông báo nào')
+                else
+                  for (final n in _notifications) _notificationCard(n),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _notificationCard(Map<String, dynamic> n) {
+    final title = n['title']?.toString() ?? '(không tiêu đề)';
+    final message = n['message']?.toString() ?? '';
+    final type = n['type']?.toString() ?? '';
+    final status = n['status']?.toString();
+    final recipient = n['recipientName']?.toString() ??
+        n['recipientEmail']?.toString() ??
+        (n['userId'] != null ? 'User #${n['userId']}' : null);
+    final createdAt = _fmtDate(n['createdAt']);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: OpsCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(title,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: opsDark)),
+                ),
+                if (status != null) StatusChip(status),
+              ],
+            ),
+            if (message.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(message,
+                  style: const TextStyle(fontSize: 12, color: opsMutedText)),
+            ],
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                if (type.isNotEmpty)
+                  _AdminPill(icon: Icons.label_outline, text: type),
+                if (recipient != null)
+                  _AdminPill(icon: Icons.person_outline, text: recipient),
+                if (createdAt != null)
+                  _AdminPill(icon: Icons.schedule, text: createdAt),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _broadcastFlow() async {
+    final titleCtrl = TextEditingController();
+    final msgCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Gửi thông báo tới tất cả'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+                controller: titleCtrl,
+                decoration:
+                    const InputDecoration(labelText: 'Tiêu đề *', isDense: true)),
+            const SizedBox(height: 10),
+            TextField(
+              controller: msgCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                  labelText: 'Nội dung *',
+                  isDense: true,
+                  border: OutlineInputBorder()),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Hủy')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: opsPrimary, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Gửi'),
+          ),
+        ],
+      ),
+    );
+    final title = titleCtrl.text.trim();
+    final msg = msgCtrl.text.trim();
+    titleCtrl.dispose();
+    msgCtrl.dispose();
+    if (ok != true || title.isEmpty || msg.isEmpty) return;
+    await _run(
+      () => _service.adminBroadcastNotification(title: title, message: msg),
+      'Đã gửi thông báo broadcast',
+      reloadTab: 8,
+    );
+  }
+
+  // ── Tab 9: Scheduler ────────────────────────────────────────────────────────
+
+  Widget _buildScheduler() {
+    if (_tabLoading[9] == true && _schedulerStatus == null) {
+      return const Center(child: CircularProgressIndicator(color: AislBrand.navy));
+    }
+    final enabled = _schedulerStatus?['schedulerEnabled'];
+    final jobs = _schedulerStatus?['jobs'];
+    return RefreshIndicator(
+      onRefresh: () => _loadTab(9, force: true),
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const OpsSectionLabel('Trạng thái scheduler',
+              icon: Icons.schedule_outlined),
+          OpsCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      enabled == true
+                          ? Icons.check_circle
+                          : Icons.pause_circle_filled,
+                      size: 18,
+                      color: enabled == true
+                          ? const Color(0xFF16A34A)
+                          : opsMutedText,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      enabled == true
+                          ? 'Đang bật'
+                          : (enabled == false ? 'Đang tắt' : 'Không rõ'),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, color: opsDark),
+                    ),
+                  ],
+                ),
+                if (jobs is List && jobs.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  for (final j in jobs)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text('• $j',
+                          style: const TextStyle(
+                              fontSize: 12, color: opsMutedText)),
+                    ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          const OpsSectionLabel('Chạy tay các job',
+              icon: Icons.play_circle_outline),
+          _schedulerJobCard(
+            'Tự huỷ đơn quá hạn',
+            'Huỷ các đơn khởi tạo nhưng chưa bỏ đồ quá hạn',
+            Icons.timer_outlined,
+            const Color(0xFFF59E0B),
+            () => _service.adminTriggerAutoCancel(),
+          ),
+          _schedulerJobCard(
+            'Nhả ô quá hạn',
+            'Thu hồi ô bị giữ / đang có đồ quá hạn lấy',
+            Icons.lock_open_outlined,
+            opsPrimary,
+            () => _service.adminTriggerReleaseBoxes(),
+          ),
+          _schedulerJobCard(
+            'Nhắc lấy hàng',
+            'Bắn thông báo nhắc khách tới lấy đồ',
+            Icons.notifications_active_outlined,
+            const Color(0xFF7C3AED),
+            () => _service.adminTriggerPickupReminders(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _schedulerJobCard(
+    String title,
+    String desc,
+    IconData icon,
+    Color color,
+    Future<Map<String, dynamic>> Function() trigger,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: OpsCard(
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: opsDark)),
+                  Text(desc,
+                      style: const TextStyle(
+                          fontSize: 12, color: opsMutedText)),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: () => _runSchedulerJob(title, trigger),
+              child: const Text('Chạy'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _runSchedulerJob(
+    String title,
+    Future<Map<String, dynamic>> Function() trigger,
+  ) async {
+    try {
+      final res = await trigger();
+      if (!mounted) return;
+      final msg = res['message']?.toString();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(
+                (msg != null && msg.isNotEmpty) ? msg : '$title: đã chạy')),
+      );
+      await _loadTab(9, force: true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(LockerOpsService.errorMessage(e))),
+        );
+      }
+    }
   }
 }
 

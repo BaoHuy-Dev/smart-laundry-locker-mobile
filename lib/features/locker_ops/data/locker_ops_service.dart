@@ -14,7 +14,11 @@ class LockerOpsService {
     Map<String, dynamic>? query,
   }) async {
     final res = await _dio.get(path, queryParameters: query);
-    final data = res.data?['data'];
+    var data = res.data?['data'];
+    // Backend có endpoint trả thẳng List, có endpoint trả Spring Page (.content).
+    if (data is Map && data['content'] is List) {
+      data = data['content'];
+    }
     if (data is List) {
       return data.cast<Map<String, dynamic>>();
     }
@@ -465,6 +469,71 @@ class LockerOpsService {
 
   Future<void> adminDeletePromotion(int id) async =>
       _map('DELETE', '/api/admin/promotions/$id');
+
+  // ── ADMIN — Thanh toán ──────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> adminPayments({String? status}) =>
+      _list('/api/admin/payments', query: {
+        'size': 100,
+        if (status != null) 'status': status,
+      });
+
+  /// Đổi trạng thái thanh toán (status truyền qua query param, khớp web).
+  Future<Map<String, dynamic>> adminSetPaymentStatus(int id, String status) =>
+      _map('PUT', '/api/admin/payments/$id/status', query: {'status': status});
+
+  // ── ADMIN — Phản hồi (feedback) ─────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> adminFeedback({bool? resolved}) =>
+      _list('/api/admin/feedback', query: {
+        'size': 100,
+        if (resolved != null) 'isResolved': resolved,
+      });
+
+  /// Đánh dấu phản hồi RESOLVED / PENDING.
+  Future<Map<String, dynamic>> adminSetFeedbackStatus(int id, String status) =>
+      _map('PATCH', '/api/admin/feedback/$id/status', body: {'status': status});
+
+  /// Admin trả lời một phản hồi.
+  Future<Map<String, dynamic>> adminReplyFeedback(int id, String reply) =>
+      _map('POST', '/api/admin/feedback/$id/reply', body: {'reply': reply});
+
+  // ── ADMIN — Thông báo (notifications) ───────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> adminNotifications() =>
+      _list('/api/admin/notifications', query: {'size': 100});
+
+  Future<Map<String, dynamic>> adminNotificationStats() =>
+      _map('GET', '/api/admin/notifications/stats');
+
+  /// Gửi thông báo broadcast (mặc định IN_APP tới toàn bộ user).
+  Future<Map<String, dynamic>> adminBroadcastNotification({
+    required String title,
+    required String message,
+    String type = 'SYSTEM_ALERT',
+    String channel = 'IN_APP',
+    bool targetAllUsers = true,
+  }) => _map('POST', '/api/admin/notifications/broadcast', body: {
+        'type': type,
+        'channel': channel,
+        'title': title,
+        'message': message,
+        'targetAllUsers': targetAllUsers,
+      });
+
+  // ── ADMIN — Lịch hệ thống (scheduler) ───────────────────────────────────────
+
+  Future<Map<String, dynamic>> adminSchedulerStatus() =>
+      _map('GET', '/api/admin/scheduler/status');
+
+  Future<Map<String, dynamic>> adminTriggerAutoCancel() =>
+      _map('POST', '/api/admin/scheduler/auto-cancel');
+
+  Future<Map<String, dynamic>> adminTriggerReleaseBoxes() =>
+      _map('POST', '/api/admin/scheduler/release-boxes');
+
+  Future<Map<String, dynamic>> adminTriggerPickupReminders() =>
+      _map('POST', '/api/admin/scheduler/pickup-reminders');
 
   Future<List<Map<String, dynamic>>> adminDrones({String? status}) =>
       _list('/api/admin/drones',
