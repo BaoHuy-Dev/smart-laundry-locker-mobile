@@ -6,6 +6,27 @@
 
 ## Files changed
 
+### 2026-07-03 — Live map theo dõi drone real-time cho NGƯỜI NHẬN (Phase 2, STOMP) (branch `feat/mobile-delivery-push-notifications` + BE `feat/notification-drone-position`)
+
+Bổ sung vào feature `lib/features/drone_delivery/` (không tạo feature mới). Mở **on-demand**: nút "Theo dõi trên bản đồ" ở trang timeline (Phase 1) → live map; chỉ subscribe STOMP khi mở map, unsubscribe khi rời. **Gọi STOMP THẬT (không mock)** + thêm publisher backend.
+
+Mobile:
+
+- `domain/entities/drone_position_snapshot.dart` — **mới**: `{ orderId, status, lat, lng, headingDeg, etaMinutes, speedMps?, batteryPercent?, timestamp }` + getter `stage`
+- `domain/repositories/drone_position_repository.dart` — **mới**: `Stream<DronePositionSnapshot> watchPosition(orderId)` + `stopWatching(orderId)`
+- `infrastructure/models/drone_position_response.dart` — **mới**: parse frame STOMP (mềm lỗi), `ts` epoch/ISO
+- `infrastructure/services/drone_position_socket_service.dart` — **mới**: STOMP `/ws` mirror `RealtimeNotificationService` (Bearer token, reconnect 5s, heartbeat 10s), subscribe theo orderId `/topic/deliveries/{orderId}/position`, đóng socket khi hết listener
+- `infrastructure/repositories/drone_position_repository_impl.dart` — **mới**
+- `presentation/providers/drone_live_map_providers.dart` — **mới**: `StreamProvider.autoDispose.family` + `ref.onDispose → stopWatching` (on-demand)
+- `presentation/pages/drone_live_map_page.dart` — **mới**: `flutter_map` (OSM tile giống mission_planner), marker xoay heading, **interpolate mượt** (AnimationController lerp previous→target ~1.5s, lerp góc ngắn nhất), watchdog **mất tín hiệu >10s → đóng băng + banner "Mất tín hiệu · vị trí lúc HH:MM"**, overlay status + ETA, nút follow, vệt breadcrumb đã đi
+- `presentation/widgets/drone_marker.dart` — **mới**
+- `presentation/pages/drone_delivery_tracking_page.dart` — nút "Theo dõi trên bản đồ" (chỉ hiện khi status ∈ {dispatched, approaching} và `droneLiveMapEnabled`)
+- `core/config/feature_flags.dart` — `droneLiveMapEnabled = false`; `core/routing/app_router.dart` — route `droneLiveMap = '/drone-delivery/live-map'`
+
+Backend (`notification-service`, branch `feat/notification-drone-position`):
+
+- `dto/DronePositionRequest.java` + `service/DronePositionService.java` + endpoint `POST /internal/deliveries/{orderId}/position` (NotificationController) → `WebSocketNotificationService.sendToDestination('/topic/deliveries/{orderId}/position', payload)`. Internal-only (gateway chặn `/internal/**`), KHÔNG lưu DB, KHÔNG FCM. iot-service sẽ downsample telemetry rồi gọi endpoint này.
+
 ### 2026-07-03 — Theo dõi giao drone cho NGƯỜI NHẬN qua push notification (Phase 1) (branch `feat/mobile-delivery-push-notifications`)
 
 Feature mới `lib/features/drone_delivery/` đủ 4 layer, mirror `logistics_send`. Phase 1 **chỉ push notification + timeline**, CHƯA có live map/websocket. Không đụng `drone_telemetry`/`drone_mission` (phía pilot/MAVLink).

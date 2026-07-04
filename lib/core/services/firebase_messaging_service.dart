@@ -226,6 +226,7 @@ class FirebaseMessagingService {
       );
     }
 
+    final type = message.data['type'];
     final delivery = DeliveryNotification.fromData(message.data);
 
     // Push to stream so listeners (like NotificationProvider) can refresh
@@ -314,6 +315,7 @@ class FirebaseMessagingService {
   /// noti giao hàng khác (có `orderId`) -> chi tiết đơn; còn lại -> Thông báo.
   void _handleTapData(Map<String, dynamic> data) {
     final delivery = DeliveryNotification.fromData(data);
+    final type = data['type'];
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final context = AppRouter.navigatorKey.currentContext;

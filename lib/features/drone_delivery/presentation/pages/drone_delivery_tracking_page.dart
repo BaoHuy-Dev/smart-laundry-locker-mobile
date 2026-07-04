@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:smart_laundry_locker/core/config/feature_flags.dart';
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
 import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:smart_laundry_locker/features/drone_delivery/domain/entities/drone_delivery_stage.dart';
@@ -92,7 +93,8 @@ class _DroneDeliveryTrackingPageState
                   ref.invalidate(droneDeliveryStatusProvider(widget.orderId)),
             ),
           ),
-          data: (status) => _TrackingBody(status: status),
+          data: (status) =>
+              _TrackingBody(status: status, orderId: widget.orderId),
         ),
       ),
     );
@@ -104,8 +106,16 @@ class _DroneDeliveryTrackingPageState
 
 class _TrackingBody extends StatelessWidget {
   final DroneDeliveryStatus status;
+  final String orderId;
 
-  const _TrackingBody({required this.status});
+  const _TrackingBody({required this.status, required this.orderId});
+
+  /// Chỉ mời xem live map khi drone đang trên đường (dispatched/approaching) và
+  /// cờ Phase 2 bật. Các mốc arrived/delivered/failed không cần bản đồ nữa.
+  bool get _canTrackOnMap =>
+      FeatureFlags.droneLiveMapEnabled &&
+      (status.stage == DroneDeliveryStage.dispatched ||
+          status.stage == DroneDeliveryStage.approaching);
 
   @override
   Widget build(BuildContext context) {
@@ -118,6 +128,22 @@ class _TrackingBody extends StatelessWidget {
         if (stage.isDelayed || stage.isFailure) ...[
           const SizedBox(height: 16),
           _StatusBanner(stage: stage, etaMinutes: status.etaMinutes),
+        ],
+        if (_canTrackOnMap) ...[
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: AISLShadcnTheme.navyPrimary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              onPressed: () =>
+                  context.go(AppRouter.droneLiveMap, extra: orderId),
+              icon: const Icon(LucideIcons.map, size: 18),
+              label: const Text('Theo dõi trên bản đồ'),
+            ),
+          ),
         ],
         const SizedBox(height: 24),
         Container(
@@ -195,27 +221,27 @@ class _HeaderCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          Row(
+          // Wrap thay vì Row: 3 chip (đơn/drone/ETA) có thể vượt bề rộng card
+          // trên màn hẹp hoặc mã đơn/drone dài — wrap xuống dòng thay vì tràn.
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
             children: [
               if ((status.orderCode ?? '').isNotEmpty)
                 _InfoChip(
                   icon: LucideIcons.package,
                   label: 'Đơn ${status.orderCode}',
                 ),
-              if ((status.droneCode ?? '').isNotEmpty) ...[
-                const SizedBox(width: 10),
+              if ((status.droneCode ?? '').isNotEmpty)
                 _InfoChip(
                   icon: LucideIcons.planeTakeoff,
                   label: status.droneCode!,
                 ),
-              ],
-              if (status.etaMinutes != null && !stage.isTerminal) ...[
-                const SizedBox(width: 10),
+              if (status.etaMinutes != null && !stage.isTerminal)
                 _InfoChip(
                   icon: LucideIcons.clock,
                   label: 'ETA ${status.etaMinutes} phút',
                 ),
-              ],
             ],
           ),
         ],

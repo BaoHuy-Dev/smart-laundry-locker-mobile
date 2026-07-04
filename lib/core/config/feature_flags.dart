@@ -42,4 +42,9 @@ class FeatureFlags {
   /// Backend chưa có → `GET /api/orders/{orderId}/drone-delivery` 404. Khi tắt,
   /// datasource trả mock để timeline chạy được mà không gọi endpoint chết.
   static const bool droneDeliveryEnabled = false;
+
+  /// Live map theo dõi drone real-time cho NGƯỜI NHẬN (Phase 2, qua STOMP
+  /// `/topic/deliveries/{orderId}/position`). Gate nút "Theo dõi trên bản đồ"
+  /// ở trang timeline. Bật khi backend đã publish snapshot vị trí lên topic.
+  static const bool droneLiveMapEnabled = false;
 }
