@@ -48,6 +48,7 @@ import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/my_r
 import 'package:smart_laundry_locker/features/drone_mission/presentation/mission_planner_page.dart';
 import 'package:smart_laundry_locker/features/drone_telemetry/presentation/flight_data_page.dart';
 import 'package:smart_laundry_locker/features/drone_delivery/presentation/pages/drone_delivery_tracking_page.dart';
+import 'package:smart_laundry_locker/features/drone_delivery/presentation/pages/drone_live_map_page.dart';
 import 'package:smart_laundry_locker/features/stores/domain/entities/store.dart';
 import 'package:smart_laundry_locker/features/stores/presentation/pages/stores_page.dart';
 import 'package:smart_laundry_locker/features/stores/presentation/pages/store_detail_page.dart';
@@ -98,6 +99,7 @@ class AppRouter {
   static const String droneMissionPlanner = '/drone/mission-planner';
   static const String droneFlightData = '/drone/flight-data';
   static const String droneDeliveryTracking = '/drone-delivery';
+  static const String droneLiveMap = '/drone-delivery/live-map';
 
   static final GlobalKey<NavigatorState> navigatorKey =
       GlobalKey<NavigatorState>();
@@ -438,6 +440,19 @@ class AppRouter {
               state.uri.queryParameters['orderId'] ??
               '';
           return DroneDeliveryTrackingPage(orderId: orderId);
+        },
+      ),
+      GoRoute(
+        path: droneLiveMap,
+        name: 'drone_live_map',
+        builder: (context, state) {
+          // `extra` là orderId (String); fallback query param.
+          final extra = state.extra;
+          final orderId =
+              (extra is String ? extra : null) ??
+              state.uri.queryParameters['orderId'] ??
+              '';
+          return DroneLiveMapPage(orderId: orderId);
         },
       ),
     ],
