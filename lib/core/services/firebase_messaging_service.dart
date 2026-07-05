@@ -226,7 +226,7 @@ class FirebaseMessagingService {
       );
     }
 
-    final type = message.data['type'];
+    final type = message.data['type']?.toString();
     final delivery = DeliveryNotification.fromData(message.data);
 
     // Push to stream so listeners (like NotificationProvider) can refresh
@@ -314,6 +314,7 @@ class FirebaseMessagingService {
   /// Ưu tiên: noti giao drone (`type` = drone_*) -> trang theo dõi timeline;
   /// noti giao hàng khác (có `orderId`) -> chi tiết đơn; còn lại -> Thông báo.
   void _handleTapData(Map<String, dynamic> data) {
+    final type = data['type']?.toString();
     final delivery = DeliveryNotification.fromData(data);
     final type = data['type'];
 
