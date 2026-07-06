@@ -1,23 +1,18 @@
 import 'package:smart_laundry_locker/core/routing/app_router.dart';
 
-/// Landing page per signed-in role:
-/// ADMIN -> admin home, MANAGER -> ops dashboard, TECHNICIAN -> technician home,
-/// MAINTENANCE/STAFF -> staff/maintenance home, else customer home.
+/// Landing page per signed-in role. Mobile only serves 3 roles:
+/// TECHNICIAN -> locker maintenance + IoT, MAINTENANCE -> drone fleet,
+/// else customer home. ADMIN manages the system on the web app only,
+/// so mobile shows a "use the web console" notice.
 String homeForRoles(List<String> roles) {
   if (roles.contains('ADMIN')) {
-    return AppRouter.adminHome;
-  }
-  if (roles.contains('MANAGER')) {
-    return AppRouter.managerHome;
+    return AppRouter.adminWebNotice;
   }
   if (roles.contains('TECHNICIAN')) {
     return AppRouter.technicianHome;
   }
   if (roles.contains('MAINTENANCE')) {
     return AppRouter.maintenanceHome;
-  }
-  if (roles.contains('STAFF')) {
-    return AppRouter.staffHome;
   }
   return AppRouter.home;
 }

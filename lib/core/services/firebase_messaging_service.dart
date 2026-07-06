@@ -316,7 +316,6 @@ class FirebaseMessagingService {
   void _handleTapData(Map<String, dynamic> data) {
     final type = data['type']?.toString();
     final delivery = DeliveryNotification.fromData(data);
-    final type = data['type'];
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final context = AppRouter.navigatorKey.currentContext;

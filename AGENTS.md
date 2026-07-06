@@ -50,10 +50,10 @@ fix/<area>-<short-task>
 
 | Role trong JWT | Landing page |
 |---|---|
-| `MANAGER` / `ADMIN` | `/manager` → `ManagerHomePage` |
-| `TECHNICIAN` | `/technician-home` → `TechnicianHomePage` *(planned)* |
-| `MAINTENANCE` / `STAFF` | `/staff-home` → `StaffHomePage` *(planned)* |
-| Tất cả còn lại | `/home` → customer shell |
+| `ADMIN` | `/admin-web-notice` → `AdminWebNoticePage` (admin chỉ dùng bản web) |
+| `TECHNICIAN` | `/technician-home` → `TechnicianHomePage` (bảo trì vật lý tủ + thiết bị IoT) |
+| `MAINTENANCE` | `/maintenance-home` → `MaintenanceHomePage` (chỉ đội bay drone) |
+| Tất cả còn lại (gồm `MANAGER`/`STAFF` đã bỏ) | `/home` → customer shell |
 
 **COURIER** = mode toggle trong `CourierModeProvider`, không phải shell riêng.
 

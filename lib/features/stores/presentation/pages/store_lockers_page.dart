@@ -546,6 +546,7 @@ class _LockerCardState extends State<_LockerCard> {
           cell: cell,
           lockerName: _lockerName,
           origin: widget.storeLatLng,
+          lockerId: _lockerId,
         ),
       );
       return;

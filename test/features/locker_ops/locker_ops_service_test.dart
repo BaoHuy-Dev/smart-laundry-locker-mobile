@@ -13,81 +13,6 @@ void main() {
     service = LockerOpsService(dio: mock.dio);
   });
 
-  // ── STAFF ────────────────────────────────────────────────────────────────
-
-  group('STAFF endpoints', () {
-    group('staffLockers()', () {
-      test('returns list of lockers on success', () async {
-        adapter.onGet('/api/staff/lockers', (server) => server.reply(200, apiOk([
-          {'id': 1, 'name': 'Tủ A1', 'code': 'LA001', 'status': 'ACTIVE', 'address': '1 Đường ABC'},
-          {'id': 2, 'name': 'Tủ B2', 'code': 'LB002', 'status': 'ACTIVE', 'address': '2 Đường XYZ'},
-        ])));
-
-        final result = await service.staffLockers();
-        expect(result, hasLength(2));
-        expect(result.first['name'], equals('Tủ A1'));
-        expect(result.last['code'], equals('LB002'));
-      });
-
-      test('returns empty list when data is empty array', () async {
-        adapter.onGet('/api/staff/lockers', (server) => server.reply(200, apiOk([])));
-
-        final result = await service.staffLockers();
-        expect(result, isEmpty);
-      });
-    });
-
-    group('staffLayout()', () {
-      test('returns layout map for a locker', () async {
-        adapter.onGet('/api/staff/lockers/1/layout', (server) => server.reply(200, apiOk({
-          'lockerId': 1,
-          'rows': 3,
-          'columns': 4,
-          'boxes': [
-            {'id': 101, 'boxNumber': 1, 'status': 'AVAILABLE', 'cellType': 'STANDARD'},
-            {'id': 102, 'boxNumber': 2, 'status': 'OCCUPIED', 'cellType': 'XL'},
-          ],
-        })));
-
-        final result = await service.staffLayout(1);
-        expect(result['rows'], equals(3));
-        expect(result['columns'], equals(4));
-        expect((result['boxes'] as List).length, equals(2));
-      });
-    });
-
-    group('staffOrders()', () {
-      test('returns active orders list', () async {
-        adapter.onGet('/api/staff/orders', (server) => server.reply(200, apiOk([
-          {'id': 1001, 'type': 'SEND', 'status': 'STORING', 'lockerId': 1},
-          {'id': 1002, 'type': 'RENTAL', 'status': 'INITIALIZED', 'lockerId': 2},
-        ])));
-
-        final result = await service.staffOrders();
-        expect(result, hasLength(2));
-        expect(result.first['type'], equals('SEND'));
-        expect(result.last['status'], equals('INITIALIZED'));
-      });
-    });
-
-    group('staffStats()', () {
-      test('returns stats map', () async {
-        adapter.onGet('/api/staff/lockers/stats', (server) => server.reply(200, apiOk({
-          'totalLockers': 3,
-          'totalBoxes': 36,
-          'available': 20,
-          'occupied': 12,
-          'fault': 4,
-        })));
-
-        final result = await service.staffStats();
-        expect(result['totalBoxes'], equals(36));
-        expect(result['available'], equals(20));
-        expect(result['fault'], equals(4));
-      });
-    });
-  });
-
   // ── TECHNICIAN ────────────────────────────────────────────────────────────
 
   group('TECHNICIAN endpoints', () {
@@ -169,7 +94,7 @@ void main() {
     });
   });
 
-  // ── MAINTENANCE ───────────────────────────────────────────────────────────
+  // ── MAINTENANCE (locker upkeep endpoints — now used by TECHNICIAN UI) ─────
 
   group('MAINTENANCE endpoints', () {
     test('faults() returns fault cell list', () async {
@@ -212,26 +137,37 @@ void main() {
     });
   });
 
-  // ── MANAGER ───────────────────────────────────────────────────────────────
+  // ── MAINTENANCE — drone fleet ─────────────────────────────────────────────
 
-  group('MANAGER endpoints', () {
-    test('managerStats() returns stats list', () async {
-      adapter.onGet('/api/manage/lockers/stats', (server) => server.reply(200, apiOk([
-        {'lockerId': 1, 'lockerName': 'Tủ A1', 'totalBoxes': 12, 'available': 8, 'occupied': 3, 'fault': 1},
+  group('Drone fleet endpoints', () {
+    test('droneUnits() returns fleet list', () async {
+      adapter.onGet('/api/maintenance/drones', (server) => server.reply(200, apiOk([
+        {'id': 1, 'code': 'DRONE-01', 'status': 'IDLE', 'batteryPercent': 90, 'lockerId': 1},
+        {'id': 2, 'code': 'DRONE-02', 'status': 'IN_FLIGHT', 'batteryPercent': 55, 'lockerId': 2},
       ])));
 
-      final result = await service.managerStats();
-      expect(result.first['totalBoxes'], equals(12));
-      expect(result.first['available'], equals(8));
+      final result = await service.droneUnits();
+      expect(result, hasLength(2));
+      expect(result.first['code'], equals('DRONE-01'));
+      expect(result.last['status'], equals('IN_FLIGHT'));
     });
 
-    test('managerOrders() with status filter', () async {
-      adapter.onGet('/api/manage/orders', (server) => server.reply(200, apiOk([
-        {'id': 200, 'type': 'SEND', 'status': 'STORING'},
-      ])), queryParameters: {'status': 'STORING'});
+    test('updateDroneStatus() returns updated drone', () async {
+      adapter.onPost('/api/maintenance/drones/1/status', (server) => server.reply(200, apiOk({
+        'id': 1, 'status': 'CHARGING',
+      })));
 
-      final result = await service.managerOrders(status: 'STORING');
-      expect(result.first['status'], equals('STORING'));
+      final result = await service.updateDroneStatus(1, 'CHARGING');
+      expect(result['status'], equals('CHARGING'));
+    });
+
+    test('updateDroneBattery() returns updated drone', () async {
+      adapter.onPost('/api/maintenance/drones/1/battery', (server) => server.reply(200, apiOk({
+        'id': 1, 'batteryPercent': 40,
+      })));
+
+      final result = await service.updateDroneBattery(1, 40);
+      expect(result['batteryPercent'], equals(40));
     });
   });
 
@@ -304,368 +240,6 @@ void main() {
       adapter.onPost('/api/payments/checkout', (server) => server.reply(400, apiError('Đơn đã được thanh toán')));
 
       expect(() => service.checkout(300, 'WALLET'), throwsA(isA<Exception>()));
-    });
-  });
-
-  // ── ADMIN ────────────────────────────────────────────────────────────────
-
-  group('ADMIN endpoints', () {
-    group('adminDashboard()', () {
-      test('returns overview stats map', () async {
-        adapter.onGet(
-          '/api/admin/dashboard/overview',
-          (server) => server.reply(200, apiOk({
-            'totalOrders': 150,
-            'totalUsers': 42,
-            'totalStores': 5,
-            'totalRevenue': 9000000,
-          })),
-        );
-
-        final result = await service.adminDashboard();
-        expect(result['totalOrders'], equals(150));
-        expect(result['totalUsers'], equals(42));
-        expect(result['totalStores'], equals(5));
-      });
-
-      test('returns empty map when data is null', () async {
-        adapter.onGet(
-          '/api/admin/dashboard/overview',
-          (server) => server.reply(200, apiOk(null)),
-        );
-
-        final result = await service.adminDashboard();
-        expect(result, isEmpty);
-      });
-    });
-
-    group('adminOrderStats()', () {
-      test('returns order statistics map', () async {
-        adapter.onGet(
-          '/api/admin/orders/statistics',
-          (server) => server.reply(200, apiOk({
-            'INITIALIZED': 10,
-            'STORING': 35,
-            'COMPLETED': 100,
-            'CANCELED': 5,
-          })),
-        );
-
-        final result = await service.adminOrderStats();
-        expect(result['STORING'], equals(35));
-        expect(result['COMPLETED'], equals(100));
-      });
-    });
-
-    group('adminRevenue()', () {
-      test('returns revenue breakdown map', () async {
-        adapter.onGet(
-          '/api/admin/orders/revenue',
-          (server) => server.reply(200, apiOk({
-            'todayRevenue': 1500000,
-            'weekRevenue': 8200000,
-            'monthRevenue': 32000000,
-          })),
-        );
-
-        final result = await service.adminRevenue();
-        expect(result['todayRevenue'], equals(1500000));
-        expect(result['monthRevenue'], equals(32000000));
-      });
-    });
-
-    group('adminUsers()', () {
-      test('returns list of users', () async {
-        adapter.onGet(
-          '/api/admin/users',
-          (server) => server.reply(200, apiOk([
-            {
-              'id': 1,
-              'email': 'admin@test.com',
-              'fullName': 'Admin',
-              'roles': ['ADMIN'],
-              'status': 'ACTIVE',
-            },
-            {
-              'id': 2,
-              'email': 'user@test.com',
-              'fullName': 'Customer',
-              'roles': ['CUSTOMER'],
-              'status': 'ACTIVE',
-            },
-          ])),
-        );
-
-        final result = await service.adminUsers();
-        expect(result, hasLength(2));
-        expect(result.first['email'], equals('admin@test.com'));
-        expect(result.last['roles'], equals(['CUSTOMER']));
-      });
-
-      test('returns empty list when no users', () async {
-        adapter.onGet(
-          '/api/admin/users',
-          (server) => server.reply(200, apiOk([])),
-        );
-
-        final result = await service.adminUsers();
-        expect(result, isEmpty);
-      });
-    });
-
-    group('adminSetUserStatus()', () {
-      test('returns updated user on INACTIVE', () async {
-        adapter.onPut(
-          '/api/admin/users/2/status',
-          (server) => server.reply(200, apiOk({
-            'id': 2,
-            'email': 'user@test.com',
-            'status': 'INACTIVE',
-          })),
-          data: {'status': 'INACTIVE'},
-        );
-
-        final result = await service.adminSetUserStatus(2, 'INACTIVE');
-        expect(result['status'], equals('INACTIVE'));
-      });
-
-      test('returns updated user on ACTIVE', () async {
-        adapter.onPut(
-          '/api/admin/users/2/status',
-          (server) => server.reply(200, apiOk({
-            'id': 2,
-            'status': 'ACTIVE',
-          })),
-          data: {'status': 'ACTIVE'},
-        );
-
-        final result = await service.adminSetUserStatus(2, 'ACTIVE');
-        expect(result['status'], equals('ACTIVE'));
-      });
-    });
-
-    group('adminSetUserRoles()', () {
-      test('assigns new role list to user', () async {
-        adapter.onPut(
-          '/api/admin/users/3/roles',
-          (server) => server.reply(200, apiOk({
-            'id': 3,
-            'roles': ['MANAGER'],
-          })),
-          data: {'roles': ['MANAGER']},
-        );
-
-        final result = await service.adminSetUserRoles(3, ['MANAGER']);
-        expect(result['roles'], equals(['MANAGER']));
-      });
-    });
-
-    group('adminStores()', () {
-      test('returns list of stores', () async {
-        adapter.onGet(
-          '/api/admin/stores',
-          (server) => server.reply(200, apiOk([
-            {
-              'id': 1,
-              'name': 'Chi nhánh Quận 1',
-              'address': '1 Đường ABC',
-              'phone': '0901234567',
-              'status': 'ACTIVE',
-            },
-            {
-              'id': 2,
-              'name': 'Chi nhánh Quận 3',
-              'address': '3 Đường XYZ',
-              'phone': '0907654321',
-              'status': 'INACTIVE',
-            },
-          ])),
-        );
-
-        final result = await service.adminStores();
-        expect(result, hasLength(2));
-        expect(result.first['name'], equals('Chi nhánh Quận 1'));
-        expect(result.last['status'], equals('INACTIVE'));
-      });
-    });
-
-    group('adminCreateStore()', () {
-      test('returns created store on success', () async {
-        adapter.onPost(
-          '/api/admin/stores',
-          (server) => server.reply(201, apiOk({
-            'id': 10,
-            'name': 'Chi nhánh Mới',
-            'address': '10 Phố Huế',
-            'status': 'ACTIVE',
-          })),
-          data: {'name': 'Chi nhánh Mới', 'address': '10 Phố Huế'},
-        );
-
-        final result = await service.adminCreateStore({
-          'name': 'Chi nhánh Mới',
-          'address': '10 Phố Huế',
-        });
-        expect(result['id'], equals(10));
-        expect(result['name'], equals('Chi nhánh Mới'));
-      });
-    });
-
-    group('adminSetStoreStatus()', () {
-      test('deactivates store', () async {
-        adapter.onPut(
-          '/api/admin/stores/1/status',
-          (server) => server.reply(200, apiOk({'id': 1, 'status': 'INACTIVE'})),
-          data: {'status': 'INACTIVE'},
-        );
-
-        final result = await service.adminSetStoreStatus(1, 'INACTIVE');
-        expect(result['status'], equals('INACTIVE'));
-      });
-
-      test('activates store', () async {
-        adapter.onPut(
-          '/api/admin/stores/1/status',
-          (server) => server.reply(200, apiOk({'id': 1, 'status': 'ACTIVE'})),
-          data: {'status': 'ACTIVE'},
-        );
-
-        final result = await service.adminSetStoreStatus(1, 'ACTIVE');
-        expect(result['status'], equals('ACTIVE'));
-      });
-    });
-
-    group('adminOrders()', () {
-      test('returns all orders when no status filter', () async {
-        adapter.onGet(
-          '/api/admin/orders',
-          (server) => server.reply(200, apiOk([
-            {'id': 500, 'orderType': 'SEND', 'status': 'STORING'},
-            {'id': 501, 'orderType': 'RENTAL', 'status': 'COMPLETED'},
-          ])),
-        );
-
-        final result = await service.adminOrders();
-        expect(result, hasLength(2));
-        expect(result.first['orderType'], equals('SEND'));
-      });
-
-      test('returns filtered orders when status is provided', () async {
-        adapter.onGet(
-          '/api/admin/orders',
-          (server) => server.reply(200, apiOk([
-            {'id': 500, 'orderType': 'SEND', 'status': 'STORING'},
-          ])),
-          queryParameters: {'status': 'STORING'},
-        );
-
-        final result = await service.adminOrders(status: 'STORING');
-        expect(result, hasLength(1));
-        expect(result.first['status'], equals('STORING'));
-      });
-
-      test('returns empty list when no orders', () async {
-        adapter.onGet(
-          '/api/admin/orders',
-          (server) => server.reply(200, apiOk([])),
-        );
-
-        final result = await service.adminOrders();
-        expect(result, isEmpty);
-      });
-    });
-
-    group('adminSetOrderStatus()', () {
-      test('updates order to COMPLETED', () async {
-        adapter.onPut(
-          '/api/admin/orders/500/status',
-          (server) => server.reply(200, apiOk({'id': 500, 'status': 'COMPLETED'})),
-          data: {'status': 'COMPLETED'},
-        );
-
-        final result = await service.adminSetOrderStatus(500, 'COMPLETED');
-        expect(result['status'], equals('COMPLETED'));
-      });
-
-      test('cancels order', () async {
-        adapter.onPut(
-          '/api/admin/orders/500/status',
-          (server) => server.reply(200, apiOk({'id': 500, 'status': 'CANCELED'})),
-          data: {'status': 'CANCELED'},
-        );
-
-        final result = await service.adminSetOrderStatus(500, 'CANCELED');
-        expect(result['status'], equals('CANCELED'));
-      });
-    });
-
-    group('adminPromotions()', () {
-      test('returns list of promotions', () async {
-        adapter.onGet(
-          '/api/admin/promotions',
-          (server) => server.reply(200, apiOk([
-            {
-              'id': 1,
-              'code': 'SUMMER20',
-              'discountType': 'PERCENT',
-              'discountValue': 20,
-              'status': 'ACTIVE',
-              'startDate': '2026-06-01T00:00:00',
-              'endDate': '2026-06-30T23:59:59',
-            },
-            {
-              'id': 2,
-              'code': 'FLAT50K',
-              'discountType': 'FIXED',
-              'discountValue': 50000,
-              'status': 'INACTIVE',
-            },
-          ])),
-        );
-
-        final result = await service.adminPromotions();
-        expect(result, hasLength(2));
-        expect(result.first['code'], equals('SUMMER20'));
-        expect(result.last['discountType'], equals('FIXED'));
-      });
-    });
-
-    group('adminCreatePromotion()', () {
-      test('returns created promotion', () async {
-        final body = {
-          'code': 'NEWYEAR10',
-          'discountType': 'PERCENT',
-          'discountValue': 10.0,
-          'startDate': '2026-12-31T00:00:00.000',
-          'endDate': '2027-01-01T23:59:59.000',
-        };
-        adapter.onPost(
-          '/api/admin/promotions',
-          (server) => server.reply(201, apiOk({
-            'id': 5,
-            'code': 'NEWYEAR10',
-            'discountType': 'PERCENT',
-            'discountValue': 10.0,
-            'status': 'ACTIVE',
-          })),
-          data: body,
-        );
-
-        final result = await service.adminCreatePromotion(body);
-        expect(result['code'], equals('NEWYEAR10'));
-        expect(result['discountValue'], equals(10.0));
-      });
-    });
-
-    group('adminDeletePromotion()', () {
-      test('completes without throwing on success', () async {
-        adapter.onDelete(
-          '/api/admin/promotions/1',
-          (server) => server.reply(200, apiOk(null)),
-        );
-
-        await expectLater(service.adminDeletePromotion(1), completes);
-      });
     });
   });
 }
