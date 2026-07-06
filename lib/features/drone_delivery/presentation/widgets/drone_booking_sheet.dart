@@ -3,6 +3,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:smart_laundry_locker/features/drone_delivery/data/drone_delivery_store.dart';
 import 'package:smart_laundry_locker/features/drone_delivery/domain/entities/drone_order.dart';
 import 'package:smart_laundry_locker/features/drone_delivery/presentation/pages/drone_tracking_page.dart';
+import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
 
 class DroneBookingSheet extends StatefulWidget {
   const DroneBookingSheet({
@@ -10,11 +11,16 @@ class DroneBookingSheet extends StatefulWidget {
     required this.cell,
     required this.lockerName,
     required this.origin,
+    this.lockerId,
   });
 
   final Map<String, dynamic> cell;
   final String lockerName;
   final LatLng origin;
+
+  /// Id tủ để gửi yêu cầu lên backend (hàng đợi điều phối của đội bay).
+  /// Null (caller cũ chưa truyền) thì chỉ chạy mock tracking như trước.
+  final int? lockerId;
 
   @override
   State<DroneBookingSheet> createState() => _DroneBookingSheetState();
@@ -30,15 +36,34 @@ class _DroneBookingSheetState extends State<DroneBookingSheet> {
   }
 
   void _confirm() {
+    final description = _descController.text.trim().isEmpty
+        ? null
+        : _descController.text.trim();
+
+    // Gửi yêu cầu thật lên backend để đội bay (MAINTENANCE) thấy trong hàng
+    // đợi điều phối — best-effort, không chặn UX tracking local nếu BE lỗi.
+    final lockerId = widget.lockerId;
+    if (lockerId != null) {
+      final boxId = widget.cell['id'];
+      LockerOpsService()
+          .createDroneDelivery(
+            lockerId: lockerId,
+            boxId: boxId is int ? boxId : int.tryParse('$boxId'),
+            description: description,
+          )
+          .catchError((Object e) {
+        debugPrint('createDroneDelivery failed: $e');
+        return <String, dynamic>{};
+      });
+    }
+
     final order = DroneOrder(
       id: 'DRN-${DateTime.now().millisecondsSinceEpoch}',
       lockerName: widget.lockerName,
       boxNumber: (widget.cell['boxNumber'] as int?) ?? 0,
       origin: widget.origin,
       createdAt: DateTime.now(),
-      description: _descController.text.trim().isEmpty
-          ? null
-          : _descController.text.trim(),
+      description: description,
     );
 
     DroneDeliveryStore.instance.placeOrder(order);
