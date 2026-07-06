@@ -80,12 +80,12 @@ C:\flutter\bin\flutter.bat run
 | `lib/features/auth/presentation/pages/login_screen.dart` | Real identifier/password login screen. |
 | `lib/features/auth/presentation/pages/splash_screen.dart` | Restores token and routes by role. |
 | `lib/features/home/presentation/pages/home_page.dart` | Customer home and locker quick actions. |
-| `lib/features/locker_ops/data/locker_ops_service.dart` | Dio service for locker/order/manager/maintenance APIs. |
+| `lib/features/locker_ops/data/locker_ops_service.dart` | Dio service for locker/order/maintenance/technician APIs. |
 | `lib/features/locker_ops/presentation/pages/send_parcel_page.dart` | Customer SEND flow. |
 | `lib/features/locker_ops/presentation/pages/rent_locker_page.dart` | Customer RENTAL flow. |
 | `lib/features/locker_ops/presentation/pages/my_locker_orders_page.dart` | Customer locker order history/actions. |
-| `lib/features/locker_ops/presentation/pages/manager_home_page.dart` | Manager dashboard. |
-| `lib/features/locker_ops/presentation/pages/maintenance_home_page.dart` | Maintenance queue. |
+| `lib/features/locker_ops/presentation/pages/technician_home_page.dart` | Technician: locker maintenance + IoT devices. |
+| `lib/features/locker_ops/presentation/pages/maintenance_home_page.dart` | Maintenance: drone fleet only. |
 
 ## Backend Requirements
 
