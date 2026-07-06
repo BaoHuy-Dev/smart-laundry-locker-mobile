@@ -204,31 +204,6 @@ class LockerOpsService {
     }
   }
 
-  // ---- Manager ----
-  Future<List<Map<String, dynamic>>> managerStats() =>
-      _list('/api/manage/lockers/stats');
-
-  Future<List<Map<String, dynamic>>> managerOrders({
-    String? status,
-    String? type,
-  }) => _list(
-    '/api/manage/orders',
-    query: {
-      if (status != null && status.isNotEmpty) 'status': status,
-      if (type != null && type.isNotEmpty) 'type': type,
-    },
-  );
-
-  /// Manager đổi trạng thái đơn (trước đây chỉ Admin làm được).
-  Future<Map<String, dynamic>> managerSetOrderStatus(
-    int orderId,
-    String status,
-  ) => _map(
-    'PATCH',
-    '/api/manage/orders/$orderId/status',
-    body: {'status': status},
-  );
-
   // ---- Maintenance ----
   Future<List<Map<String, dynamic>>> faults() =>
       _list('/api/maintenance/faults');
@@ -346,6 +321,43 @@ class LockerOpsService {
   Future<Map<String, dynamic>> addDroneLog(int id, String note) =>
       _map('POST', '/api/maintenance/drones/$id/logs', body: {'note': note});
 
+  // ---- Drone delivery requests (khách tạo -> đội bay điều phối) ----
+
+  /// Khách tạo yêu cầu giao hàng bằng drone tới 1 tủ (ô DRONE tuỳ chọn).
+  Future<Map<String, dynamic>> createDroneDelivery({
+    required int lockerId,
+    int? boxId,
+    String? receiverPhone,
+    String? description,
+  }) => _map('POST', '/api/drone-deliveries', body: {
+        'lockerId': lockerId,
+        if (boxId != null) 'boxId': boxId,
+        if (receiverPhone != null) 'receiverPhone': receiverPhone,
+        if (description != null) 'description': description,
+      });
+
+  /// Các yêu cầu giao drone của chính khách (mọi trạng thái, mới nhất trước).
+  Future<List<Map<String, dynamic>>> myDroneDeliveries() =>
+      _list('/api/drone-deliveries/my');
+
+  /// Khách huỷ yêu cầu khi còn PENDING.
+  Future<Map<String, dynamic>> cancelDroneDelivery(int id) =>
+      _map('PUT', '/api/drone-deliveries/$id/cancel');
+
+  /// Hàng đợi điều phối cho đội bay (MAINTENANCE); lọc theo [status] nếu có.
+  Future<List<Map<String, dynamic>>> droneDeliveryQueue({String? status}) =>
+      _list('/api/maintenance/drone-deliveries',
+          query: status == null ? null : {'status': status});
+
+  /// Đội bay điều phối yêu cầu; gán [droneUnitId] thì drone đó chuyển IN_FLIGHT.
+  Future<Map<String, dynamic>> dispatchDroneDelivery(int id, {int? droneUnitId}) =>
+      _map('POST', '/api/maintenance/drone-deliveries/$id/dispatch',
+          body: droneUnitId == null ? null : {'droneUnitId': droneUnitId});
+
+  /// Drone đã thả hàng xong — yêu cầu DELIVERED, drone quay về IDLE.
+  Future<Map<String, dynamic>> completeDroneDelivery(int id) =>
+      _map('POST', '/api/maintenance/drone-deliveries/$id/complete');
+
   /// #6 KTV cập nhật trạng thái bảo trì bãi đáp drone của 1 tủ.
   /// [status] = OK / FAULT / MAINTENANCE.
   Future<Map<String, dynamic>> updateLandingPadStatus(
@@ -357,24 +369,6 @@ class LockerOpsService {
     '/api/maintenance/lockers/$lockerId/landing-pad',
     body: {'status': status, if (reason != null) 'reason': reason},
   );
-
-  // ── STAFF ──────────────────────────────────────────────────────────────────
-
-  /// Danh sách tủ mà STAFF được phân công quản lý.
-  Future<List<Map<String, dynamic>>> staffLockers() =>
-      _list('/api/staff/lockers');
-
-  /// Sơ đồ ô của một tủ (dành cho STAFF).
-  Future<Map<String, dynamic>> staffLayout(int lockerId) =>
-      _map('GET', '/api/staff/lockers/$lockerId/layout');
-
-  /// Danh sách đơn hàng trong ca của STAFF.
-  Future<List<Map<String, dynamic>>> staffOrders() =>
-      _list('/api/staff/orders');
-
-  /// Thống kê tổng quan của các tủ STAFF quản lý.
-  Future<Map<String, dynamic>> staffStats() =>
-      _map('GET', '/api/staff/lockers/stats');
 
   // ── TECHNICIAN ─────────────────────────────────────────────────────────────
 
@@ -403,171 +397,6 @@ class LockerOpsService {
   Future<void> techRestartDevice(int id) async {
     await _map('POST', '/api/technician/devices/$id/restart');
   }
-
-  // ── ADMIN ──────────────────────────────────────────────────────────────────
-
-  Future<Map<String, dynamic>> adminDashboard() =>
-      _map('GET', '/api/admin/dashboard/overview');
-
-  Future<Map<String, dynamic>> adminOrderStats() =>
-      _map('GET', '/api/admin/orders/statistics');
-
-  Future<Map<String, dynamic>> adminRevenue() =>
-      _map('GET', '/api/admin/orders/revenue');
-
-  Future<List<Map<String, dynamic>>> adminUsers() =>
-      _list('/api/admin/users');
-
-  Future<Map<String, dynamic>> adminSetUserStatus(int userId, String status) =>
-      _map('PUT', '/api/admin/users/$userId/status', body: {'status': status});
-
-  Future<Map<String, dynamic>> adminSetUserRoles(
-          int userId, List<String> roles) =>
-      _map('PUT', '/api/admin/users/$userId/roles', body: {'roles': roles});
-
-  /// Số dư ví nội bộ của một user (admin xem để điều chỉnh).
-  Future<Map<String, dynamic>> adminWallet(int userId) =>
-      _map('GET', '/api/admin/wallet/$userId');
-
-  /// Điều chỉnh số dư ví của user. [amount] có dấu:
-  /// dương = cộng tiền, âm = trừ tiền. [reason] tuỳ chọn để ghi audit.
-  Future<Map<String, dynamic>> adminAdjustWallet(
-    int userId,
-    num amount, {
-    String? reason,
-  }) => _map('POST', '/api/admin/wallet/$userId/adjust', body: {
-        'amount': amount,
-        if (reason != null && reason.isNotEmpty) 'reason': reason,
-      });
-
-  Future<List<Map<String, dynamic>>> adminStores() =>
-      _list('/api/admin/stores');
-
-  Future<Map<String, dynamic>> adminCreateStore(Map<String, dynamic> data) =>
-      _map('POST', '/api/admin/stores', body: data);
-
-  Future<Map<String, dynamic>> adminSetStoreStatus(
-          int storeId, String status) =>
-      _map('PUT', '/api/admin/stores/$storeId/status',
-          body: {'status': status});
-
-  Future<List<Map<String, dynamic>>> adminOrders({String? status}) =>
-      _list('/api/admin/orders',
-          query: status != null ? {'status': status} : null);
-
-  Future<Map<String, dynamic>> adminSetOrderStatus(
-          int orderId, String status) =>
-      _map('PUT', '/api/admin/orders/$orderId/status',
-          body: {'status': status});
-
-  Future<List<Map<String, dynamic>>> adminPromotions() =>
-      _list('/api/admin/promotions');
-
-  Future<Map<String, dynamic>> adminCreatePromotion(
-          Map<String, dynamic> data) =>
-      _map('POST', '/api/admin/promotions', body: data);
-
-  Future<void> adminDeletePromotion(int id) async =>
-      _map('DELETE', '/api/admin/promotions/$id');
-
-  // ── ADMIN — Thanh toán ──────────────────────────────────────────────────────
-
-  Future<List<Map<String, dynamic>>> adminPayments({String? status}) =>
-      _list('/api/admin/payments', query: {
-        'size': 100,
-        if (status != null) 'status': status,
-      });
-
-  /// Đổi trạng thái thanh toán (status truyền qua query param, khớp web).
-  Future<Map<String, dynamic>> adminSetPaymentStatus(int id, String status) =>
-      _map('PUT', '/api/admin/payments/$id/status', query: {'status': status});
-
-  // ── ADMIN — Phản hồi (feedback) ─────────────────────────────────────────────
-
-  Future<List<Map<String, dynamic>>> adminFeedback({bool? resolved}) =>
-      _list('/api/admin/feedback', query: {
-        'size': 100,
-        if (resolved != null) 'isResolved': resolved,
-      });
-
-  /// Đánh dấu phản hồi RESOLVED / PENDING.
-  Future<Map<String, dynamic>> adminSetFeedbackStatus(int id, String status) =>
-      _map('PATCH', '/api/admin/feedback/$id/status', body: {'status': status});
-
-  /// Admin trả lời một phản hồi.
-  Future<Map<String, dynamic>> adminReplyFeedback(int id, String reply) =>
-      _map('POST', '/api/admin/feedback/$id/reply', body: {'reply': reply});
-
-  // ── ADMIN — Thông báo (notifications) ───────────────────────────────────────
-
-  Future<List<Map<String, dynamic>>> adminNotifications() =>
-      _list('/api/admin/notifications', query: {'size': 100});
-
-  Future<Map<String, dynamic>> adminNotificationStats() =>
-      _map('GET', '/api/admin/notifications/stats');
-
-  /// Gửi thông báo broadcast (mặc định IN_APP tới toàn bộ user).
-  Future<Map<String, dynamic>> adminBroadcastNotification({
-    required String title,
-    required String message,
-    String type = 'SYSTEM_ALERT',
-    String channel = 'IN_APP',
-    bool targetAllUsers = true,
-  }) => _map('POST', '/api/admin/notifications/broadcast', body: {
-        'type': type,
-        'channel': channel,
-        'title': title,
-        'message': message,
-        'targetAllUsers': targetAllUsers,
-      });
-
-  // ── ADMIN — Lịch hệ thống (scheduler) ───────────────────────────────────────
-
-  Future<Map<String, dynamic>> adminSchedulerStatus() =>
-      _map('GET', '/api/admin/scheduler/status');
-
-  Future<Map<String, dynamic>> adminTriggerAutoCancel() =>
-      _map('POST', '/api/admin/scheduler/auto-cancel');
-
-  Future<Map<String, dynamic>> adminTriggerReleaseBoxes() =>
-      _map('POST', '/api/admin/scheduler/release-boxes');
-
-  Future<Map<String, dynamic>> adminTriggerPickupReminders() =>
-      _map('POST', '/api/admin/scheduler/pickup-reminders');
-
-  Future<List<Map<String, dynamic>>> adminDrones({String? status}) =>
-      _list('/api/admin/drones',
-          query: status != null ? {'status': status} : null);
-
-  /// #4 Thêm drone mới gắn vào 1 tủ làm trạm gốc.
-  Future<Map<String, dynamic>> adminCreateDrone(int lockerId, String code) =>
-      _map('POST', '/api/admin/lockers/drones',
-          body: {'lockerId': lockerId, 'code': code});
-
-  /// #4 Sửa drone: đổi tủ gốc và/hoặc đổi mã (trường null = giữ nguyên).
-  Future<Map<String, dynamic>> adminUpdateDrone(
-    int id, {
-    int? lockerId,
-    String? code,
-  }) => _map('PUT', '/api/admin/drones/$id', body: {
-        if (lockerId != null) 'lockerId': lockerId,
-        if (code != null) 'code': code,
-      });
-
-  /// #4 Ngừng hoạt động (decommission) một drone.
-  Future<void> adminDecommissionDrone(int id) async =>
-      _map('DELETE', '/api/admin/drones/$id');
-
-  /// #3 Tạo lịch bảo trì định kỳ cho 1 drone.
-  Future<Map<String, dynamic>> adminCreateDroneSchedule(
-    int droneUnitId,
-    String title,
-    int intervalDays,
-  ) => _map('POST', '/api/admin/lockers/schedules', body: {
-        'droneUnitId': droneUnitId,
-        'title': title,
-        'intervalDays': intervalDays,
-      });
 
   /// Human-readable message from an [ApiResponse] error payload.
   static String errorMessage(Object error) {
