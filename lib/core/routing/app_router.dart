@@ -36,10 +36,8 @@ import 'package:go_router/go_router.dart';
 
 import 'package:smart_laundry_locker/features/orders/domain/entities/order.dart';
 import 'package:smart_laundry_locker/features/orders/presentation/pages/customer/customer_order_detail_page.dart';
-import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/manager_home_page.dart';
-import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/admin_home_page.dart';
+import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/admin_web_notice_page.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/maintenance_home_page.dart';
-import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/staff_home_page.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/technician_home_page.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/send_parcel_page.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/rent_locker_page.dart';
@@ -83,11 +81,9 @@ class AppRouter {
   static const String myDelegations = '/my-delegations';
   static const String myVouchers = '/my-vouchers';
   static const String promotions = '/promotions';
-  static const String managerHome = '/manager';
   static const String maintenanceHome = '/maintenance-home';
-  static const String staffHome = '/staff-home';
   static const String technicianHome = '/technician-home';
-  static const String adminHome = '/admin-home';
+  static const String adminWebNotice = '/admin-web-notice';
   static const String sendParcel = '/locker/send-parcel';
   static const String rentLocker = '/locker/rent';
   static const String myLockerOrders = '/locker/my-orders';
@@ -297,19 +293,9 @@ class AppRouter {
         builder: (context, state) => const MyDelegationsPage(),
       ),
       GoRoute(
-        path: managerHome,
-        name: 'manager_home',
-        builder: (context, state) => const ManagerHomePage(),
-      ),
-      GoRoute(
         path: maintenanceHome,
         name: 'maintenance_home',
         builder: (context, state) => const MaintenanceHomePage(),
-      ),
-      GoRoute(
-        path: staffHome,
-        name: 'staff_home',
-        builder: (context, state) => const StaffHomePage(),
       ),
       GoRoute(
         path: technicianHome,
@@ -317,9 +303,9 @@ class AppRouter {
         builder: (context, state) => const TechnicianHomePage(),
       ),
       GoRoute(
-        path: adminHome,
-        name: 'admin_home',
-        builder: (_, __) => const AdminHomePage(),
+        path: adminWebNotice,
+        name: 'admin_web_notice',
+        builder: (_, __) => const AdminWebNoticePage(),
       ),
       GoRoute(
         path: sendParcel,
