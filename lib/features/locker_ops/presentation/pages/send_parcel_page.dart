@@ -247,6 +247,7 @@ class _SendParcelPageState extends State<SendParcelPage> {
           const OpsSectionLabel('Mã giảm giá', icon: LucideIcons.ticket),
           PromoCodeField(
             orderTotal: _fee,
+            lockerId: _lockerId,
             onChanged: (discount, code) => setState(() {
               _discount = discount;
               _promoCode = code;

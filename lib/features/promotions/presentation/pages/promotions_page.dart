@@ -7,6 +7,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:smart_laundry_locker/features/promotions/data/models/promotion_model.dart';
 import 'package:smart_laundry_locker/features/promotions/presentation/pages/promotion_detail_page.dart';
 import 'package:smart_laundry_locker/features/promotions/presentation/providers/promotion_provider.dart';
+import 'package:smart_laundry_locker/features/vouchers/data/repositories/voucher_repository.dart';
 import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 
 class PromotionsPage extends ConsumerStatefulWidget {
@@ -290,6 +291,38 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
                           ),
                         ),
                       ),
+                      const SizedBox(width: 6),
+                      // Lưu vào ví voucher (promotion_claims) — xem lại ở
+                      // "Ưu đãi của tôi", mã tự chuyển USED khi áp vào đơn.
+                      GestureDetector(
+                        onTap: () => _claimPromotion(context, promo),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 9, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AislBrand.blue.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: AislBrand.blue.withValues(alpha: 0.35)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(LucideIcons.bookmarkPlus,
+                                  size: 12, color: AislBrand.blue),
+                              SizedBox(width: 4),
+                              Text(
+                                'Lưu',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: AislBrand.blue,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -314,6 +347,40 @@ class _PromotionsPageState extends ConsumerState<PromotionsPage> {
         child: Icon(LucideIcons.ticket, size: 32, color: Colors.white24),
       ),
     );
+  }
+
+  /// Lưu mã vào ví voucher (idempotent — lưu lại không lỗi).
+  Future<void> _claimPromotion(BuildContext context, PromotionModel promo) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await VoucherRepository().claimPromotion(promo.id);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(LucideIcons.bookmarkCheck,
+                  color: Colors.white, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                  child: Text(
+                      'Đã lưu mã ${promo.code} vào "Ưu đãi của tôi"')),
+            ],
+          ),
+          backgroundColor: AislBrand.navy,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Không lưu được mã — kiểm tra đăng nhập và thử lại'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _copyCode(BuildContext context, String code) {

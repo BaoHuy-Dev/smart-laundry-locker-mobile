@@ -28,11 +28,14 @@ class VoucherProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> useVoucher(String voucherId) async {
-    final success = await _repository.useVoucher(voucherId);
-    if (success) {
-      await loadMyVouchers(); // refresh
+  /// Lưu một khuyến mãi vào ví (từ trang Khuyến mãi). Trả về false nếu lỗi.
+  Future<bool> claimPromotion(int promotionId) async {
+    try {
+      await _repository.claimPromotion(promotionId);
+      await loadMyVouchers();
+      return true;
+    } catch (_) {
+      return false;
     }
-    return success;
   }
 }
