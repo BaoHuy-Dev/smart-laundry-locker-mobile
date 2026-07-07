@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:smart_laundry_locker/core/routing/app_router.dart';
 import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 import '../providers/voucher_provider.dart';
 import '../../data/models/voucher_model.dart';
@@ -132,6 +133,12 @@ class _MyVouchersPageState extends State<MyVouchersPage>
                       color: Colors.grey.shade600,
                       fontWeight: FontWeight.w500,
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton.icon(
+                    onPressed: () => context.push(AppRouter.promotions),
+                    icon: const Icon(LucideIcons.ticket, size: 16),
+                    label: const Text('Khám phá ưu đãi và lưu mã'),
                   ),
                 ],
               ),
