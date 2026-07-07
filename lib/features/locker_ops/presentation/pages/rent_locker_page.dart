@@ -262,6 +262,7 @@ class _RentLockerPageState extends State<RentLockerPage> {
         const OpsSectionLabel('Mã giảm giá', icon: LucideIcons.ticket),
         PromoCodeField(
           orderTotal: _price,
+          lockerId: _lockerId,
           onChanged: (discount, code) => setState(() {
             _discount = discount;
             _promoCode = code;

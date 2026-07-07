@@ -33,10 +33,14 @@ class PromoCodeField extends StatefulWidget {
     super.key,
     required this.orderTotal,
     required this.onChanged,
+    this.lockerId,
   });
 
   /// Current order subtotal (VND), used to compute percentage discounts.
   final int orderTotal;
+
+  /// Tủ đang đặt — backend dùng để check mã có scope theo tủ/kiosk.
+  final int? lockerId;
 
   /// Called with the applied discount (VND) and the code (null when cleared).
   final void Function(int discount, String? code) onChanged;
@@ -67,12 +71,15 @@ class _PromoCodeFieldState extends State<PromoCodeField> {
       _error = null;
     });
     try {
-      final res = await _service.validatePromotion(code);
+      final res =
+          await _service.validatePromotion(code, lockerId: widget.lockerId);
       final valid = res['valid'] == true;
       final promotion = res['promotion'] as Map<String, dynamic>?;
       if (!valid || promotion == null) {
         setState(() {
-          _error = 'Mã không hợp lệ hoặc đã hết hạn';
+          // Backend trả lý do cụ thể (sai tủ / hết lượt / hết hạn...).
+          _error =
+              (res['reason'] as String?) ?? 'Mã không hợp lệ hoặc đã hết hạn';
           _appliedCode = null;
         });
         widget.onChanged(0, null);

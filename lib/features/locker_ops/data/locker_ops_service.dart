@@ -73,8 +73,6 @@ class LockerOpsService {
       'receiverName': receiverName,
       'note': note,
       if (size != null) 'size': size,
-      // Forward-compatible: backend ignores unknown fields today; will apply
-      // once the send DTO accepts a promotion code.
       if (promotionCode != null) 'promotionCode': promotionCode,
     },
   );
@@ -98,9 +96,12 @@ class LockerOpsService {
   );
 
   // ---- Promotions / loyalty / payments ----
-  /// Validate a promo code. Returns `{code, valid, promotion:{...}}`.
-  Future<Map<String, dynamic>> validatePromotion(String code) =>
-      _map('GET', '/api/promotions/validate/$code');
+  /// Validate a promo code. Returns `{code, valid, reason?, promotion:{...}}`.
+  /// [lockerId] để backend check mã có scope theo tủ/kiosk; đăng nhập rồi thì
+  /// backend còn check lượt dùng còn lại của chính user.
+  Future<Map<String, dynamic>> validatePromotion(String code, {int? lockerId}) =>
+      _map('GET', '/api/promotions/validate/$code',
+          query: lockerId == null ? null : {'lockerId': lockerId});
 
   /// Current user's loyalty account: `{id, userId, points, stamps, tier}`.
   Future<Map<String, dynamic>> loyaltyPoints() =>
