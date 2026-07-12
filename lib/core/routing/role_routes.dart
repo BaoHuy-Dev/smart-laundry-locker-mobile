@@ -8,7 +8,7 @@ String homeForRoles(List<String> roles) {
   if (roles.contains('ADMIN') || roles.contains('ROLE_ADMIN')) {
     return AppRouter.adminWebNotice;
   }
-  if (roles.contains('TECHNICIAN') || roles.contains('ROLE_TECHNICIAN')) {
+  if (roles.contains('TECHNICAL') || roles.contains('ROLE_TECHNICAL')) {
     return AppRouter.technicianHome;
   }
   if (roles.contains('MAINTENANCE') || roles.contains('ROLE_MAINTENANCE')) {
