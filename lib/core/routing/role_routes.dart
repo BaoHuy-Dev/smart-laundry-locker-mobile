@@ -5,13 +5,13 @@ import 'package:smart_laundry_locker/core/routing/app_router.dart';
 /// else customer home. ADMIN manages the system on the web app only,
 /// so mobile shows a "use the web console" notice.
 String homeForRoles(List<String> roles) {
-  if (roles.contains('ADMIN')) {
+  if (roles.contains('ADMIN') || roles.contains('ROLE_ADMIN')) {
     return AppRouter.adminWebNotice;
   }
-  if (roles.contains('TECHNICIAN')) {
+  if (roles.contains('TECHNICIAN') || roles.contains('ROLE_TECHNICIAN')) {
     return AppRouter.technicianHome;
   }
-  if (roles.contains('MAINTENANCE')) {
+  if (roles.contains('MAINTENANCE') || roles.contains('ROLE_MAINTENANCE')) {
     return AppRouter.maintenanceHome;
   }
   return AppRouter.home;
