@@ -124,12 +124,15 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
             subtitle: _pendingDeliveries.isNotEmpty
                 ? '${_pendingDeliveries.length} đơn drone đang chờ điều phối'
                 : 'Không có đơn drone nào chờ điều phối',
+            onBack: context.canPop() ? () => context.pop() : null,
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 BrandCircleIconButton(icon: Icons.refresh, onTap: _load),
-                const SizedBox(width: 8),
-                BrandCircleIconButton(icon: Icons.logout, onTap: _logout),
+                if (!context.canPop()) ...[
+                  const SizedBox(width: 8),
+                  BrandCircleIconButton(icon: Icons.logout, onTap: _logout),
+                ],
               ],
             ),
           ),

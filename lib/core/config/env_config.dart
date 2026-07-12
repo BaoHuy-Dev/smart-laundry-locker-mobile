@@ -3,6 +3,7 @@ import 'package:envied/envied.dart';
 part 'env_config.g.dart';
 
 @Envied(path: '.env')
+// Trigger rebuild
 abstract class EnvConfig {
   @EnviedField(
     varName: 'API_BASE_URL',

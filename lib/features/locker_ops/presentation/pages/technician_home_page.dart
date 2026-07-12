@@ -6,6 +6,7 @@ import 'package:smart_laundry_locker/features/locker_ops/presentation/utils/lock
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/locker_picker.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/ops_widgets.dart';
 import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
+import 'package:smart_laundry_locker/core/routing/app_router.dart';
 
 /// Home for the TECHNICIAN role: physical locker maintenance (fault cells,
 /// work queue, preventive schedules, landing pad) + IoT device management.
@@ -83,9 +84,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage>
       try {
         final schedules = await _service.maintenanceSchedules();
         if (mounted) {
-          setState(() => _schedules = schedules
-              .where((s) => s['droneUnitId'] == null)
-              .toList(growable: false));
+          setState(() => _schedules = schedules.toList(growable: false));
         }
       } catch (_) {}
       try {
@@ -215,6 +214,11 @@ class _TechnicianHomePageState extends State<TechnicianHomePage>
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                BrandCircleIconButton(
+                  icon: Icons.flight,
+                  onTap: () => context.push(AppRouter.maintenanceHome),
+                ),
+                const SizedBox(width: 8),
                 BrandCircleIconButton(icon: Icons.refresh, onTap: _load),
                 const SizedBox(width: 8),
                 BrandCircleIconButton(icon: Icons.logout, onTap: _logout),
@@ -1506,7 +1510,11 @@ class _TechnicianHomePageState extends State<TechnicianHomePage>
   }
 
   Widget _scheduleCard(Map<String, dynamic> s, {required bool due}) {
-    final lockerLabel = s['lockerName'] ?? 'Tủ ${s['lockerId']}';
+    final isDrone = s['droneUnitId'] != null;
+    final targetLabel = isDrone 
+        ? 'Drone ${s['droneCode'] ?? s['droneUnitId']}' 
+        : (s['lockerName'] ?? 'Tủ ${s['lockerId']}');
+    final targetIcon = isDrone ? Icons.flight_takeoff : Icons.inventory_2_outlined;
     final nextDue = _fmtDate(s['nextDueAt']);
     final lastDone = _fmtDate(s['lastDoneAt']);
     final id = _asInt(s['id']);
@@ -1541,7 +1549,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage>
               spacing: 8,
               runSpacing: 6,
               children: [
-                _MiniPill(icon: Icons.inventory_2_outlined, text: '$lockerLabel'),
+                _MiniPill(icon: targetIcon, text: targetLabel),
                 _MiniPill(
                   icon: Icons.repeat,
                   text: 'Mỗi ${s['intervalDays']} ngày',
