@@ -7,8 +7,8 @@ import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/rent_locker_page.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/send_parcel_page.dart';
 import 'package:smart_laundry_locker/features/stores/domain/entities/store.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
-
 /// Hiển thị lưới ô tủ locker tại một cửa hàng cụ thể.
 /// Load danh sách tủ (cabinets) qua GET /api/lockers?storeId=X,
 /// sau đó lazy-load layout từng tủ khi user mở rộng thẻ tủ.
@@ -412,9 +412,9 @@ class _LockerCardState extends State<_LockerCard> {
                         _Pill(
                           label: '$available/$totalCells ô trống',
                           bg: available > 0
-                              ? AislBrand.cyan.withValues(alpha: 0.15)
+                              ? AislBrand.cyan
                               : const Color(0xFFE2E8F0),
-                          fg: available > 0 ? AislBrand.blue : Colors.grey,
+                          fg: available > 0 ? Colors.white : Colors.grey,
                         ),
                         const SizedBox(width: 6),
                       ],
@@ -653,15 +653,15 @@ class _GridLegend extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
       child: Wrap(
-        spacing: 12,
-        runSpacing: 6,
+        spacing: 8,
+        runSpacing: 8,
         children: const [
-          _LegendDot(color: _CellPalette.available, label: 'Trống'),
-          _LegendDot(color: _CellPalette.occupied, label: 'Đang dùng'),
-          _LegendDot(color: _CellPalette.reserved, label: 'Đã đặt'),
-          _LegendDot(color: _CellPalette.fault, label: 'Lỗi'),
-          _LegendDot(color: _CellPalette.cleaning, label: 'Bảo trì'),
-          _LegendDot(
+          _LegendChip(color: _CellPalette.available, label: 'Trống'),
+          _LegendChip(color: _CellPalette.occupied, label: 'Đang dùng'),
+          _LegendChip(color: _CellPalette.reserved, label: 'Đã đặt'),
+          _LegendChip(color: _CellPalette.fault, label: 'Lỗi'),
+          _LegendChip(color: _CellPalette.cleaning, label: 'Bảo trì'),
+          _LegendChip(
             color: _CellPalette.drone,
             label: 'Drone',
             icon: Icons.flight_rounded,
@@ -672,33 +672,45 @@ class _GridLegend extends StatelessWidget {
   }
 }
 
-class _LegendDot extends StatelessWidget {
-  const _LegendDot({required this.color, required this.label, this.icon});
+class _LegendChip extends StatelessWidget {
+  const _LegendChip({required this.color, required this.label, this.icon});
   final Color color;
   final String label;
   final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        icon != null
-            ? Icon(icon, color: color, size: 12)
-            : Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(3),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          icon != null
+              ? Icon(icon, color: color, size: 12)
+              : Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              ),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-        ),
-      ],
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -738,9 +750,51 @@ class _CellTile extends StatelessWidget {
     };
   }
 
+  Gradient get _bgGradient {
+    if (_isDrone) {
+      return const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF818CF8), Color(0xFF4F46E5)],
+      );
+    }
+    return switch (_status) {
+      'AVAILABLE' => LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AislBrand.cyan.withValues(alpha: 0.8), AislBrand.cyan],
+        ),
+      'OCCUPIED' || 'IN_USE' => const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFF1F5F9), Color(0xFFCBD5E1)],
+        ),
+      'RESERVED' => const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFDE68A), Color(0xFFF59E0B)],
+        ),
+      'FAULT' => const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFCA5A5), Color(0xFFDC2626)],
+        ),
+      'CLEANING' => const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF93C5FD), Color(0xFF3B82F6)],
+        ),
+      _ => const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFE5E7EB), Color(0xFF9CA3AF)],
+        ),
+    };
+  }
+
   Color get _fg {
     if (_status == 'OCCUPIED' || _status == 'IN_USE') {
-      return const Color(0xFF94A3B8);
+      return const Color(0xFF64748B);
     }
     return Colors.white;
   }
@@ -754,78 +808,136 @@ class _CellTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Widget content = AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: _bgGradient,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.3),
+          width: 1,
+        ),
+        boxShadow: (_isAvailable && !_isDrone)
+            ? [
+                BoxShadow(
+                  color: _CellPalette.available.withValues(alpha: 0.5),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ]
+            : _isDrone
+                ? [
+                    BoxShadow(
+                      color: _CellPalette.drone.withValues(alpha: 0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    )
+                  ],
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: _isDrone ? _buildDroneContent() : _buildStandardContent(),
+          ),
+          // Tay nắm cửa
+          Positioned(
+            right: 6,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: Container(
+                width: 4,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: _fg.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.1),
+                      blurRadius: 2,
+                      offset: const Offset(-1, 1),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (_isAvailable) {
+      content = content.animate(onPlay: (controller) => controller.repeat(reverse: true))
+          .shimmer(duration: 2000.ms, color: Colors.white.withValues(alpha: 0.2))
+          .scaleXY(end: 1.015, curve: Curves.easeInOutSine, duration: 1500.ms);
+    }
+
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        height: 58,
-        decoration: BoxDecoration(
-          color: _bg,
-          borderRadius: BorderRadius.circular(11),
-          boxShadow: (_isAvailable && !_isDrone)
-              ? [
-                  BoxShadow(
-                    color: _CellPalette.available.withValues(alpha: 0.35),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : _isDrone
-                  ? [
-                      BoxShadow(
-                        color: _CellPalette.drone.withValues(alpha: 0.30),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
-                  : null,
-        ),
-        child: _isDrone ? _buildDroneContent() : _buildStandardContent(),
-      ),
+      child: content,
     );
   }
 
-  /// Ô drone — icon máy bay không người lái, không có label "Trống"
+  /// Ô drone — icon máy bay không người lái
   Widget _buildDroneContent() {
-    return const Column(
+    return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(Icons.flight_rounded, color: Colors.white, size: 20),
-        SizedBox(height: 2),
-        Text(
-          'Drone',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 8,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.5,
+        const Icon(Icons.flight_rounded, color: Colors.white, size: 26),
+        const SizedBox(height: 2),
+        if (_isAvailable)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Text(
+              'DRONE',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.8,
+              ),
+            ),
           ),
-        ),
       ],
     );
   }
 
-  /// Ô thường — chữ kích cỡ + "Trống" nếu AVAILABLE
+  /// Ô thường — icon kích cỡ + "TRỐNG"
   Widget _buildStandardContent() {
+    final isXl = _cellType == 'XL' || _sizeLabel == 'L';
+    final icon = isXl ? LucideIcons.luggage : LucideIcons.box;
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          _sizeLabel,
-          style: TextStyle(
-            color: _fg,
-            fontWeight: FontWeight.w800,
-            fontSize: 17,
-          ),
-        ),
+        Icon(icon, color: _fg.withValues(alpha: 0.95), size: isXl ? 32 : 24),
         if (_isAvailable) ...[
-          const SizedBox(height: 2),
-          Text(
-            'Trống',
-            style: TextStyle(
-              color: _fg.withValues(alpha: 0.85),
-              fontSize: 9,
-              fontWeight: FontWeight.w600,
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              'TRỐNG',
+              style: TextStyle(
+                color: _fg,
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
+              ),
             ),
           ),
         ],
