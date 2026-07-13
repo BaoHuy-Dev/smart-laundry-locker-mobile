@@ -345,6 +345,25 @@ class _SendParcelPageState extends State<SendParcelPage> {
     );
   }
 
+  Future<void> _mockPayment() async {
+    final id = _order?['id'] as int?;
+    if (id == null) return;
+    setState(() => _loading = true);
+    try {
+      // Dùng CASH thay cho WALLET để mock thành công mà không cần số dư trong DB thật
+      final order = await _service.checkout(id, 'CASH');
+      if (!mounted) return;
+      setState(() => _order = order);
+      _snack('Đã mock thanh toán (CASH) thành công');
+      // Tự động gọi confirmDrop sau khi thanh toán thành công
+      await _confirmDrop();
+    } catch (e) {
+      _snack(LockerOpsService.errorMessage(e));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   // ---- Stage 2: result ----
   Widget _buildResult() {
     final order = _order!;
@@ -422,14 +441,21 @@ class _SendParcelPageState extends State<SendParcelPage> {
           ),
         ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.05),
         const SizedBox(height: 16),
-        if (!isDropped)
+        if (!isDropped) ...[
+          OpsPrimaryButton(
+            label: 'Đã thanh toán (Mock Ví)',
+            icon: LucideIcons.wallet,
+            loading: _loading,
+            onPressed: _mockPayment,
+          ),
+          const SizedBox(height: 12),
           OpsPrimaryButton(
             label: 'Tôi đã bỏ hàng vào ô',
             icon: LucideIcons.check,
             loading: _loading,
             onPressed: _confirmDrop,
-          )
-        else
+          ),
+        ] else
           OpsPrimaryButton(
             label: 'Hoàn tất',
             icon: LucideIcons.house,

@@ -25,6 +25,8 @@ class MyLockerOrdersPage extends StatefulWidget {
 class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
   final _service = LockerOpsService();
   List<Map<String, dynamic>> _orders = [];
+  Map<int, Map<int, int>> _lockerBoxesMap = {};
+  Map<int, String> _lockerNamesMap = {};
   bool _loading = true;
   String _typeFilter = 'ALL';
 
@@ -38,8 +40,55 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
     setState(() => _loading = true);
     try {
       final orders = await _service.myOrders();
+
+      // Fetch box layouts to display box numbers instead of box IDs
+      final lockerIds = orders
+          .map((o) => _asInt(o['lockerId']))
+          .whereType<int>()
+          .toSet();
+
       if (!mounted) return;
-      setState(() => _orders = orders);
+
+      final Map<int, Map<int, int>> lockerBoxesMap = {};
+      final Map<int, String> lockerNamesMap = {};
+
+      for (final lId in lockerIds) {
+        try {
+          final info = await _service.locker(lId);
+          debugPrint('Locker $lId info: $info');
+          if (info['name'] != null) {
+            lockerNamesMap[lId] = info['name'] as String;
+          }
+        } catch (e) {
+          debugPrint('Locker $lId fetch error: $e');
+        }
+
+        try {
+          final layout = await _service.layout(lId);
+          debugPrint('Layout $lId info: $layout');
+          final cells = layout['cells'] as List?;
+          final map = <int, int>{};
+          if (cells != null) {
+            for (final c in cells) {
+              final cId = _asInt(c['id']);
+              final bNum = _asInt(c['boxNumber']);
+              if (cId != null && bNum != null) {
+                map[cId] = bNum;
+              }
+            }
+          }
+          lockerBoxesMap[lId] = map;
+        } catch (e) {
+          debugPrint('Layout $lId fetch error: $e');
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _lockerBoxesMap = lockerBoxesMap;
+        _lockerNamesMap = lockerNamesMap;
+        _orders = orders;
+      });
     } catch (e) {
       _snack(LockerOpsService.errorMessage(e));
     } finally {
@@ -110,7 +159,6 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
       _snack(LockerOpsService.errorMessage(e));
     }
   }
-
 
   Future<void> _delegateDialog(int orderId) async {
     final phoneCtrl = TextEditingController();
@@ -313,7 +361,8 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
-      builder: (ctx) => _PaymentMethodPicker(total: total, walletBalance: balance),
+      builder: (ctx) =>
+          _PaymentMethodPicker(total: total, walletBalance: balance),
     );
     if (method == null) return;
     await _doCheckout(orderId, method);
@@ -336,9 +385,11 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
       final res = await _service.unlock(lockerId, boxId, pin);
       final accepted = res['accepted'] == true;
       final msg = res['message']?.toString();
-      _snack(accepted
-          ? 'Tủ đã mở ô $boxId — mời bạn thao tác rồi đóng cửa.'
-          : 'Không mở được ô $boxId${msg != null && msg.isNotEmpty ? ': $msg' : ''}');
+      _snack(
+        accepted
+            ? 'Tủ đã mở ô $boxId — mời bạn thao tác rồi đóng cửa.'
+            : 'Không mở được ô $boxId${msg != null && msg.isNotEmpty ? ': $msg' : ''}',
+      );
       if (accepted) await _load();
     } catch (e) {
       _snack(LockerOpsService.errorMessage(e));
@@ -390,6 +441,15 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
           child: _DetailSheet(
             order: order,
+            lockerName: _lockerNamesMap[_asInt(order['lockerId'])],
+            sendBoxNumber:
+                _lockerBoxesMap[_asInt(order['lockerId'])]?[_asInt(
+                  order['sendBoxId'],
+                )],
+            receiveBoxNumber:
+                _lockerBoxesMap[_asInt(order['lockerId'])]?[_asInt(
+                  order['receiveBoxId'],
+                )],
             onReorder: (id) async {
               Navigator.pop(ctx);
               await _runAction(
@@ -481,28 +541,28 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
             child: Row(
-                children: [
-                  _TypeChip(
-                    label: 'Tất cả',
-                    count: _orders.length,
-                    selected: _typeFilter == 'ALL',
-                    onTap: () => setState(() => _typeFilter = 'ALL'),
-                  ),
-                  const SizedBox(width: 8),
-                  _TypeChip(
-                    label: 'Thuê tủ',
-                    selected: _typeFilter == 'RENTAL',
-                    onTap: () => setState(() => _typeFilter = 'RENTAL'),
-                  ),
-                  const SizedBox(width: 8),
-                  _TypeChip(
-                    label: 'Gửi hàng',
-                    selected: _typeFilter == 'SEND',
-                    onTap: () => setState(() => _typeFilter = 'SEND'),
-                  ),
-                ],
-              ),
+              children: [
+                _TypeChip(
+                  label: 'Tất cả',
+                  count: _orders.length,
+                  selected: _typeFilter == 'ALL',
+                  onTap: () => setState(() => _typeFilter = 'ALL'),
+                ),
+                const SizedBox(width: 8),
+                _TypeChip(
+                  label: 'Thuê tủ',
+                  selected: _typeFilter == 'RENTAL',
+                  onTap: () => setState(() => _typeFilter = 'RENTAL'),
+                ),
+                const SizedBox(width: 8),
+                _TypeChip(
+                  label: 'Gửi hàng',
+                  selected: _typeFilter == 'SEND',
+                  onTap: () => setState(() => _typeFilter = 'SEND'),
+                ),
+              ],
             ),
+          ),
 
           const SizedBox(height: 8),
 
@@ -516,7 +576,8 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
                 ? OpsEmptyState(
                     icon: LucideIcons.packageOpen,
                     title: 'Chưa có đơn nào',
-                    subtitle: 'Tạo đơn Gửi hàng hoặc Thuê tủ từ màn hình chính.',
+                    subtitle:
+                        'Tạo đơn Gửi hàng hoặc Thuê tủ từ màn hình chính.',
                   )
                 : RefreshIndicator(
                     color: AislBrand.navy,
@@ -540,22 +601,33 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
                             ),
                           );
                         }
-                        final order = item.order!;
+                        final o = item.order!;
                         return Padding(
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                          child: _OrderCard(
-                            order: order,
-                            onTap: () => _openDetail(order),
-                          ).animate().fadeIn(
-                            delay: (i * 30).ms,
-                            duration: 200.ms,
-                          ).slideY(
-                            begin: 0.05,
-                            end: 0,
-                            delay: (i * 30).ms,
-                            duration: 200.ms,
-                            curve: Curves.easeOut,
-                          ),
+                          child:
+                              _OrderCard(
+                                    order: o,
+                                    lockerName:
+                                        _lockerNamesMap[_asInt(o['lockerId'])],
+                                    sendBoxNumber:
+                                        _lockerBoxesMap[_asInt(
+                                          o['lockerId'],
+                                        )]?[_asInt(o['sendBoxId'])],
+                                    receiveBoxNumber:
+                                        _lockerBoxesMap[_asInt(
+                                          o['lockerId'],
+                                        )]?[_asInt(o['receiveBoxId'])],
+                                    onTap: () => _openDetail(o),
+                                  )
+                                  .animate()
+                                  .fadeIn(delay: (i * 30).ms, duration: 200.ms)
+                                  .slideY(
+                                    begin: 0.05,
+                                    end: 0,
+                                    delay: (i * 30).ms,
+                                    duration: 200.ms,
+                                    curve: Curves.easeOut,
+                                  ),
                         );
                       },
                     ),
@@ -616,7 +688,9 @@ class _TypeChip extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: selected ? (context.isDark ? const Color(0xFF061A30) : Colors.white) : context.textPrimary,
+                color: selected
+                    ? (context.isDark ? const Color(0xFF061A30) : Colors.white)
+                    : context.textPrimary,
               ),
             ),
             if (count != null && count! > 0) ...[
@@ -626,7 +700,10 @@ class _TypeChip extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   color: selected
-                      ? (context.isDark ? const Color(0xFF061A30) : Colors.white).withValues(alpha: 0.7)
+                      ? (context.isDark
+                                ? const Color(0xFF061A30)
+                                : Colors.white)
+                            .withValues(alpha: 0.7)
                       : context.textMuted,
                 ),
               ),
@@ -641,8 +718,18 @@ class _TypeChip extends StatelessWidget {
 // ── Order card (Grab style) ───────────────────────────────────────────────────
 
 class _OrderCard extends StatelessWidget {
-  const _OrderCard({required this.order, required this.onTap});
+  const _OrderCard({
+    required this.order,
+    this.lockerName,
+    this.sendBoxNumber,
+    this.receiveBoxNumber,
+    required this.onTap,
+  });
+
   final Map<String, dynamic> order;
+  final String? lockerName;
+  final int? sendBoxNumber;
+  final int? receiveBoxNumber;
   final VoidCallback onTap;
 
   @override
@@ -654,8 +741,7 @@ class _OrderCard extends StatelessWidget {
     final overdue =
         isOverdue(deadline) && status != 'COMPLETED' && status != 'CANCELED';
     final sColor = statusColor(status);
-    final isDone =
-        status == 'COMPLETED' || status == 'CANCELED';
+    final isDone = status == 'COMPLETED' || status == 'CANCELED';
 
     return Material(
       color: context.cardBg,
@@ -720,12 +806,13 @@ class _OrderCard extends StatelessWidget {
                         // Route: Tủ and Ô
                         _RouteRow(
                           isOrigin: true,
-                          text: 'Tủ ${order['lockerId'] ?? '-'}',
+                          text: lockerName ?? 'Tủ ${order['lockerId'] ?? '-'}',
                         ),
                         const SizedBox(height: 8),
                         _RouteRow(
                           isOrigin: false,
-                          text: 'Ô ${boxId ?? '-'}',
+                          text:
+                              'Ô ${sendBoxNumber ?? receiveBoxNumber ?? boxId ?? '-'}',
                         ),
                         const SizedBox(height: 14),
                         // Price + action
@@ -889,6 +976,9 @@ double? _asDouble(dynamic value) {
 class _DetailSheet extends StatelessWidget {
   const _DetailSheet({
     required this.order,
+    this.lockerName,
+    this.sendBoxNumber,
+    this.receiveBoxNumber,
     required this.onReorder,
     required this.onConfirmDrop,
     required this.onComplete,
@@ -903,6 +993,9 @@ class _DetailSheet extends StatelessWidget {
   });
 
   final Map<String, dynamic> order;
+  final String? lockerName;
+  final int? sendBoxNumber;
+  final int? receiveBoxNumber;
   final void Function(int orderId) onReorder;
   final void Function(int orderId) onConfirmDrop;
   final void Function(int orderId) onComplete;
@@ -930,11 +1023,12 @@ class _DetailSheet extends StatelessWidget {
         extraFee != null &&
         (extraFee is num ? extraFee > 0 : num.tryParse('$extraFee') != null);
 
-
-    final paymentStatus =
-        (order['paymentStatus'] as String? ?? 'UNPAID').toUpperCase();
+    final paymentStatus = (order['paymentStatus'] as String? ?? 'UNPAID')
+        .toUpperCase();
     final totalRaw = order['totalPrice'];
-    final totalNum = totalRaw is num ? totalRaw : num.tryParse('$totalRaw') ?? 0;
+    final totalNum = totalRaw is num
+        ? totalRaw
+        : num.tryParse('$totalRaw') ?? 0;
     final canPay =
         paymentStatus != 'PAID' && totalNum > 0 && status != 'CANCELED';
 
@@ -1077,13 +1171,13 @@ class _DetailSheet extends StatelessWidget {
               OpsInfoRow(
                 icon: LucideIcons.warehouse,
                 label: 'Tủ',
-                value: '${order['lockerId'] ?? '-'}',
+                value: lockerName ?? '${order['lockerId'] ?? '-'}',
               ),
               OpsInfoRow(
                 icon: LucideIcons.grid3x3,
                 label: 'Ô',
                 value:
-                    '${order['sendBoxId'] ?? '-'}${order['receiveBoxId'] != null ? ' → ${order['receiveBoxId']}' : ''}',
+                    '${sendBoxNumber ?? order['sendBoxId'] ?? '-'}${order['receiveBoxId'] != null ? ' → ${receiveBoxNumber ?? order['receiveBoxId']}' : ''}',
               ),
               if (deadline != null)
                 OpsInfoRow(
@@ -1127,7 +1221,10 @@ class _DetailSheet extends StatelessWidget {
 // ── Payment method picker ─────────────────────────────────────────────────────
 
 class _PaymentMethodPicker extends StatelessWidget {
-  const _PaymentMethodPicker({required this.total, required this.walletBalance});
+  const _PaymentMethodPicker({
+    required this.total,
+    required this.walletBalance,
+  });
   final double total;
   final num walletBalance;
 
