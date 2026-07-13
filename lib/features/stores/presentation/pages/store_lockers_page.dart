@@ -311,46 +311,8 @@ class _LockerCardState extends State<_LockerCard> {
     }
   }
 
-  /// Supplements real API cells up to 10, adding drone cells in the last row.
-  /// Layout: 2 rows × 5 cols.
-  ///   Row 0: 5 STANDARD cells (S, M, L, M, S)
-  ///   Row 1: 2 STANDARD (L, M) + 3 DRONE
   static Map<String, dynamic> _enrichLayout(Map<String, dynamic> raw) {
-    final real = (raw['cells'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-    if (real.length >= 10) return raw;
-
-    const sizes = ['SMALL', 'MEDIUM', 'LARGE', 'MEDIUM', 'SMALL',
-                   'LARGE', 'MEDIUM'];
-    const statuses = ['AVAILABLE', 'OCCUPIED', 'AVAILABLE', 'RESERVED',
-                      'AVAILABLE', 'AVAILABLE', 'OCCUPIED'];
-
-    final cells = <Map<String, dynamic>>[];
-
-    for (int row = 0; row < 2; row++) {
-      for (int col = 0; col < 5; col++) {
-        // Keep real cell if one exists at this position
-        final existing = real.where(
-          (c) => c['rowIndex'] == row && c['colIndex'] == col,
-        );
-        if (existing.isNotEmpty) {
-          cells.add(existing.first);
-          continue;
-        }
-
-        final linearIdx = row * 5 + col;
-        final isDrone = row == 1 && col >= 2; // last 3 slots of row 1
-        cells.add({
-          'rowIndex': row,
-          'colIndex': col,
-          'cellType': isDrone ? 'DRONE' : 'STANDARD',
-          'size': isDrone ? 'LARGE' : sizes[linearIdx % sizes.length],
-          'status': isDrone ? 'AVAILABLE' : statuses[linearIdx % statuses.length],
-          'boxNumber': linearIdx + 1,
-        });
-      }
-    }
-
-    return {'cells': cells, 'totalCells': cells.length};
+    return raw;
   }
 
   void _toggle() {
@@ -594,12 +556,12 @@ class _LockerCardState extends State<_LockerCard> {
   }
 }
 
-// ── Cell Grid ─────────────────────────────────────────────────────────────────
-
 class _CellGrid extends StatelessWidget {
   const _CellGrid({required this.cells, required this.onCellTap});
   final List<Map<String, dynamic>> cells;
   final ValueChanged<Map<String, dynamic>> onCellTap;
+
+  bool _isXl(Map<String, dynamic> cell) => (cell['cellType'] as String?) == 'XL';
 
   @override
   Widget build(BuildContext context) {
@@ -631,27 +593,48 @@ class _CellGrid extends StatelessWidget {
         const _GridLegend(),
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 4, 14, 16),
-          child: Column(
-            children: List.generate(numRows, (row) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 5),
-                child: Row(
-                  children: List.generate(numCols, (col) {
-                    final cell = grid[row][col];
-                    return Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 3),
-                        child: cell != null
-                            ? _CellTile(
-                                cell: cell,
-                                onTap: cell['status'] == 'AVAILABLE'
-                                    ? () => onCellTap(cell)
-                                    : null,
-                              )
-                            : const SizedBox(height: 56),
-                      ),
-                    );
-                  }),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: List.generate(numCols, (col) {
+              final colChildren = <Widget>[];
+              int skipRows = 0;
+              
+              for (int row = 0; row < numRows; row++) {
+                if (skipRows > 0) {
+                  skipRows--;
+                  continue;
+                }
+                
+                final cell = grid[row][col];
+                final span = cell != null ? (_isXl(cell) ? 2 : 1) : 1;
+                skipRows = span - 1;
+                
+                final height = 58.0 * span + 5.0 * (span - 1);
+                
+                colChildren.add(
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 5),
+                    child: SizedBox(
+                      height: height,
+                      child: cell != null
+                          ? _CellTile(
+                              cell: cell,
+                              onTap: cell['status'] == 'AVAILABLE'
+                                  ? () => onCellTap(cell)
+                                  : null,
+                            )
+                          : null,
+                    ),
+                  ),
+                );
+              }
+              
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  child: Column(
+                    children: colChildren,
+                  ),
                 ),
               );
             }),

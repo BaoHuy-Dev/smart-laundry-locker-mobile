@@ -54,6 +54,7 @@ class _RentLockerPageState extends State<RentLockerPage> {
   Map<String, dynamic>? _order;
   int _discount = 0;
   String? _promoCode;
+  Map<String, int>? _availableCounts;
 
   @override
   void initState() {
@@ -63,6 +64,7 @@ class _RentLockerPageState extends State<RentLockerPage> {
       // Đến từ lưới ô — tủ đã xác định, bỏ qua gọi API load danh sách tủ.
       _lockerId = widget.initialLockerId;
       _loadingLockers = false;
+      _loadLayout(_lockerId!);
     } else {
       _loadLockers();
     }
@@ -88,10 +90,38 @@ class _RentLockerPageState extends State<RentLockerPage> {
         }
         _loadingLockers = false;
       });
+      if (_lockerId != null) _loadLayout(_lockerId!);
     } catch (e) {
       if (!mounted) return;
       setState(() => _loadingLockers = false);
       _snack(LockerOpsService.errorMessage(e));
+    }
+  }
+
+  Future<void> _loadLayout(int id) async {
+    try {
+      final res = await _service.layout(id);
+      if (!mounted) return;
+      final cells = res['cells'] as List?;
+      if (cells != null) {
+        int std = 0, xl = 0;
+        for (final c in cells) {
+          if (c['status'] == 'AVAILABLE') {
+            if (c['cellType'] == 'STANDARD') std++;
+            else if (c['cellType'] == 'XL') xl++;
+          }
+        }
+        setState(() {
+          _availableCounts = {'STANDARD': std, 'XL': xl};
+          // Tự động chuyển loại ô nếu ô đang chọn đã hết
+          if ((_availableCounts?[_cellType] ?? 0) == 0) {
+            if (std > 0) _cellType = 'STANDARD';
+            else if (xl > 0) _cellType = 'XL';
+          }
+        });
+      }
+    } catch (e) {
+      // ignore
     }
   }
 
@@ -112,6 +142,23 @@ class _RentLockerPageState extends State<RentLockerPage> {
       );
       if (!mounted) return;
       setState(() => _order = order);
+    } catch (e) {
+      _snack(LockerOpsService.errorMessage(e));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _mockPayment() async {
+    final id = _order?['id'] as int?;
+    if (id == null) return;
+    setState(() => _loading = true);
+    try {
+      final order = await _service.checkout(id, 'CASH');
+      if (!mounted) return;
+      setState(() => _order = order);
+      _snack('Đã mock thanh toán (CASH) thành công');
+      await _confirmDrop();
     } catch (e) {
       _snack(LockerOpsService.errorMessage(e));
     } finally {
@@ -179,7 +226,14 @@ class _RentLockerPageState extends State<RentLockerPage> {
           LockerPickerField(
             lockers: _lockers,
             selectedId: _lockerId,
-            onSelected: (l) => setState(() => _lockerId = l['id'] as int?),
+            onSelected: (l) {
+              final newId = l['id'] as int?;
+              setState(() {
+                _lockerId = newId;
+                _availableCounts = null;
+              });
+              if (newId != null) _loadLayout(newId);
+            },
           ),
         const SizedBox(height: 20),
         const OpsSectionLabel('Loại ô', icon: LucideIcons.boxes),
@@ -277,7 +331,7 @@ class _RentLockerPageState extends State<RentLockerPage> {
           label: 'Thuê ngay',
           icon: LucideIcons.lockKeyhole,
           loading: _loading,
-          onPressed: _create,
+          onPressed: (_availableCounts?[_cellType] == 0) ? null : _create,
         ),
       ].animate(interval: 40.ms).fadeIn(duration: 250.ms).slideY(begin: 0.06),
     );
@@ -371,17 +425,20 @@ class _RentLockerPageState extends State<RentLockerPage> {
     required String rate,
   }) {
     final selected = _cellType == value;
+    final available = _availableCounts?[value] ?? -1;
+    final disabled = available == 0;
+    
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _cellType = value),
+        onTap: disabled ? null : () => setState(() => _cellType = value),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: selected ? opsPrimary.withValues(alpha: 0.06) : Colors.white,
+            color: selected ? opsPrimary.withValues(alpha: 0.06) : (disabled ? Colors.grey.shade100 : Colors.white),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: selected ? opsPrimary : opsBorder,
+              color: selected ? opsPrimary : (disabled ? Colors.grey.shade300 : opsBorder),
               width: selected ? 1.8 : 1,
             ),
           ),
@@ -390,7 +447,7 @@ class _RentLockerPageState extends State<RentLockerPage> {
             children: [
               Row(
                 children: [
-                  Icon(icon, color: selected ? opsPrimary : opsMutedText, size: 22),
+                  Icon(icon, color: disabled ? Colors.grey.shade400 : (selected ? opsPrimary : opsMutedText), size: 22),
                   const Spacer(),
                   if (selected)
                     const Icon(LucideIcons.circleCheck, color: opsPrimary, size: 18),
@@ -401,20 +458,25 @@ class _RentLockerPageState extends State<RentLockerPage> {
                 title,
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
-                  color: selected ? opsPrimary : opsDark,
+                  color: disabled ? Colors.grey.shade400 : (selected ? opsPrimary : opsDark),
                 ),
               ),
               const SizedBox(height: 4),
-              Text(size, style: const TextStyle(fontSize: 11, color: opsMutedText)),
+              Text(size, style: TextStyle(fontSize: 11, color: disabled ? Colors.grey.shade400 : opsMutedText)),
               const SizedBox(height: 2),
               Text(
                 rate,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: opsDark,
+                  color: disabled ? Colors.grey.shade400 : opsDark,
                 ),
               ),
+              const SizedBox(height: 6),
+              if (available == 0)
+                const Text('Hết ô', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.redAccent))
+              else if (available > 0)
+                Text('Còn $available ô trống', style: const TextStyle(fontSize: 11, color: Colors.green)),
             ],
           ),
         ),
@@ -478,17 +540,20 @@ class _RentLockerPageState extends State<RentLockerPage> {
     final title = isXl ? 'Ô vali (XL)' : 'Ô thường';
     final size = isXl ? '30 × 80 × 40 cm' : '45 × 30 × 50 cm';
     final rate = isXl ? '10.000đ/giờ' : '5.000đ/giờ';
+    
+    final available = _availableCounts?[cellType] ?? -1;
+    final disabled = available == 0;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
-        color: opsPrimary.withValues(alpha: 0.06),
+        color: disabled ? opsMutedBackground : opsPrimary.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: opsPrimary, width: 1.8),
+        border: Border.all(color: disabled ? opsBorder : opsPrimary, width: 1.8),
       ),
       child: Row(
         children: [
-          Icon(icon, color: opsPrimary, size: 22),
+          Icon(icon, color: disabled ? opsMutedText : opsPrimary, size: 22),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -496,17 +561,28 @@ class _RentLockerPageState extends State<RentLockerPage> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w800,
-                    color: opsDark,
+                    color: disabled ? opsMutedText : opsDark,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(size, style: const TextStyle(fontSize: 11, color: opsMutedText)),
                 const SizedBox(height: 2),
-                Text(
-                  rate,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: opsDark),
+                Row(
+                  children: [
+                    Text(
+                      rate,
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: disabled ? opsMutedText : opsDark),
+                    ),
+                    if (available >= 0) ...[
+                      const SizedBox(width: 8),
+                      if (available == 0)
+                        const Text('Hết ô', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.redAccent))
+                      else
+                        Text('Còn $available ô trống', style: const TextStyle(fontSize: 11, color: Colors.green)),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -577,14 +653,21 @@ class _RentLockerPageState extends State<RentLockerPage> {
           ),
         ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.05),
         const SizedBox(height: 16),
-        if (!started)
+        if (!started) ...[
+          OpsPrimaryButton(
+            label: 'Đã thanh toán (Mock Ví)',
+            icon: LucideIcons.wallet,
+            loading: _loading,
+            onPressed: _mockPayment,
+          ),
+          const SizedBox(height: 12),
           OpsPrimaryButton(
             label: 'Tôi đã bỏ đồ — bắt đầu kỳ thuê',
             icon: LucideIcons.check,
             loading: _loading,
             onPressed: _confirmDrop,
-          )
-        else
+          ),
+        ] else
           OpsPrimaryButton(
             label: 'Xong — xem trong Đơn của tôi',
             icon: LucideIcons.house,
