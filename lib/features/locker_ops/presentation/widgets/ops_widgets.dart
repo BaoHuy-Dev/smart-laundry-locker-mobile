@@ -92,8 +92,17 @@ String fmtPrice(dynamic value) {
   return '${n < 0 ? '-' : ''}$bufferđ';
 }
 
-DateTime? _parseDate(dynamic value) =>
-    value == null ? null : DateTime.tryParse('$value')?.toLocal();
+DateTime? _parseDate(dynamic value) {
+  if (value == null) return null;
+  String s = '$value';
+  if (s.contains('T')) {
+    final timePart = s.split('T').last;
+    if (!timePart.endsWith('Z') && !timePart.contains('+') && !timePart.contains('-')) {
+      s += 'Z';
+    }
+  }
+  return DateTime.tryParse(s)?.toLocal();
+}
 
 String _two(int n) => n.toString().padLeft(2, '0');
 
