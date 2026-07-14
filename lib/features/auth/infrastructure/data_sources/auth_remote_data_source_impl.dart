@@ -81,6 +81,38 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   @override
+  Future<void> sendEmailLoginOtp({required String email}) async {
+    await _apiClient.post<dynamic>(
+      '/api/auth/email/send-otp',
+      data: {'email': email},
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> verifyEmailLoginOtp({
+    required String email,
+    required String otp,
+  }) async {
+    final response = await _apiClient.post<Map<String, dynamic>>(
+      '/api/auth/email/verify-otp',
+      data: {'email': email, 'otp': otp},
+    );
+    final data = _extractData(response);
+
+    if (data['isNewUser'] == true) {
+      final regResponse = await _apiClient.post<Map<String, dynamic>>(
+        '/api/auth/email/complete-registration',
+        data: {
+          'tempToken': data['tempToken'],
+          'firstName': 'Customer',
+        },
+      );
+      return _extractData(regResponse);
+    }
+    return data;
+  }
+
+  @override
   Future<Map<String, dynamic>> confirmQrLogin(
     QrConfirmRequestModel request,
   ) async {

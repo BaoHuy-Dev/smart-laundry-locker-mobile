@@ -242,6 +242,59 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<Either<Failure, void>> sendEmailLoginOtp(String email) async {
+    if (!await _networkInfo.isConnected) {
+      return const Left(NetworkFailure('Không có kết nối mạng.'));
+    }
+    try {
+      await _remoteDataSource.sendEmailLoginOtp(email: email);
+      return const Right(null);
+    } catch (e) {
+      final msg = _errorMessageFromException(e);
+      return Left(ServerFailure(msg));
+    }
+  }
+
+  @override
+  Future<Either<Failure, AuthTokenEntity>> verifyEmailLoginOtp(
+    String email,
+    String otp,
+  ) async {
+    if (!await _networkInfo.isConnected) {
+      return const Left(NetworkFailure('Không có kết nối mạng.'));
+    }
+    try {
+      final response = await _remoteDataSource.verifyEmailLoginOtp(
+        email: email,
+        otp: otp,
+      );
+
+      final tokenEntity = AuthTokenEntity(
+        accessToken:
+            response['accessToken']?.toString() ??
+            response['access_token']?.toString() ??
+            '',
+        refreshToken:
+            response['refreshToken']?.toString() ??
+            response['refresh_token']?.toString() ??
+            '',
+      );
+
+      if (tokenEntity.accessToken.isEmpty) {
+        return const Left(
+          AuthenticationFailure('Không nhận được token xác thực từ server.'),
+        );
+      }
+
+      await _localDataSource.cacheToken(tokenEntity);
+      return Right(tokenEntity);
+    } catch (e) {
+      final msg = _errorMessageFromException(e);
+      return Left(_mapVerifyOtpBackendFailure(msg));
+    }
+  }
+
+  @override
   Future<Either<Failure, bool>> confirmQrLogin(String sessionId) async {
     try {
       final access = await TokenService.getAccessToken();

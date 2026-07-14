@@ -8,6 +8,8 @@ import 'package:smart_laundry_locker/features/auth/application/use_cases/confirm
 import 'package:smart_laundry_locker/features/auth/application/use_cases/login_use_case.dart';
 import 'package:smart_laundry_locker/features/auth/application/use_cases/login_with_face_use_case.dart';
 import 'package:smart_laundry_locker/features/auth/application/use_cases/social_login_use_case.dart';
+import 'package:smart_laundry_locker/features/auth/application/use_cases/send_email_login_otp_use_case.dart';
+import 'package:smart_laundry_locker/features/auth/application/use_cases/verify_email_login_otp_use_case.dart';
 import 'package:smart_laundry_locker/core/services/firebase_auth_service.dart';
 import 'package:smart_laundry_locker/features/auth/domain/entities/auth_token_entity.dart';
 import 'package:smart_laundry_locker/features/auth/infrastructure/utils/qr_session_id_parser.dart';
@@ -18,6 +20,8 @@ class LoginProvider extends ChangeNotifier {
   final LoginWithFaceUseCase _loginWithFaceUseCase;
   final ConfirmQrLoginUseCase _confirmQrLoginUseCase;
   final SocialLoginUseCase _socialLoginUseCase;
+  final SendEmailLoginOtpUseCase _sendEmailLoginOtpUseCase;
+  final VerifyEmailLoginOtpUseCase _verifyEmailLoginOtpUseCase;
   final FirebaseAuthService _firebaseAuthService;
   final ApiClient _apiClient;
 
@@ -26,12 +30,16 @@ class LoginProvider extends ChangeNotifier {
     required LoginWithFaceUseCase loginWithFaceUseCase,
     required ConfirmQrLoginUseCase confirmQrLoginUseCase,
     required SocialLoginUseCase socialLoginUseCase,
+    required SendEmailLoginOtpUseCase sendEmailLoginOtpUseCase,
+    required VerifyEmailLoginOtpUseCase verifyEmailLoginOtpUseCase,
     required FirebaseAuthService firebaseAuthService,
     required ApiClient apiClient,
   }) : _loginUseCase = loginUseCase,
        _loginWithFaceUseCase = loginWithFaceUseCase,
        _confirmQrLoginUseCase = confirmQrLoginUseCase,
        _socialLoginUseCase = socialLoginUseCase,
+       _sendEmailLoginOtpUseCase = sendEmailLoginOtpUseCase,
+       _verifyEmailLoginOtpUseCase = verifyEmailLoginOtpUseCase,
        _firebaseAuthService = firebaseAuthService,
        _apiClient = apiClient;
 
@@ -233,6 +241,47 @@ class LoginProvider extends ChangeNotifier {
       _error = 'Mã xác nhận không đúng hoặc đã hết hạn';
       notifyListeners();
     }
+  }
+
+  bool _isEmailOtpSent = false;
+  bool get isEmailOtpSent => _isEmailOtpSent;
+
+  Future<void> sendEmailOtp(String email) async {
+    _isLoading = true;
+    _error = null;
+    _isEmailOtpSent = false;
+    notifyListeners();
+
+    final result = await _sendEmailLoginOtpUseCase(email);
+    result.fold(
+      (failure) {
+        _isLoading = false;
+        _error = failure.message;
+        notifyListeners();
+      },
+      (_) {
+        _isLoading = false;
+        _isEmailOtpSent = true;
+        notifyListeners();
+      },
+    );
+  }
+
+  void clearEmailVerification() {
+    _isEmailOtpSent = false;
+    _error = null;
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  Future<void> confirmEmailOtp({required String email, required String otp}) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    final params = VerifyEmailLoginOtpParams(email: email, otp: otp);
+    final result = await _verifyEmailLoginOtpUseCase(params);
+    result.fold(_handleFailure, _handleLoginSuccess);
   }
 
   Future<void> loginWithFace({required Uint8List imageBytes}) async {

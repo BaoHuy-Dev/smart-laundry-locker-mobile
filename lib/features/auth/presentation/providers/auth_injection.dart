@@ -17,6 +17,9 @@ import 'package:smart_laundry_locker/features/auth/presentation/providers/login_
 import 'package:smart_laundry_locker/features/auth/presentation/providers/register_provider.dart';
 import 'package:smart_laundry_locker/features/auth/presentation/providers/verify_otp_provider.dart';
 
+import 'package:smart_laundry_locker/features/auth/application/use_cases/send_email_login_otp_use_case.dart';
+import 'package:smart_laundry_locker/features/auth/application/use_cases/verify_email_login_otp_use_case.dart';
+
 class AuthInjection {
   static RegisterProvider provideRegisterProvider(ApiClient apiClient) {
     final remoteDataSource = AuthRemoteDataSourceImpl(apiClient);
@@ -33,6 +36,8 @@ class AuthInjection {
     final loginWithFaceUseCase = LoginWithFaceUseCase(repository);
     final confirmQrLoginUseCase = ConfirmQrLoginUseCase(repository);
     final socialLoginUseCase = SocialLoginUseCase(repository);
+    final sendEmailLoginOtpUseCase = SendEmailLoginOtpUseCase(repository);
+    final verifyEmailLoginOtpUseCase = VerifyEmailLoginOtpUseCase(repository);
     final firebaseAuthService = FirebaseAuthService();
 
     return LoginProvider(
@@ -40,6 +45,8 @@ class AuthInjection {
       loginWithFaceUseCase: loginWithFaceUseCase,
       confirmQrLoginUseCase: confirmQrLoginUseCase,
       socialLoginUseCase: socialLoginUseCase,
+      sendEmailLoginOtpUseCase: sendEmailLoginOtpUseCase,
+      verifyEmailLoginOtpUseCase: verifyEmailLoginOtpUseCase,
       firebaseAuthService: firebaseAuthService,
       apiClient: apiClient,
     );
