@@ -6,6 +6,24 @@
 
 ## Files changed
 
+### 2026-07-14 — Drone delivery Phase 2 slice 1: maintenance queue dùng `orderId` + mission foundation (branch `feat/drone-delivery-order-foundation`)
+
+Role `MAINTENANCE` không còn xem queue mới qua legacy `DroneDeliveryRequest` cho flow Phase 2. Maintenance page giờ đọc queue order-based từ `order-service` và thao tác trên **`orderId`**.
+
+- `lib/features/locker_ops/data/locker_ops_service.dart` — thêm:
+  - `droneOrderQueue({deliveryStage})` -> **`GET /api/maintenance/drone-orders`**
+  - `acceptDroneOrder(orderId, droneUnitId, idempotencyKey)` -> **`POST /api/maintenance/drone-orders/{orderId}/accept`**
+  - `launchDroneOrder(orderId, idempotencyKey)` -> **`POST /api/maintenance/drone-orders/{orderId}/launch`**
+- `lib/features/locker_ops/presentation/pages/maintenance_home_page.dart` — cắt `_load()` sang queue mới; chia section theo `deliveryStage` (`AWAITING_DISPATCH`, `ACCEPTED`, `LAUNCHING`); card action đổi từ `Điều phối` / `Đã thả hàng` sang **`Tiếp nhận`** / **`Phóng`**; dialog tiếp nhận chỉ chọn drone `IDLE`; toàn bộ action mới dùng `orderId`.
+- `test/features/locker_ops/locker_ops_service_test.dart` — thêm test cho 3 endpoint Phase 2.
+- `test/features/locker_ops/maintenance_home_page_test.dart` — thêm widget test xác nhận maintenance page render queue mới và bấm `Tiếp nhận` theo `orderId`.
+
+Ghi chú trạng thái:
+
+- Backend Phase 2 hiện mới là **mission/preflight/launch skeleton**: `accept` tạo `drone_missions` và đổi `deliveryStage=ACCEPTED`, `launch` đổi `deliveryStage=LAUNCHING` và yêu cầu backend chuyển drone `IN_FLIGHT`.
+- Chưa có telemetry/SITL/MAVLink upload thật, chưa có arrival/deposit/open-locker tự động, chưa có live customer timeline từ flow mới.
+- Legacy `GET/POST /api/maintenance/drone-deliveries*` vẫn còn cho flow cũ/historical/manual test, nhưng maintenance UI đã chuyển sang contract mới cho Phase 2 slice này.
+
 ### 2026-07-14 — Drone delivery Phase 1 foundation: booking dùng `orderId` thật (branch `feat/drone-delivery-order-foundation`)
 
 Customer booking drone không còn là demo cục bộ ghi `DroneDeliveryStore` với ID giả `DRN-*`.

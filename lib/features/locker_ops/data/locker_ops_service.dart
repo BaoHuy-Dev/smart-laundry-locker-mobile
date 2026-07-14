@@ -371,6 +371,33 @@ class LockerOpsService {
       _list('/api/maintenance/drone-deliveries',
           query: status == null ? null : {'status': status});
 
+  /// Hàng đợi order-based cho đội bay theo Phase 2.
+  Future<List<Map<String, dynamic>>> droneOrderQueue({String? deliveryStage}) =>
+      _list('/api/maintenance/drone-orders',
+          query: deliveryStage == null ? null : {'deliveryStage': deliveryStage});
+
+  /// Đội bay tiếp nhận một order drone và gán drone cho mission.
+  Future<Map<String, dynamic>> acceptDroneOrder(
+    int orderId, {
+    required int droneUnitId,
+    required String idempotencyKey,
+  }) => _map(
+        'POST',
+        '/api/maintenance/drone-orders/$orderId/accept',
+        headers: {'Idempotency-Key': idempotencyKey},
+        body: {'droneUnitId': droneUnitId},
+      );
+
+  /// Đội bay phát lệnh launch cho mission đã sẵn sàng.
+  Future<Map<String, dynamic>> launchDroneOrder(
+    int orderId, {
+    required String idempotencyKey,
+  }) => _map(
+        'POST',
+        '/api/maintenance/drone-orders/$orderId/launch',
+        headers: {'Idempotency-Key': idempotencyKey},
+      );
+
   /// Đội bay điều phối yêu cầu; gán [droneUnitId] thì drone đó chuyển IN_FLIGHT.
   Future<Map<String, dynamic>> dispatchDroneDelivery(int id, {int? droneUnitId}) =>
       _map('POST', '/api/maintenance/drone-deliveries/$id/dispatch',

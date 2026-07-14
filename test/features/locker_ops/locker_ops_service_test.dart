@@ -169,6 +169,62 @@ void main() {
       final result = await service.updateDroneBattery(1, 40);
       expect(result['batteryPercent'], equals(40));
     });
+
+    test('droneOrderQueue() returns order-based maintenance queue', () async {
+      adapter.onGet('/api/maintenance/drone-orders', (server) => server.reply(200, apiOk([
+        {
+          'orderId': 21,
+          'missionId': null,
+          'missionStatus': null,
+          'deliveryStage': 'AWAITING_DISPATCH',
+          'destinationLockerId': 5,
+          'reservedBoxId': 9001,
+          'description': 'Tai lieu khan',
+        },
+      ])));
+
+      final result = await service.droneOrderQueue();
+      expect(result, hasLength(1));
+      expect(result.first['orderId'], equals(21));
+      expect(result.first['deliveryStage'], equals('AWAITING_DISPATCH'));
+    });
+
+    test('acceptDroneOrder() posts to order-based maintenance endpoint', () async {
+      adapter.onPost('/api/maintenance/drone-orders/21/accept', (server) => server.reply(202, apiOk({
+        'orderId': 21,
+        'missionId': 301,
+        'missionStatus': 'READY_TO_LAUNCH',
+        'deliveryStage': 'ACCEPTED',
+        'droneUnitId': 9,
+        'droneCode': 'DRONE-09',
+      })));
+
+      final result = await service.acceptDroneOrder(
+        21,
+        droneUnitId: 9,
+        idempotencyKey: 'accept-1',
+      );
+
+      expect(result['missionId'], equals(301));
+      expect(result['deliveryStage'], equals('ACCEPTED'));
+      expect(result['droneCode'], equals('DRONE-09'));
+    });
+
+    test('launchDroneOrder() posts to launch endpoint', () async {
+      adapter.onPost('/api/maintenance/drone-orders/21/launch', (server) => server.reply(202, apiOk({
+        'orderId': 21,
+        'missionId': 301,
+        'missionStatus': 'LAUNCHING',
+        'deliveryStage': 'LAUNCHING',
+        'droneUnitId': 9,
+        'droneCode': 'DRONE-09',
+      })));
+
+      final result = await service.launchDroneOrder(21, idempotencyKey: 'launch-1');
+
+      expect(result['missionStatus'], equals('LAUNCHING'));
+      expect(result['deliveryStage'], equals('LAUNCHING'));
+    });
   });
 
   // ── CUSTOMER — Order flow ────────────────────────────────────────────────
