@@ -423,24 +423,42 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
         ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: () => context.push(AppRouter.forgotPassword),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: const Text(
-              'Quên mật khẩu?',
-              style: TextStyle(
-                fontSize: 13,
-                color: _kBlue,
-                fontWeight: FontWeight.w600,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            TextButton(
+              onPressed: _handleEmailOtpLogin,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'Đăng nhập bằng OTP',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: _kBlue,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-          ),
+            TextButton(
+              onPressed: () => context.push(AppRouter.forgotPassword),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'Quên mật khẩu?',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: _kBlue,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
         ),
         _buildError(_loginError ?? _loginProvider.error),
       ],
@@ -934,6 +952,132 @@ class _LoginScreenState extends State<LoginScreen>
                         child: const Text(
                           'Đổi số điện thoại',
                           style: TextStyle(color: _kBlue),
+                        ),
+                      ),
+                    if (provider.error != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          provider.error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+  // ---------------------------------------------------------------------------
+  // Email OTP dialog
+  // ---------------------------------------------------------------------------
+  void _handleEmailOtpLogin() {
+    final email = _identifierController.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() => _loginError = 'Vui lòng nhập Email hợp lệ để nhận OTP');
+      return;
+    }
+    setState(() => _loginError = null);
+    _loginProvider.sendEmailOtp(email);
+    _showEmailOtpDialog(email);
+  }
+
+  void _showEmailOtpDialog(String email) {
+    final otpController = TextEditingController();
+
+    SmartDialog.show(
+      builder: (_) {
+        return ChangeNotifierProvider.value(
+          value: _loginProvider,
+          child: Consumer<LoginProvider>(
+            builder: (context, provider, _) {
+              final isSent = provider.isEmailOtpSent;
+
+              if (provider.isSuccess) {
+                WidgetsBinding.instance.addPostFrameCallback(
+                  (_) => SmartDialog.dismiss(),
+                );
+              }
+
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 24),
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Nhập mã OTP',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: _kInk,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      isSent
+                          ? 'Mã OTP đã được gửi đến $email'
+                          : 'Đang gửi mã OTP đến $email...',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 14, color: _kMuted),
+                    ),
+                    if (isSent) ...[
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: otpController,
+                        keyboardType: TextInputType.number,
+                        autofocus: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Mã OTP (6 số)',
+                          hintText: '------',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    if (isSent)
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: provider.isLoading
+                              ? null
+                              : () async {
+                                  FocusScope.of(context).unfocus();
+                                  final code = otpController.text.trim();
+                                  if (code.isEmpty) return;
+                                  await provider.confirmEmailOtp(
+                                    email: email,
+                                    otp: code,
+                                  );
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _kBlue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: provider.isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text('Xác nhận'),
                         ),
                       ),
                     if (provider.error != null)

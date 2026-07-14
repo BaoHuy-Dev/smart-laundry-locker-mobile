@@ -12,6 +12,11 @@ abstract class AuthRemoteDataSource {
   });
   Future<Map<String, dynamic>> verifyOtp(VerifyOtpRequestModel request);
 
+  Future<void> sendEmailLoginOtp({required String email});
+  Future<Map<String, dynamic>> verifyEmailLoginOtp({
+    required String email,
+    required String otp,
+  });
   Future<Map<String, dynamic>> confirmQrLogin(QrConfirmRequestModel request);
 
   Future<Map<String, dynamic>> firebaseLogin({required String idToken});

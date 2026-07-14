@@ -356,6 +356,7 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
 
     final method = await showModalBottomSheet<String>(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.white,
       showDragHandle: true,
       shape: const RoundedRectangleBorder(
