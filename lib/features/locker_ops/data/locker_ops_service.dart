@@ -48,7 +48,7 @@ class LockerOpsService {
       _list('/api/lockers', query: {'storeId': storeId});
 
   Future<Map<String, dynamic>> locker(int lockerId) =>
-      _map('GET', '/api/iot/lockers/$lockerId');
+      _map('GET', '/api/lockers/$lockerId');
 
   Future<Map<String, dynamic>> layout(int lockerId) =>
       _map('GET', '/api/lockers/$lockerId/layout');
