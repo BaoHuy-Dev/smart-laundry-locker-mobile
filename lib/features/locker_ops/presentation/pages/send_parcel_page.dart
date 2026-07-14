@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:smart_laundry_locker/core/routing/app_router.dart';
 import 'package:smart_laundry_locker/core/theme/shadcn_theme.dart';
 import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/locker_picker.dart';
@@ -162,6 +163,63 @@ class _SendParcelPageState extends State<SendParcelPage> {
         backgroundColor: AISLShadcnTheme.navyPrimary,
         foregroundColor: Colors.white,
       ),
+      bottomNavigationBar: _order == null ? Container(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: MediaQuery.of(context).padding.bottom + 16,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                const Icon(LucideIcons.receiptText, size: 16, color: opsMutedText),
+                const SizedBox(width: 6),
+                const Text('Phí gửi', style: TextStyle(color: opsMutedText)),
+                const Spacer(),
+                if (_discount > 0) ...[
+                  Text(
+                    fmtPrice(_fee),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: opsMutedText,
+                      decoration: TextDecoration.lineThrough,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                Text(
+                  fmtPrice(_netFee),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: opsDark,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            OpsPrimaryButton(
+              label: 'Tạo đơn & lấy PIN bỏ hàng',
+              icon: LucideIcons.arrowRight,
+              loading: _loading,
+              onPressed: _create,
+            ),
+          ],
+        ),
+      ) : null,
       body: _order == null ? _buildForm() : _buildResult(),
     );
   }
@@ -255,41 +313,6 @@ class _SendParcelPageState extends State<SendParcelPage> {
           ),
           const SizedBox(height: 10),
           const LoyaltyPointsHint(),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              const Icon(LucideIcons.receiptText, size: 16, color: opsMutedText),
-              const SizedBox(width: 6),
-              const Text('Phí gửi', style: TextStyle(color: opsMutedText)),
-              const Spacer(),
-              if (_discount > 0) ...[
-                Text(
-                  fmtPrice(_fee),
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: opsMutedText,
-                    decoration: TextDecoration.lineThrough,
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
-              Text(
-                fmtPrice(_netFee),
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16,
-                  color: opsDark,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          OpsPrimaryButton(
-            label: 'Tạo đơn & lấy PIN bỏ hàng',
-            icon: LucideIcons.arrowRight,
-            loading: _loading,
-            onPressed: _create,
-          ),
         ].animate(interval: 40.ms).fadeIn(duration: 250.ms).slideY(begin: 0.06),
       ),
     );
@@ -459,7 +482,13 @@ class _SendParcelPageState extends State<SendParcelPage> {
           OpsPrimaryButton(
             label: 'Hoàn tất',
             icon: LucideIcons.house,
-            onPressed: () => context.pop(),
+            onPressed: () {
+              final router = GoRouter.of(context);
+              Navigator.of(context, rootNavigator: true).popUntil((route) => route.isFirst);
+              Future.microtask(() {
+                router.go(AppRouter.orders);
+              });
+            },
           ),
       ],
     );
