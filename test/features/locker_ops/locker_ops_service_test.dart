@@ -174,6 +174,28 @@ void main() {
   // ── CUSTOMER — Order flow ────────────────────────────────────────────────
 
   group('CUSTOMER order flow', () {
+    test('createDroneDeliveryOrder() posts to order-based endpoint', () async {
+      adapter.onPost('/api/orders/drone-deliveries', (server) => server.reply(200, apiOk({
+        'orderId': 77,
+        'reservedBoxId': 9001,
+        'type': 'DRONE_DELIVERY',
+        'deliveryStage': 'PENDING_PAYMENT',
+      })));
+
+      final result = await service.createDroneDeliveryOrder(
+        destinationLockerId: 5,
+        preferredBoxId: 9001,
+        description: 'Tai lieu',
+        parcelWeightGrams: 1200,
+        paymentMethod: 'CASH',
+        idempotencyKey: 'idem-1',
+      );
+
+      expect(result['orderId'], equals(77));
+      expect(result['reservedBoxId'], equals(9001));
+      expect(result['deliveryStage'], equals('PENDING_PAYMENT'));
+    });
+
     test('myOrders() returns order list', () async {
       adapter.onGet('/api/orders/my-orders', (server) => server.reply(200, apiOk([
         {'id': 300, 'type': 'SEND', 'status': 'INITIALIZED', 'paymentStatus': 'UNPAID', 'totalPrice': 15000},

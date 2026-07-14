@@ -6,6 +6,20 @@
 
 ## Files changed
 
+### 2026-07-14 — Drone delivery Phase 1 foundation: booking dùng `orderId` thật (branch `feat/drone-delivery-order-foundation`)
+
+Customer booking drone không còn là demo cục bộ ghi `DroneDeliveryStore` với ID giả `DRN-*`.
+
+- `lib/features/locker_ops/data/locker_ops_service.dart` — thêm `createDroneDeliveryOrder(...)` gọi **`POST /api/orders/drone-deliveries`** với header `Idempotency-Key` và body `{destinationLockerId, preferredBoxId, description?, parcelWeightGrams, paymentMethod}`.
+- `lib/features/drone_delivery/presentation/widgets/drone_booking_sheet.dart` — booking sheet giờ **chờ response backend**, disable nút khi submit, hiện lỗi thật bằng `SmartDialog`, và chỉ báo thành công khi backend trả `orderId` hợp lệ. Không còn tạo `DroneOrder` cục bộ, không còn `DroneDeliveryStore.placeOrder()`, không còn tự mở `DroneTrackingPage` bằng ID giả.
+- `test/features/locker_ops/locker_ops_service_test.dart` — thêm test endpoint order-based mới.
+- `test/features/drone_delivery/drone_booking_sheet_test.dart` — thêm widget test xác nhận booking dùng `orderId` backend.
+
+Ghi chú trạng thái:
+
+- Backend hiện đã có **`GET /api/orders/{orderId}/drone-delivery`** nhưng mới là read model foundation (`orderId`, `reservedBoxId`, `deliveryStage=PENDING_PAYMENT`, ...), chưa phải timeline/tracking đầy đủ 6 mốc.
+- Vì vậy feature timeline/live-map trong `lib/features/drone_delivery/**` vẫn giữ cờ mock hiện tại; Phase 1 này chỉ sửa **booking honesty + contract `orderId` thật**.
+
 ### 2026-07-03 — Live map theo dõi drone real-time cho NGƯỜI NHẬN (Phase 2, STOMP) (branch `feat/mobile-delivery-push-notifications` + BE `feat/notification-drone-position`)
 
 Bổ sung vào feature `lib/features/drone_delivery/` (không tạo feature mới). Mở **on-demand**: nút "Theo dõi trên bản đồ" ở trang timeline (Phase 1) → live map; chỉ subscribe STOMP khi mở map, unsubscribe khi rời. **Gọi STOMP THẬT (không mock)** + thêm publisher backend.
@@ -136,7 +150,7 @@ Docs:
 | Choose locker | Merged | Uses `/api/stores`, `/api/lockers`, `/api/lockers/{lockerId}/boxes/available`. Nay thêm `/api/lockers?storeId=X` và `/api/lockers/{id}/layout`. |
 | Payment | Merged | Creates payment via `/api/payments` and opens payment URL/deeplink if returned. |
 | Track status | Merged | Refreshes order status via `/api/orders/{id}/status`. |
-| Theo dõi giao drone (người nhận) | **Merged (2026-07-03)** | Feature `drone_delivery`, Phase 1 push-only. FCM 6 type `drone_*` → deep-link `DroneDeliveryTrackingPage(orderId)` (timeline). Fetch trạng thái `GET /api/orders/{orderId}/drone-delivery` **đang tắt sau flag `droneDeliveryEnabled` + mock** (backend chưa có endpoint). Phase 2 (live map/STOMP) chỉ cần thêm `{lat,lng,heading}` — contract hiện đã tương thích. |
+| Theo dõi giao drone (người nhận) | **Merged (2026-07-03), foundation cập nhật 2026-07-14** | Feature `drone_delivery`, Phase 1 push-only. FCM 6 type `drone_*` → deep-link `DroneDeliveryTrackingPage(orderId)` (timeline). Booking customer hiện đã dùng `POST /api/orders/drone-deliveries` và **`orderId` thật**; sheet đặt drone không còn tạo ID giả `DRN-*`. Fetch trạng thái `GET /api/orders/{orderId}/drone-delivery` hiện có backend foundation nhưng timeline vẫn tắt sau flag `droneDeliveryEnabled` + mock cho đến khi BE trả đủ contract tracking. Phase 2 (live map/STOMP) chỉ cần thêm `{lat,lng,heading}` — contract hiện đã tương thích. |
 | Order history | Service ready | `UserOrderService.getMyOrders()` added. Existing Flutter `OrderPage` not replaced to protect courier/customer switching. |
 | Notifications | Service ready | USER notification service added. Existing notification page not replaced. |
 | Profile | Service ready | USER profile service added. Existing profile UI not replaced. |
@@ -198,7 +212,7 @@ Connected through new USER services:
 - `/api/services`: Flutter service selection calls this, but backend route/controller was not confirmed in the current microservice tree.
 - Full promotion/voucher picker: old mobile uses promotion and loyalty services; only raw promotion code passthrough was merged.
 - Shared register/OTP UI integration: requires a focused change because current Flutter auth screens are shared by all roles.
-- `GET /api/orders/{orderId}/drone-delivery`: mobile đã sẵn sàng tiêu thụ (feature `drone_delivery`) nhưng backend chưa có endpoint → đang tắt sau flag `droneDeliveryEnabled` + mock. Bật cờ khi backend triển khai. Backend cũng cần gửi FCM data payload `{ type: drone_*, title, content, orderId, deliveryId, status, eta }`.
+- `GET /api/orders/{orderId}/drone-delivery`: backend đã có foundation endpoint từ 2026-07-14, nhưng mới trả read model tối thiểu cho booking/order foundation; mobile timeline vẫn tắt sau flag `droneDeliveryEnabled` + mock cho đến khi backend trả đủ contract tracking. Backend vẫn cần gửi FCM data payload `{ type: drone_*, title, content, orderId, deliveryId, status, eta }`.
 
 ## Checks
 

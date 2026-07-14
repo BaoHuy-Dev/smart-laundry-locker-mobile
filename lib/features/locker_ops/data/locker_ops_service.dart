@@ -30,12 +30,13 @@ class LockerOpsService {
     String path, {
     Map<String, dynamic>? body,
     Map<String, dynamic>? query,
+    Map<String, dynamic>? headers,
   }) async {
     final res = await _dio.request(
       path,
       data: body,
       queryParameters: query,
-      options: Options(method: method),
+      options: Options(method: method, headers: headers),
     );
     final data = res.data?['data'];
     return data is Map<String, dynamic> ? data : <String, dynamic>{};
@@ -92,6 +93,26 @@ class LockerOpsService {
       'hours': hours,
       'note': note,
       if (promotionCode != null) 'promotionCode': promotionCode,
+    },
+  );
+
+  Future<Map<String, dynamic>> createDroneDeliveryOrder({
+    required int destinationLockerId,
+    int? preferredBoxId,
+    String? description,
+    required int parcelWeightGrams,
+    required String paymentMethod,
+    required String idempotencyKey,
+  }) => _map(
+    'POST',
+    '/api/orders/drone-deliveries',
+    headers: {'Idempotency-Key': idempotencyKey},
+    body: {
+      'destinationLockerId': destinationLockerId,
+      if (preferredBoxId != null) 'preferredBoxId': preferredBoxId,
+      if (description != null) 'description': description,
+      'parcelWeightGrams': parcelWeightGrams,
+      'paymentMethod': paymentMethod,
     },
   );
 
