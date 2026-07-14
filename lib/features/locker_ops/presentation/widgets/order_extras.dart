@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
 import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/ops_widgets.dart';
+import 'package:smart_laundry_locker/features/promotions/data/models/promotion_model.dart';
+import 'package:smart_laundry_locker/features/promotions/data/repositories/promotion_repository.dart';
+import 'package:smart_laundry_locker/core/network/api_client.dart';
 
 /// Compute the discount (in VND) a validated [promotion] grants on [total].
 /// Mirrors the order-service Promotion model (discountType / discountValue /
@@ -51,21 +53,12 @@ class PromoCodeField extends StatefulWidget {
 
 class _PromoCodeFieldState extends State<PromoCodeField> {
   final _service = LockerOpsService();
-  final _ctrl = TextEditingController();
   bool _loading = false;
   String? _appliedCode;
   String? _error;
 
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _apply() async {
-    final code = _ctrl.text.trim();
+  Future<void> _apply(String code) async {
     if (code.isEmpty) return;
-    FocusScope.of(context).unfocus();
     setState(() {
       _loading = true;
       _error = null;
@@ -77,7 +70,6 @@ class _PromoCodeFieldState extends State<PromoCodeField> {
       final promotion = res['promotion'] as Map<String, dynamic>?;
       if (!valid || promotion == null) {
         setState(() {
-          // Backend trả lý do cụ thể (sai tủ / hết lượt / hết hạn...).
           _error =
               (res['reason'] as String?) ?? 'Mã không hợp lệ hoặc đã hết hạn';
           _appliedCode = null;
@@ -108,9 +100,27 @@ class _PromoCodeFieldState extends State<PromoCodeField> {
     setState(() {
       _appliedCode = null;
       _error = null;
-      _ctrl.clear();
     });
     widget.onChanged(0, null);
+  }
+
+  Future<void> _showVoucherPicker() async {
+    final code = await showModalBottomSheet<String>(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: Colors.white,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (ctx) => _VoucherPickerSheet(
+        orderTotal: widget.orderTotal,
+        currentCode: _appliedCode,
+      ),
+    );
+    if (code != null) {
+      _apply(code);
+    }
   }
 
   @override
@@ -147,62 +157,40 @@ class _PromoCodeFieldState extends State<PromoCodeField> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _ctrl,
-                textCapitalization: TextCapitalization.characters,
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
-                ],
-                decoration: InputDecoration(
-                  hintText: 'Nhập mã giảm giá',
-                  prefixIcon:
-                      const Icon(LucideIcons.ticket, size: 18, color: opsMutedText),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: opsBorder),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: opsBorder),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: opsPrimary, width: 1.6),
+        GestureDetector(
+          onTap: _loading ? null : _showVoucherPicker,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: opsBorder),
+            ),
+            child: Row(
+              children: [
+                const Icon(LucideIcons.ticket, size: 18, color: opsMutedText),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Chọn mã giảm giá',
+                    style: TextStyle(
+                      color: opsDark,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
                   ),
                 ),
-              ),
+                if (_loading)
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: opsPrimary),
+                  )
+                else
+                  const Icon(LucideIcons.chevronRight, size: 18, color: opsMutedText),
+              ],
             ),
-            const SizedBox(width: 10),
-            SizedBox(
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _loading ? null : _apply,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: opsDark,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                child: _loading
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text('Áp dụng'),
-              ),
-            ),
-          ],
+          ),
         ),
         if (_error != null) ...[
           const SizedBox(height: 6),
@@ -211,6 +199,157 @@ class _PromoCodeFieldState extends State<PromoCodeField> {
             style: const TextStyle(color: Color(0xFFDC2626), fontSize: 12.5),
           ),
         ],
+      ],
+    );
+  }
+}
+
+class _VoucherPickerSheet extends StatefulWidget {
+  const _VoucherPickerSheet({
+    required this.orderTotal,
+    this.currentCode,
+  });
+
+  final int orderTotal;
+  final String? currentCode;
+
+  @override
+  State<_VoucherPickerSheet> createState() => _VoucherPickerSheetState();
+}
+
+class _VoucherPickerSheetState extends State<_VoucherPickerSheet> {
+  final _repo = PromotionRepository(ApiClient());
+  List<PromotionModel>? _promotions;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final res = await _repo.getActivePromotions();
+      if (!mounted) return;
+      setState(() {
+        _promotions = res;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+          child: Text(
+            'Chọn mã giảm giá',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 18,
+              color: opsDark,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (_loading)
+          const Padding(
+            padding: EdgeInsets.all(32),
+            child: Center(child: CircularProgressIndicator(color: opsPrimary)),
+          )
+        else if (_promotions == null || _promotions!.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(32),
+            child: Center(
+              child: Text(
+                'Chưa có mã giảm giá nào.',
+                style: TextStyle(color: opsMutedText),
+              ),
+            ),
+          )
+        else
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              itemCount: _promotions!.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (ctx, i) {
+                final p = _promotions![i];
+                final meetsMin = p.minOrderAmount == null || widget.orderTotal >= p.minOrderAmount!;
+                final isSelected = p.code == widget.currentCode;
+
+                return Opacity(
+                  opacity: meetsMin ? 1.0 : 0.5,
+                  child: GestureDetector(
+                    onTap: meetsMin ? () => Navigator.pop(context, p.code) : null,
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isSelected ? opsPrimary.withValues(alpha: 0.05) : opsSurface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: isSelected ? opsPrimary : opsBorder, width: isSelected ? 1.5 : 1),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFACC15).withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(LucideIcons.ticket, color: Color(0xFFCA8A04)),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  p.code,
+                                  style: const TextStyle(fontWeight: FontWeight.w800, color: opsDark, fontSize: 15),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  p.name,
+                                  style: const TextStyle(fontSize: 13, color: opsMutedText),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (p.minOrderLabel != null) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    p.minOrderLabel!,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: meetsMin ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                                    ),
+                                  ),
+                                ]
+                              ],
+                            ),
+                          ),
+                          if (isSelected)
+                            const Icon(LucideIcons.circleCheck, color: opsPrimary, size: 22)
+                          else if (meetsMin)
+                            const Icon(LucideIcons.chevronRight, color: opsMutedText, size: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
       ],
     );
   }
