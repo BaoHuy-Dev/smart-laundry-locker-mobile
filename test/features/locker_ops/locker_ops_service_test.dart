@@ -235,7 +235,7 @@ void main() {
         'orderId': 77,
         'reservedBoxId': 9001,
         'type': 'DRONE_DELIVERY',
-        'deliveryStage': 'PENDING_PAYMENT',
+        'deliveryStage': 'AWAITING_DISPATCH',
       })));
 
       final result = await service.createDroneDeliveryOrder(
@@ -249,7 +249,7 @@ void main() {
 
       expect(result['orderId'], equals(77));
       expect(result['reservedBoxId'], equals(9001));
-      expect(result['deliveryStage'], equals('PENDING_PAYMENT'));
+      expect(result['deliveryStage'], equals('AWAITING_DISPATCH'));
     });
 
     test('myOrders() returns order list', () async {

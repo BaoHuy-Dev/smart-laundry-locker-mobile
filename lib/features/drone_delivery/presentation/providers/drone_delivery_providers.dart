@@ -29,16 +29,20 @@ final droneDeliveryFcmTickProvider = StreamProvider.autoDispose
           .map((_) => ++tick);
     });
 
-/// Trạng thái giao drone hiện tại theo [orderId].
-///
-/// Tự fetch lần đầu khi mở trang; và tự refetch mỗi khi [droneDeliveryFcmTickProvider]
-/// phát mốc mới cho đúng đơn này. Pull-to-refresh: `ref.invalidate(...)`.
-final droneDeliveryStatusProvider = FutureProvider.autoDispose
-    .family<DroneDeliveryStatus, String>((ref, orderId) async {
-      // Đăng ký phụ thuộc vào FCM tick → có event drone mới thì provider chạy lại.
+/// Trạng thái giao drone hiện tại theo [orderId]. Poll backend mỗi 3 giây để
+/// timeline tiến triển ngay cả khi FCM đến trễ; FCM vẫn làm provider khởi tạo
+/// lại để lấy mốc quan trọng sớm hơn.
+final droneDeliveryStatusProvider = StreamProvider.autoDispose
+    .family<DroneDeliveryStatus, String>((ref, orderId) async* {
       ref.watch(droneDeliveryFcmTickProvider(orderId));
-
       final useCase = ref.watch(getDroneDeliveryStatusUseCaseProvider);
-      final result = await useCase.execute(orderId);
-      return result.fold((failure) => throw Exception(failure.message), (e) => e);
+
+      while (true) {
+        final result = await useCase.execute(orderId);
+        yield result.fold(
+          (failure) => throw Exception(failure.message),
+          (status) => status,
+        );
+        await Future<void>.delayed(const Duration(seconds: 3));
+      }
     });

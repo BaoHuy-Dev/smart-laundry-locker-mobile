@@ -6,6 +6,40 @@
 
 ## Files changed
 
+### 2026-07-14 — Drone demo tracking: timeline thật theo `orderId`
+
+Luồng demo vẫn dùng cùng order/mission contract production, không tạo ID hay trạng thái cục bộ. Sau khi MAINTENANCE phóng, backend simulator tiến stage và mobile customer poll read model mỗi 3 giây.
+
+- `lib/features/drone_delivery/domain/entities/drone_delivery_stage.dart` — timeline 8 mốc `AWAITING_DISPATCH -> ACCEPTED -> LAUNCHING -> DEPARTED -> EN_ROUTE -> APPROACHING -> ARRIVED -> READY_FOR_PICKUP`, giữ alias type cũ để tương thích.
+- `lib/features/drone_delivery/infrastructure/models/drone_delivery_response.dart` — ưu tiên `deliveryStage` backend và dùng `missionId` làm delivery id.
+- `lib/features/drone_delivery/presentation/providers/drone_delivery_providers.dart` — chuyển sang `StreamProvider`, fetch ngay và poll `GET /api/orders/{orderId}/drone-delivery` mỗi 3 giây.
+- `lib/features/drone_delivery/presentation/widgets/drone_delivery_timeline.dart` — render progress theo thứ tự stage mới.
+- `lib/features/locker_ops/presentation/pages/my_locker_orders_page.dart` — thêm action **Theo dõi giao drone** mở route `AppRouter.droneDeliveryTracking` bằng `orderId` thật.
+- `lib/core/config/feature_flags.dart` — bật `droneDeliveryEnabled`; timeline không còn dùng response mock.
+- `lib/core/services/firebase_messaging_service.dart` — type `DRONE_DELIVERY_STATUS_CHANGED` mở timeline customer; `DRONE_ORDER_CREATED` mở maintenance queue; giữ type `drone_*` cũ trong giai đoạn chuyển contract.
+- Tests mới kiểm tra parse stage/read model, timeline UI và notification classification.
+
+Giới hạn hiện tại: simulator chỉ cung cấp stage + ETA, chưa có GPS/live map/MAVLink/sensor thật. Payment vẫn chỉ bắt buộc trước lúc mở tủ/pickup ở `READY_FOR_PICKUP`.
+
+### 2026-07-14 — Drone delivery Phase 2 slice 2: thanh toán trước pickup, không chặn dispatch (branch `feat/drone-delivery-order-foundation` mobile + BE `feat/drone-pay-before-pickup`)
+
+Luồng drone customer được nắn lại theo nghiệp vụ mới: **maintenance vẫn nhận/phóng được khi order chưa thanh toán**, còn payment chỉ là gate trước lúc customer mở tủ/pickup.
+
+- `lib/features/locker_ops/presentation/pages/my_locker_orders_page.dart`
+  - order card/detail giờ ưu tiên hiển thị `deliveryStage` cho `DRONE_DELIVERY` nếu backend trả về
+  - customer drone **không còn** lộ action locker thường theo trạng thái generic cũ
+  - khi drone chưa thanh toán, các action pickup-sensitive như **`Mở tủ`**, **`Tôi đã lấy đồ — hoàn tất`**, **`Ủy quyền người khác lấy hộ`** bị ẩn/chặn; chỉ giữ nút `Thanh toán`
+- `lib/features/locker_ops/presentation/widgets/ops_widgets.dart`
+  - bổ sung label/màu cho các stage drone như `AWAITING_DISPATCH`, `ACCEPTED`, `LAUNCHING`, `READY_FOR_PICKUP`
+- `test/features/locker_ops/locker_ops_service_test.dart`
+  - expectation create flow cập nhật sang `deliveryStage = AWAITING_DISPATCH`
+
+Ghi chú trạng thái:
+
+- `POST /api/orders/drone-deliveries` nay tạo order drone vào queue dispatch ngay (`AWAITING_DISPATCH`) dù `paymentStatus = UNPAID`
+- maintenance queue/accept/launch không còn bị chặn bởi payment
+- payment gate được dời sang backend pickup/access ở BE; mobile customer chỉ phản ánh đúng gate đó trên UI
+
 ### 2026-07-14 — Drone delivery Phase 2 slice 1: maintenance queue dùng `orderId` + mission foundation (branch `feat/drone-delivery-order-foundation`)
 
 Role `MAINTENANCE` không còn xem queue mới qua legacy `DroneDeliveryRequest` cho flow Phase 2. Maintenance page giờ đọc queue order-based từ `order-service` và thao tác trên **`orderId`**.

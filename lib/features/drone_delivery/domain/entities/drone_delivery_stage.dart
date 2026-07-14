@@ -1,73 +1,87 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-/// 6 mốc trạng thái giao hàng bằng drone mà backend bắn xuống qua FCM
-/// (`type` = drone_dispatched … drone_failed, `data.status` = tên mốc).
-///
-/// `unknown` để phòng khi nhận status lạ (không làm vỡ UI). Feature này tự sở
-/// hữu enum riêng để giữ 4 layer độc lập — không phụ thuộc domain của feature
-/// `notifications` (nơi có `DeliveryStatus` tương tự cho luồng noti chung).
+/// Business stages exposed by the order-based drone delivery read model.
 enum DroneDeliveryStage {
-  dispatched,
+  awaitingDispatch,
+  accepted,
+  launching,
+  departed,
+  enRoute,
   approaching,
   arrived,
-  delivered,
+  readyForPickup,
   delayed,
   failed,
   unknown;
 
-  /// Chuyển chuỗi `status` trong payload FCM thành enum (không phân biệt hoa
-  /// thường). Status lạ → [unknown].
   static DroneDeliveryStage fromRaw(String? raw) {
-    switch ((raw ?? '').trim().toLowerCase()) {
-      case 'dispatched':
-        return DroneDeliveryStage.dispatched;
-      case 'approaching':
+    switch ((raw ?? '').trim().toUpperCase()) {
+      case 'AWAITING_DISPATCH':
+        return DroneDeliveryStage.awaitingDispatch;
+      case 'ACCEPTED':
+        return DroneDeliveryStage.accepted;
+      case 'LAUNCHING':
+        return DroneDeliveryStage.launching;
+      case 'DEPARTED':
+      case 'DISPATCHED':
+        return DroneDeliveryStage.departed;
+      case 'EN_ROUTE':
+        return DroneDeliveryStage.enRoute;
+      case 'APPROACHING':
         return DroneDeliveryStage.approaching;
-      case 'arrived':
+      case 'ARRIVED':
         return DroneDeliveryStage.arrived;
-      case 'delivered':
-        return DroneDeliveryStage.delivered;
-      case 'delayed':
+      case 'READY_FOR_PICKUP':
+      case 'DELIVERED':
+        return DroneDeliveryStage.readyForPickup;
+      case 'DELAYED':
         return DroneDeliveryStage.delayed;
-      case 'failed':
+      case 'FAILED':
         return DroneDeliveryStage.failed;
       default:
         return DroneDeliveryStage.unknown;
     }
   }
 
-  /// 4 mốc chính vẽ trên timeline theo đúng thứ tự tiến trình. `delayed`,
-  /// `failed`, `unknown` là trạng thái phủ lên timeline chứ không phải một bước.
   static const List<DroneDeliveryStage> timeline = [
-    DroneDeliveryStage.dispatched,
+    DroneDeliveryStage.awaitingDispatch,
+    DroneDeliveryStage.accepted,
+    DroneDeliveryStage.launching,
+    DroneDeliveryStage.departed,
+    DroneDeliveryStage.enRoute,
     DroneDeliveryStage.approaching,
     DroneDeliveryStage.arrived,
-    DroneDeliveryStage.delivered,
+    DroneDeliveryStage.readyForPickup,
   ];
 
-  /// Vị trí trên timeline (0..3). Trả `-1` với mốc không nằm trên timeline.
   int get order => timeline.indexOf(this);
 
-  /// Đơn đã kết thúc (thành công hoặc thất bại) — không còn tiến triển tiếp.
   bool get isTerminal =>
-      this == DroneDeliveryStage.delivered || this == DroneDeliveryStage.failed;
+      this == DroneDeliveryStage.readyForPickup ||
+      this == DroneDeliveryStage.failed;
 
-  /// Nhánh lỗi/chậm để UI đổi màu cảnh báo.
   bool get isFailure => this == DroneDeliveryStage.failed;
   bool get isDelayed => this == DroneDeliveryStage.delayed;
 
-  /// Tiêu đề mặc định (tiếng Việt) khi payload không gửi kèm title.
   String get title {
     switch (this) {
-      case DroneDeliveryStage.dispatched:
-        return 'Drone đang giao hàng';
+      case DroneDeliveryStage.awaitingDispatch:
+        return 'Chờ đội bay tiếp nhận';
+      case DroneDeliveryStage.accepted:
+        return 'Đội bay đã tiếp nhận';
+      case DroneDeliveryStage.launching:
+        return 'Drone đang khởi phóng';
+      case DroneDeliveryStage.departed:
+        return 'Drone đã rời trạm';
+      case DroneDeliveryStage.enRoute:
+        return 'Drone đang trên đường';
       case DroneDeliveryStage.approaching:
         return 'Drone sắp đến';
       case DroneDeliveryStage.arrived:
-        return 'Drone đã đến nơi';
-      case DroneDeliveryStage.delivered:
-        return 'Giao hàng thành công';
+        return 'Drone đã đến tủ';
+      case DroneDeliveryStage.readyForPickup:
+        return 'Sẵn sàng nhận hàng';
       case DroneDeliveryStage.delayed:
         return 'Đơn hàng bị chậm';
       case DroneDeliveryStage.failed:
@@ -77,40 +91,49 @@ enum DroneDeliveryStage {
     }
   }
 
-  /// Nội dung gợi ý (tiếng Việt) theo contract, dùng khi payload không gửi kèm
-  /// `content`. [eta] chỉ chèn vào mốc `delayed`.
   String body(String? eta) {
     switch (this) {
-      case DroneDeliveryStage.dispatched:
-        return 'Drone đang trên đường giao hàng của bạn';
+      case DroneDeliveryStage.awaitingDispatch:
+        return 'Đơn đang chờ đội bay kiểm tra và nhận nhiệm vụ';
+      case DroneDeliveryStage.accepted:
+        return 'Drone đã được gán và sẵn sàng khởi hành';
+      case DroneDeliveryStage.launching:
+        return 'Đội bay đang thực hiện quy trình khởi phóng';
+      case DroneDeliveryStage.departed:
+        return 'Drone đã cất cánh khỏi trạm nguồn';
+      case DroneDeliveryStage.enRoute:
+        return eta == null ? 'Drone đang bay tới tủ nhận' : 'Drone dự kiến đến trong $eta';
       case DroneDeliveryStage.approaching:
-        return 'Drone sắp đến nơi, vui lòng chuẩn bị ra nhận';
+        return 'Drone đang tiếp cận tủ nhận của bạn';
       case DroneDeliveryStage.arrived:
-        return 'Drone đã đến điểm giao, vui lòng ra nhận hàng';
-      case DroneDeliveryStage.delivered:
-        return 'Giao hàng thành công. Cảm ơn bạn!';
+        return 'Drone đã đến và đang gửi kiện hàng vào tủ';
+      case DroneDeliveryStage.readyForPickup:
+        return 'Kiện hàng đã ở trong tủ, vui lòng thanh toán trước khi mở tủ';
       case DroneDeliveryStage.delayed:
-        return (eta != null && eta.isNotEmpty)
-            ? 'Đơn đang bị chậm, dự kiến tới $eta'
-            : 'Đơn đang bị chậm so với dự kiến';
+        return eta == null ? 'Đơn đang bị chậm so với dự kiến' : 'Đơn đang bị chậm, dự kiến tới $eta';
       case DroneDeliveryStage.failed:
-        return 'Giao không thành công, drone đang quay về';
+        return 'Nhiệm vụ không thành công, đội bay sẽ hỗ trợ bạn';
       case DroneDeliveryStage.unknown:
         return 'Đơn hàng của bạn có cập nhật mới';
     }
   }
 
-  /// Icon hiển thị trên timeline/banner (lucide theo icon convention).
   IconData get icon {
     switch (this) {
-      case DroneDeliveryStage.dispatched:
+      case DroneDeliveryStage.awaitingDispatch:
+        return LucideIcons.clock;
+      case DroneDeliveryStage.accepted:
+        return LucideIcons.circleCheck;
+      case DroneDeliveryStage.launching:
+      case DroneDeliveryStage.departed:
         return LucideIcons.planeTakeoff;
+      case DroneDeliveryStage.enRoute:
       case DroneDeliveryStage.approaching:
         return LucideIcons.navigation;
       case DroneDeliveryStage.arrived:
         return LucideIcons.mapPin;
-      case DroneDeliveryStage.delivered:
-        return LucideIcons.circleCheck;
+      case DroneDeliveryStage.readyForPickup:
+        return LucideIcons.packageCheck;
       case DroneDeliveryStage.delayed:
         return LucideIcons.clock;
       case DroneDeliveryStage.failed:
@@ -120,24 +143,24 @@ enum DroneDeliveryStage {
     }
   }
 
-  /// Màu theo trạng thái — GIỮ semantic: success=green, delayed=amber, failed=red.
-  /// Các mốc đang tiến hành dùng navy palette.
   Color get color {
     switch (this) {
-      case DroneDeliveryStage.dispatched:
-        return const Color(0xFF1E5A8A); // navyAccent
-      case DroneDeliveryStage.approaching:
-        return const Color(0xFF1E5A8A); // navyAccent
-      case DroneDeliveryStage.arrived:
-        return const Color(0xFF12355B); // navySecondary
-      case DroneDeliveryStage.delivered:
-        return const Color(0xFF16A34A); // success green
+      case DroneDeliveryStage.readyForPickup:
+        return const Color(0xFF16A34A);
       case DroneDeliveryStage.delayed:
-        return const Color(0xFFF59E0B); // warning amber
+        return const Color(0xFFF59E0B);
       case DroneDeliveryStage.failed:
-        return const Color(0xFFDC2626); // destructive red
+        return const Color(0xFFDC2626);
       case DroneDeliveryStage.unknown:
-        return const Color(0xFF64748B); // neutral gray
+        return const Color(0xFF64748B);
+      case DroneDeliveryStage.awaitingDispatch:
+      case DroneDeliveryStage.accepted:
+      case DroneDeliveryStage.launching:
+      case DroneDeliveryStage.departed:
+      case DroneDeliveryStage.enRoute:
+      case DroneDeliveryStage.approaching:
+      case DroneDeliveryStage.arrived:
+        return const Color(0xFF1E5A8A);
     }
   }
 }

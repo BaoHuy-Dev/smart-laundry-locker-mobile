@@ -32,8 +32,11 @@ class DroneDeliveryResponse {
     final data = json['data'] as Map<String, dynamic>? ?? json;
 
     return DroneDeliveryResponse(
-      status: (data['status'] ?? data['Status'])?.toString() ?? 'unknown',
-      deliveryId: data['deliveryId']?.toString(),
+      status:
+          (data['deliveryStage'] ?? data['status'] ?? data['Status'])
+              ?.toString() ??
+          'unknown',
+      deliveryId: (data['missionId'] ?? data['deliveryId'])?.toString(),
       orderId: data['orderId']?.toString(),
       orderCode: data['orderCode']?.toString(),
       droneCode: data['droneCode']?.toString(),
