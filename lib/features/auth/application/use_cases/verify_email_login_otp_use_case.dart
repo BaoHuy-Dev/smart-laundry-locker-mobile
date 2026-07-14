@@ -1,5 +1,4 @@
 import 'package:smart_laundry_locker/core/errors/failures.dart';
-import 'package:smart_laundry_locker/core/usecases/usecase.dart';
 import 'package:smart_laundry_locker/features/auth/domain/entities/auth_token_entity.dart';
 import 'package:smart_laundry_locker/features/auth/domain/repositories/auth_repository.dart';
 import 'package:dartz/dartz.dart';
@@ -11,13 +10,14 @@ class VerifyEmailLoginOtpParams {
   VerifyEmailLoginOtpParams({required this.email, required this.otp});
 }
 
-class VerifyEmailLoginOtpUseCase implements UseCase<AuthTokenEntity, VerifyEmailLoginOtpParams> {
+class VerifyEmailLoginOtpUseCase {
   final AuthRepository repository;
 
   VerifyEmailLoginOtpUseCase(this.repository);
 
-  @override
-  Future<Either<Failure, AuthTokenEntity>> call(VerifyEmailLoginOtpParams params) {
+  Future<Either<Failure, AuthTokenEntity>> call(
+    VerifyEmailLoginOtpParams params,
+  ) {
     return repository.verifyEmailLoginOtp(params.email, params.otp);
   }
 }

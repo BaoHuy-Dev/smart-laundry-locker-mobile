@@ -504,6 +504,10 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
               Navigator.pop(ctx);
               _openLockerFlow(order);
             },
+            onTrackDrone: (id) {
+              Navigator.pop(ctx);
+              context.go(AppRouter.droneDeliveryTracking, extra: '$id');
+            },
           ),
         ),
       ),
@@ -736,13 +740,14 @@ class _OrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final type = order['type'] as String?;
-    final status = order['status'] as String?;
+    final rawStatus = order['status'] as String?;
+    final status = _displayStatus(order, rawStatus);
     final boxId = order['sendBoxId'] ?? order['receiveBoxId'];
     final deadline = order['pickupDeadline'];
     final overdue =
-        isOverdue(deadline) && status != 'COMPLETED' && status != 'CANCELED';
+        isOverdue(deadline) && rawStatus != 'COMPLETED' && rawStatus != 'CANCELED';
     final sColor = statusColor(status);
-    final isDone = status == 'COMPLETED' || status == 'CANCELED';
+    final isDone = rawStatus == 'COMPLETED' || rawStatus == 'CANCELED';
 
     return Material(
       color: context.cardBg,
@@ -974,6 +979,17 @@ double? _asDouble(dynamic value) {
   return double.tryParse('$value');
 }
 
+String _displayStatus(Map<String, dynamic> order, String? fallback) {
+  final type = (order['type'] as String? ?? '').toUpperCase();
+  if (type == 'DRONE_DELIVERY') {
+    final deliveryStage = order['deliveryStage'] as String?;
+    if (deliveryStage != null && deliveryStage.isNotEmpty) {
+      return deliveryStage;
+    }
+  }
+  return fallback ?? '';
+}
+
 class _DetailSheet extends StatelessWidget {
   const _DetailSheet({
     required this.order,
@@ -991,6 +1007,7 @@ class _DetailSheet extends StatelessWidget {
     required this.onDirections,
     required this.onPay,
     required this.onOpenLocker,
+    required this.onTrackDrone,
   });
 
   final Map<String, dynamic> order;
@@ -1008,12 +1025,15 @@ class _DetailSheet extends StatelessWidget {
   final VoidCallback onDirections;
   final void Function(int orderId) onPay;
   final VoidCallback onOpenLocker;
+  final void Function(int orderId) onTrackDrone;
 
   @override
   Widget build(BuildContext context) {
     final id = order['id'] as int;
-    final status = order['status'] as String? ?? '';
+    final rawStatus = order['status'] as String? ?? '';
+    final status = _displayStatus(order, rawStatus);
     final type = (order['type'] as String? ?? '').toUpperCase();
+    final isDroneDelivery = type == 'DRONE_DELIVERY';
     final isRental = type == 'RENTAL';
     final boxId = (order['sendBoxId'] ?? order['receiveBoxId']) as int?;
     final deadline = order['pickupDeadline'];
@@ -1031,9 +1051,17 @@ class _DetailSheet extends StatelessWidget {
         ? totalRaw
         : num.tryParse('$totalRaw') ?? 0;
     final canPay =
-        paymentStatus != 'PAID' && totalNum > 0 && status != 'CANCELED';
+        paymentStatus != 'PAID' && totalNum > 0 && rawStatus != 'CANCELED';
+    final canUsePickupActions = !isDroneDelivery || paymentStatus == 'PAID';
 
     final actions = <Widget>[
+      if (isDroneDelivery && rawStatus != 'COMPLETED' && rawStatus != 'CANCELED')
+        OpsSheetAction(
+          label: 'Theo dõi giao drone',
+          icon: LucideIcons.navigation,
+          primary: true,
+          onTap: () => onTrackDrone(id),
+        ),
       if (canPay)
         OpsSheetAction(
           label: 'Thanh toán ${fmtPrice(order['totalPrice'])}',
@@ -1043,35 +1071,37 @@ class _DetailSheet extends StatelessWidget {
         ),
       if (boxId != null &&
           order['pinCode'] != null &&
-          status != 'COMPLETED' &&
-          status != 'CANCELED')
+          rawStatus != 'COMPLETED' &&
+          rawStatus != 'CANCELED' &&
+          canUsePickupActions)
         OpsSheetAction(
           label: 'Mở tủ',
           icon: LucideIcons.doorOpen,
           onTap: onOpenLocker,
         ),
-      if (status == 'COMPLETED' || status == 'CANCELED')
+      if (rawStatus == 'COMPLETED' || rawStatus == 'CANCELED')
         OpsSheetAction(
           label: 'Đặt lại đơn',
           icon: LucideIcons.repeat,
           primary: true,
           onTap: () => onReorder(id),
         ),
-      if (status == 'INITIALIZED')
+      if (rawStatus == 'INITIALIZED')
         OpsSheetAction(
           label: 'Tôi đã bỏ đồ vào ô',
           icon: LucideIcons.packageCheck,
           primary: true,
           onTap: () => onConfirmDrop(id),
         ),
-      if (status == 'RETURNED' || (status == 'STORING' && !isRental))
+      if (canUsePickupActions &&
+          (rawStatus == 'RETURNED' || (rawStatus == 'STORING' && !isRental)))
         OpsSheetAction(
           label: 'Tôi đã lấy đồ — hoàn tất',
           icon: LucideIcons.circleCheck,
           primary: true,
           onTap: () => onComplete(id),
         ),
-      if (isRental && status == 'STORING') ...[
+      if (isRental && rawStatus == 'STORING') ...[
         OpsSheetAction(
           label: 'Gia hạn thuê',
           icon: LucideIcons.timer,
@@ -1083,19 +1113,19 @@ class _DetailSheet extends StatelessWidget {
           onTap: () => onEndRental(id),
         ),
       ],
-      if (status == 'STORING' || status == 'RETURNED')
+      if (canUsePickupActions && (rawStatus == 'STORING' || rawStatus == 'RETURNED'))
         OpsSheetAction(
           label: 'Ủy quyền người khác lấy hộ',
           icon: LucideIcons.userPlus,
           onTap: () => onDelegate(id),
         ),
-      if (boxId != null && status != 'COMPLETED' && status != 'CANCELED')
+      if (boxId != null && rawStatus != 'COMPLETED' && rawStatus != 'CANCELED')
         OpsSheetAction(
           label: 'Báo ô lỗi',
           icon: LucideIcons.triangleAlert,
           onTap: () => onReport(boxId),
         ),
-      if (status == 'INITIALIZED')
+      if (rawStatus == 'INITIALIZED')
         OpsSheetAction(
           label: 'Hủy đơn',
           icon: LucideIcons.circleX,

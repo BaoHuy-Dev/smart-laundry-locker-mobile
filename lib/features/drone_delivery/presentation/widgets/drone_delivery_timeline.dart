@@ -1,32 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:smart_laundry_locker/features/drone_delivery/domain/entities/drone_delivery_stage.dart';
 
-/// Timeline dọc 4 mốc chính (dispatched → approaching → arrived → delivered).
-///
-/// Mốc hiện tại nổi bật; mốc đã qua tô đậm; mốc chưa tới xám. `delayed` và
-/// `failed` là trạng thái phủ lên mốc hiện tại (đổi màu amber/đỏ) — semantic màu
-/// giữ nguyên theo contract.
+/// Timeline dọc cho toàn bộ vòng đời giao drone theo order-based contract.
 class DroneDeliveryTimeline extends StatelessWidget {
   final DroneDeliveryStage stage;
 
   const DroneDeliveryTimeline({super.key, required this.stage});
 
-  /// Mốc chính đang active tương ứng với [stage]. `delayed` coi như đang trên
-  /// đường (approaching); `failed` dừng ở bước giao (delivered) nhưng tô đỏ.
   int get _activeIndex {
-    switch (stage) {
-      case DroneDeliveryStage.dispatched:
-      case DroneDeliveryStage.unknown:
-        return 0;
-      case DroneDeliveryStage.approaching:
-      case DroneDeliveryStage.delayed:
-        return 1;
-      case DroneDeliveryStage.arrived:
-        return 2;
-      case DroneDeliveryStage.delivered:
-      case DroneDeliveryStage.failed:
-        return 3;
-    }
+    if (stage.order >= 0) return stage.order;
+    if (stage.isDelayed) return DroneDeliveryStage.enRoute.order;
+    if (stage.isFailure) return DroneDeliveryStage.readyForPickup.order;
+    return 0;
   }
 
   @override

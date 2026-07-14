@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:smart_laundry_locker/features/drone_delivery/data/drone_delivery_store.dart';
-import 'package:smart_laundry_locker/features/drone_delivery/domain/entities/drone_order.dart';
-import 'package:smart_laundry_locker/features/drone_delivery/presentation/pages/drone_tracking_page.dart';
 import 'package:smart_laundry_locker/features/locker_ops/data/locker_ops_service.dart';
+
+typedef DroneOrderCreator = Future<Map<String, dynamic>> Function({
+  required int destinationLockerId,
+  required int? preferredBoxId,
+  required String? description,
+  required int parcelWeightGrams,
+  required String paymentMethod,
+  required String idempotencyKey,
+});
 
 class DroneBookingSheet extends StatefulWidget {
   const DroneBookingSheet({
@@ -12,6 +19,9 @@ class DroneBookingSheet extends StatefulWidget {
     required this.lockerName,
     required this.origin,
     this.lockerId,
+    this.createOrder,
+    this.onBooked,
+    this.showMessage,
   });
 
   final Map<String, dynamic> cell;
@@ -19,8 +29,12 @@ class DroneBookingSheet extends StatefulWidget {
   final LatLng origin;
 
   /// Id tủ để gửi yêu cầu lên backend (hàng đợi điều phối của đội bay).
-  /// Null (caller cũ chưa truyền) thì chỉ chạy mock tracking như trước.
+  /// Null thì không thể tạo order drone thật.
   final int? lockerId;
+
+  final DroneOrderCreator? createOrder;
+  final ValueChanged<int>? onBooked;
+  final ValueChanged<String>? showMessage;
 
   @override
   State<DroneBookingSheet> createState() => _DroneBookingSheetState();
@@ -28,6 +42,7 @@ class DroneBookingSheet extends StatefulWidget {
 
 class _DroneBookingSheetState extends State<DroneBookingSheet> {
   final _descController = TextEditingController();
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -35,46 +50,82 @@ class _DroneBookingSheetState extends State<DroneBookingSheet> {
     super.dispose();
   }
 
-  void _confirm() {
+  Future<void> _confirm() async {
+    if (_submitting) return;
+
     final description = _descController.text.trim().isEmpty
         ? null
         : _descController.text.trim();
-
-    // Gửi yêu cầu thật lên backend để đội bay (MAINTENANCE) thấy trong hàng
-    // đợi điều phối — best-effort, không chặn UX tracking local nếu BE lỗi.
     final lockerId = widget.lockerId;
-    if (lockerId != null) {
-      final boxId = widget.cell['id'];
-      LockerOpsService()
-          .createDroneDelivery(
-            lockerId: lockerId,
-            boxId: boxId is int ? boxId : int.tryParse('$boxId'),
-            description: description,
-          )
-          .catchError((Object e) {
-        debugPrint('createDroneDelivery failed: $e');
-        return <String, dynamic>{};
-      });
+    if (lockerId == null) {
+      _showMessage('Không xác định được tủ đích để tạo đơn drone');
+      return;
+    }
+    final rawBoxId = widget.cell['id'];
+    final preferredBoxId = rawBoxId is int ? rawBoxId : int.tryParse('$rawBoxId');
+    if (preferredBoxId == null) {
+      _showMessage('Không xác định được ô drone để giữ chỗ');
+      return;
     }
 
-    final order = DroneOrder(
-      id: 'DRN-${DateTime.now().millisecondsSinceEpoch}',
-      lockerName: widget.lockerName,
-      boxNumber: (widget.cell['boxNumber'] as int?) ?? 0,
-      origin: widget.origin,
-      createdAt: DateTime.now(),
-      description: description,
-    );
+    setState(() => _submitting = true);
+    SmartDialog.showLoading<void>(msg: 'Đang tạo đơn drone...');
 
-    DroneDeliveryStore.instance.placeOrder(order);
+    try {
+      final createOrder = widget.createOrder ??
+          ({
+            required destinationLockerId,
+            required preferredBoxId,
+            required description,
+            required parcelWeightGrams,
+            required paymentMethod,
+            required idempotencyKey,
+          }) {
+            return LockerOpsService().createDroneDeliveryOrder(
+              destinationLockerId: destinationLockerId,
+              preferredBoxId: preferredBoxId,
+              description: description,
+              parcelWeightGrams: parcelWeightGrams,
+              paymentMethod: paymentMethod,
+              idempotencyKey: idempotencyKey,
+            );
+          };
 
-    Navigator.pop(context);
-    Navigator.push<void>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => DroneTrackingPage(orderId: order.id),
-      ),
-    );
+      final response = await createOrder(
+        destinationLockerId: lockerId,
+        preferredBoxId: preferredBoxId,
+        description: description,
+        parcelWeightGrams: 1200,
+        paymentMethod: 'CASH',
+        idempotencyKey: 'drone-$lockerId-$preferredBoxId-${DateTime.now().microsecondsSinceEpoch}',
+      );
+      final rawOrderId = response['orderId'];
+      final orderId = rawOrderId is int ? rawOrderId : int.tryParse('$rawOrderId');
+      if (orderId == null) {
+        throw StateError('Backend did not return a valid orderId');
+      }
+
+      widget.onBooked?.call(orderId);
+      if (!mounted) return;
+      Navigator.pop(context, response);
+      _showMessage('Đã tạo đơn drone #$orderId');
+    } catch (error) {
+      _showMessage(LockerOpsService.errorMessage(error));
+    } finally {
+      SmartDialog.dismiss<void>();
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
+    }
+  }
+
+  void _showMessage(String message) {
+    final showMessage = widget.showMessage;
+    if (showMessage != null) {
+      showMessage(message);
+      return;
+    }
+    SmartDialog.showToast(message);
   }
 
   @override
@@ -203,7 +254,7 @@ class _DroneBookingSheetState extends State<DroneBookingSheet> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Text(
-                  'Miễn phí (Demo)',
+                  '15.000đ',
                   style: TextStyle(
                     color: Colors.green,
                     fontWeight: FontWeight.w600,
@@ -219,7 +270,7 @@ class _DroneBookingSheetState extends State<DroneBookingSheet> {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: _confirm,
+              onPressed: _submitting ? null : _confirm,
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFF6366F1),
                 padding: const EdgeInsets.symmetric(vertical: 15),

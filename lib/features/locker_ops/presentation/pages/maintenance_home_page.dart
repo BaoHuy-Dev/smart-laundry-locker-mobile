@@ -11,29 +11,35 @@ import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 /// drone maintenance schedules). Physical locker maintenance lives with the
 /// TECHNICIAN role.
 class MaintenanceHomePage extends StatefulWidget {
-  const MaintenanceHomePage({super.key});
+  const MaintenanceHomePage({super.key, this.service});
+
+  final LockerOpsService? service;
 
   @override
   State<MaintenanceHomePage> createState() => _MaintenanceHomePageState();
 }
 
 class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
-  final _service = LockerOpsService();
+  late final LockerOpsService _service = widget.service ?? LockerOpsService();
 
   List<Map<String, dynamic>> _drones = [];
-  // Hàng đợi giao hàng drone từ backend (PENDING/DISPATCHED) — thay mock cũ.
+  // Hàng đợi order-based cho đội bay theo Phase 2.
   List<Map<String, dynamic>> _deliveries = [];
   // Lịch bảo trì định kỳ của drone (droneUnitId != null) — lịch tủ thuộc TECHNICIAN.
   List<Map<String, dynamic>> _schedules = [];
   bool _loading = true;
   String? _myUserId;
 
-  List<Map<String, dynamic>> get _pendingDeliveries => _deliveries
-      .where((d) => d['status'] == 'PENDING')
+  List<Map<String, dynamic>> get _awaitingDispatchDeliveries => _deliveries
+      .where((d) => d['deliveryStage'] == 'AWAITING_DISPATCH')
       .toList(growable: false);
 
-  List<Map<String, dynamic>> get _dispatchedDeliveries => _deliveries
-      .where((d) => d['status'] == 'DISPATCHED')
+  List<Map<String, dynamic>> get _acceptedDeliveries => _deliveries
+      .where((d) => d['deliveryStage'] == 'ACCEPTED')
+      .toList(growable: false);
+
+  List<Map<String, dynamic>> get _launchingDeliveries => _deliveries
+      .where((d) => d['deliveryStage'] == 'LAUNCHING')
       .toList(growable: false);
 
   @override
@@ -51,9 +57,9 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
         final drones = await _service.droneUnits();
         if (mounted) setState(() => _drones = drones);
       } catch (_) {}
-      // Hàng đợi giao hàng drone (V12) — best-effort như trên.
+      // Hàng đợi order-based cho đội bay (Phase 2) — best-effort như trên.
       try {
-        final deliveries = await _service.droneDeliveryQueue();
+        final deliveries = await _service.droneOrderQueue();
         if (mounted) setState(() => _deliveries = deliveries);
       } catch (_) {}
       // Lịch bảo trì định kỳ drone — best-effort như trên.
@@ -121,9 +127,9 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
         children: [
           BrandHeroHeader(
             title: 'Đội bay drone',
-            subtitle: _pendingDeliveries.isNotEmpty
-                ? '${_pendingDeliveries.length} đơn drone đang chờ điều phối'
-                : 'Không có đơn drone nào chờ điều phối',
+            subtitle: _awaitingDispatchDeliveries.isNotEmpty
+                ? '${_awaitingDispatchDeliveries.length} đơn drone đang chờ tiếp nhận'
+                : 'Không có đơn drone nào chờ tiếp nhận',
             onBack: context.canPop() ? () => context.pop() : null,
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
@@ -188,34 +194,46 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
 
   // ---- Đội drone (thiết bị bay vật lý, khác ô tủ cellType=DRONE) ----
   Widget _buildDroneFleet() {
-    final pending = _pendingDeliveries;
-    final dispatched = _dispatchedDeliveries;
+    final awaiting = _awaitingDispatchDeliveries;
+    final accepted = _acceptedDeliveries;
+    final launching = _launchingDeliveries;
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          // ── Đơn hàng drone chờ điều phối (backend, do khách tạo) ─────────
-          if (pending.isNotEmpty) ...[
+          // ── Đơn hàng drone order-based cho đội bay ───────────────────────
+          if (awaiting.isNotEmpty) ...[
             OpsSectionLabel(
-              'Chờ điều phối (${pending.length})',
+              'Chờ tiếp nhận (${awaiting.length})',
               icon: Icons.inbox_rounded,
             ),
             const SizedBox(height: 8),
-            for (final order in pending) _deliveryCard(order, pending: true),
+            for (final order in awaiting)
+              _deliveryCard(order, action: _DeliveryAction.accept),
             const SizedBox(height: 8),
           ],
-          if (dispatched.isNotEmpty) ...[
+          if (accepted.isNotEmpty) ...[
             OpsSectionLabel(
-              'Đang giao (${dispatched.length})',
+              'Sẵn sàng phóng (${accepted.length})',
+              icon: Icons.rocket_launch,
+            ),
+            const SizedBox(height: 8),
+            for (final order in accepted)
+              _deliveryCard(order, action: _DeliveryAction.launch),
+            const SizedBox(height: 8),
+          ],
+          if (launching.isNotEmpty) ...[
+            OpsSectionLabel(
+              'Đang khởi phóng (${launching.length})',
               icon: Icons.flight_takeoff,
             ),
             const SizedBox(height: 8),
-            for (final order in dispatched)
-              _deliveryCard(order, pending: false),
+            for (final order in launching)
+              _deliveryCard(order, action: _DeliveryAction.launching),
             const SizedBox(height: 8),
           ],
-          if (pending.isNotEmpty || dispatched.isNotEmpty) ...[
+          if (awaiting.isNotEmpty || accepted.isNotEmpty || launching.isNotEmpty) ...[
             const Divider(),
             const SizedBox(height: 8),
           ],
@@ -349,14 +367,19 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
     return '${two(d.day)}/${two(d.month)}/${d.year}';
   }
 
-  /// Card một yêu cầu giao hàng drone (từ backend). PENDING có nút Điều phối
-  /// (chọn drone rảnh); DISPATCHED có nút Đã thả hàng.
-  Widget _deliveryCard(Map<String, dynamic> order, {required bool pending}) {
-    final id = _asInt(order['id']);
-    final lockerName = order['lockerName'] ?? 'Tủ ${order['lockerId']}';
-    final boxNumber = order['boxNumber'];
+  /// Card một drone order trong queue điều phối.
+  Widget _deliveryCard(
+    Map<String, dynamic> order, {
+    required _DeliveryAction action,
+  }) {
+    final orderId = _asInt(order['orderId']);
+    final lockerId = _asInt(order['destinationLockerId']);
+    final lockerName = order['lockerName'] ??
+        (lockerId == null ? 'Tủ đích chưa rõ' : 'Tủ đích #$lockerId');
+    final reservedBoxId = _asInt(order['reservedBoxId']);
     final description = order['description']?.toString();
     final droneCode = order['droneCode']?.toString();
+    final missionStatus = order['missionStatus']?.toString();
     final createdAt = DateTime.tryParse('${order['createdAt']}')?.toLocal();
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -408,7 +431,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
                       ),
                       Text(
                         [
-                          if (boxNumber != null) 'Ô #$boxNumber',
+                          if (reservedBoxId != null) 'Ô giữ chỗ #$reservedBoxId',
                           if (createdAt != null) _formatTime(createdAt),
                           if (droneCode != null) droneCode,
                         ].join(' · '),
@@ -421,18 +444,15 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
                   ),
                 ),
                 FilledButton.icon(
-                  onPressed: id == null
-                      ? null
-                      : pending
-                          ? () => _dispatchFlow(order)
-                          : () => _run(
-                                () => _service.completeDroneDelivery(id),
-                                'Đã thả hàng — yêu cầu hoàn tất',
-                              ),
+                  onPressed: _actionEnabled(action, orderId)
+                      ? () => _handleDeliveryAction(order, action)
+                      : null,
                   style: FilledButton.styleFrom(
-                    backgroundColor: pending
-                        ? const Color(0xFF6366F1)
-                        : const Color(0xFF16A34A),
+                    backgroundColor: switch (action) {
+                      _DeliveryAction.accept => const Color(0xFF6366F1),
+                      _DeliveryAction.launch => const Color(0xFF16A34A),
+                      _DeliveryAction.launching => const Color(0xFF94A3B8),
+                    },
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
                       vertical: 8,
@@ -442,11 +462,19 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
                     ),
                   ),
                   icon: Icon(
-                    pending ? Icons.send_rounded : Icons.check,
+                    switch (action) {
+                      _DeliveryAction.accept => Icons.send_rounded,
+                      _DeliveryAction.launch => Icons.rocket_launch,
+                      _DeliveryAction.launching => Icons.hourglass_top,
+                    },
                     size: 15,
                   ),
                   label: Text(
-                    pending ? 'Điều phối' : 'Đã thả hàng',
+                    switch (action) {
+                      _DeliveryAction.accept => 'Tiếp nhận',
+                      _DeliveryAction.launch => 'Phóng',
+                      _DeliveryAction.launching => 'Đang phóng',
+                    },
                     style: const TextStyle(
                         fontSize: 13, fontWeight: FontWeight.w700),
                   ),
@@ -460,10 +488,44 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
                 style: const TextStyle(fontSize: 12, color: Colors.black54),
               ),
             ],
+            if (missionStatus != null && missionStatus.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Mission: $missionStatus',
+                style: const TextStyle(fontSize: 12, color: Colors.black45),
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  bool _actionEnabled(_DeliveryAction action, int? orderId) {
+    if (orderId == null) return false;
+    return action != _DeliveryAction.launching;
+  }
+
+  Future<void> _handleDeliveryAction(
+    Map<String, dynamic> order,
+    _DeliveryAction action,
+  ) async {
+    final orderId = _asInt(order['orderId']);
+    if (orderId == null) return;
+    switch (action) {
+      case _DeliveryAction.accept:
+        await _acceptFlow(order);
+      case _DeliveryAction.launch:
+        await _run(
+          () => _service.launchDroneOrder(
+            orderId,
+            idempotencyKey: _idempotencyKey('launch', orderId),
+          ),
+          'Đã phát lệnh phóng nhiệm vụ',
+        );
+      case _DeliveryAction.launching:
+        return;
+    }
   }
 
   String _formatTime(DateTime t) {
@@ -474,17 +536,24 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
     return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
   }
 
-  /// Chọn drone rảnh (IDLE/CHARGING) rồi gọi API điều phối. Cho phép điều
-  /// phối không gán drone (đội bay tự lo thiết bị ngoài hệ thống).
-  Future<void> _dispatchFlow(Map<String, dynamic> order) async {
-    final id = _asInt(order['id']);
+  /// Chọn drone IDLE rồi tiếp nhận nhiệm vụ theo `orderId`.
+  Future<void> _acceptFlow(Map<String, dynamic> order) async {
+    final id = _asInt(order['orderId']);
     if (id == null) return;
     final candidates = _drones
-        .where((d) =>
-            d['status'] == 'IDLE' || d['status'] == 'CHARGING')
+        .where((d) => d['status'] == 'IDLE')
         .toList(growable: false);
-    int? selectedDroneId =
-        candidates.isNotEmpty ? _asInt(candidates.first['id']) : null;
+    if (candidates.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Không có drone IDLE để tiếp nhận nhiệm vụ'),
+          ),
+        );
+      }
+      return;
+    }
+    int? selectedDroneId = _asInt(candidates.first['id']);
 
     final ok = await showDialog<bool>(
       context: context,
@@ -496,7 +565,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
             children: [
               Icon(Icons.flight, color: Color(0xFF6366F1)),
               SizedBox(width: 8),
-              Text('Điều phối drone'),
+              Text('Tiếp nhận nhiệm vụ'),
             ],
           ),
           content: Column(
@@ -504,30 +573,23 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Giao tới ${order['lockerName'] ?? 'tủ ${order['lockerId']}'}'
-                '${order['boxNumber'] != null ? ' · ô #${order['boxNumber']}' : ''}.',
+                'Giao tới ${order['lockerName'] ?? 'tủ đích #${order['destinationLockerId']}'}'
+                '${order['reservedBoxId'] != null ? ' · ô giữ chỗ #${order['reservedBoxId']}' : ''}.',
               ),
               const SizedBox(height: 12),
-              if (candidates.isEmpty)
-                const Text(
-                  'Không có drone rảnh — điều phối không gán drone.',
-                  style: TextStyle(fontSize: 12, color: opsMutedText),
-                )
-              else
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final d in candidates)
-                      ChoiceChip(
-                        label: Text(
-                            '${d['code']} · ${d['batteryPercent'] ?? '?'}%'),
-                        selected: selectedDroneId == _asInt(d['id']),
-                        onSelected: (_) => setLocal(
-                            () => selectedDroneId = _asInt(d['id'])),
-                      ),
-                  ],
-                ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final d in candidates)
+                    ChoiceChip(
+                      label: Text('${d['code']} · ${d['batteryPercent'] ?? '?'}%'),
+                      selected: selectedDroneId == _asInt(d['id']),
+                      onSelected: (_) =>
+                          setLocal(() => selectedDroneId = _asInt(d['id'])),
+                    ),
+                ],
+              ),
             ],
           ),
           actions: [
@@ -543,18 +605,26 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
                 ),
               ),
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Điều phối ngay'),
+              child: const Text('Tiếp nhận ngay'),
             ),
           ],
         ),
       ),
     );
     if (ok != true) return;
+    if (selectedDroneId == null) return;
     await _run(
-      () => _service.dispatchDroneDelivery(id, droneUnitId: selectedDroneId),
-      'Drone đã được điều phối!',
+      () => _service.acceptDroneOrder(
+        id,
+        droneUnitId: selectedDroneId!,
+        idempotencyKey: _idempotencyKey('accept', id),
+      ),
+      'Đã tiếp nhận và gán drone cho nhiệm vụ',
     );
   }
+
+  String _idempotencyKey(String prefix, int orderId) =>
+      '$prefix-$orderId-${DateTime.now().microsecondsSinceEpoch}';
 
   Widget _droneCard(Map<String, dynamic> drone) {
     final status = drone['status'] as String? ?? 'IDLE';
@@ -1114,6 +1184,8 @@ int? _asInt(dynamic value) {
   if (value is num) return value.toInt();
   return int.tryParse('$value');
 }
+
+enum _DeliveryAction { accept, launch, launching }
 
 /// Trạng thái của 1 con drone vật lý (drone_units.status) — khác trạng thái
 /// ô tủ cellType=DRONE ở trên.

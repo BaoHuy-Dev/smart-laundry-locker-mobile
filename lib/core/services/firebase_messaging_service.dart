@@ -25,9 +25,10 @@ class FirebaseMessagingService {
   FirebaseMessagingService._();
   static final FirebaseMessagingService instance = FirebaseMessagingService._();
 
-  /// 6 loại push của luồng giao hàng bằng drone (Phase 1). Tap vào bất kỳ loại
-  /// nào đều deep-link tới trang theo dõi drone theo `orderId` trong data.
+  /// Push cập nhật chuyến giao drone cho customer. Giữ các type cũ trong thời
+  /// gian chuyển contract; type chuẩn mới dùng một event cho mọi stage.
   static const Set<String> droneDeliveryTypes = {
+    'DRONE_DELIVERY_STATUS_CHANGED',
     'drone_dispatched',
     'drone_approaching',
     'drone_arrived',
@@ -36,8 +37,13 @@ class FirebaseMessagingService {
     'drone_failed',
   };
 
+  static const Set<String> maintenanceDroneTypes = {'DRONE_ORDER_CREATED'};
+
   static bool _isDroneDeliveryType(Object? type) =>
       type is String && droneDeliveryTypes.contains(type);
+
+  static bool _isMaintenanceDroneType(Object? type) =>
+      type is String && maintenanceDroneTypes.contains(type);
 
   FirebaseMessaging get _firebaseMessaging => FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotificationsPlugin =
@@ -236,7 +242,9 @@ class FirebaseMessagingService {
     // messages and pure data-only messages from the backend)
     _showLocalNotification(message);
 
-    if (!_isDroneDeliveryType(type) && delivery == null) {
+    if (!_isDroneDeliveryType(type) &&
+        !_isMaintenanceDroneType(type) &&
+        delivery == null) {
       // Noti giao hàng (kể cả drone_*) đã hiển thị banner local ở trên rồi ->
       // không toast trùng. Các noti khác: fallback toast tiêu đề.
       final title =
@@ -311,8 +319,8 @@ class FirebaseMessagingService {
   /// Điều hướng khi người dùng bấm vào noti (background/terminated qua
   /// onMessageOpenedApp/getInitialMessage, hoặc foreground qua local-notif).
   ///
-  /// Ưu tiên: noti giao drone (`type` = drone_*) -> trang theo dõi timeline;
-  /// noti giao hàng khác (có `orderId`) -> chi tiết đơn; còn lại -> Thông báo.
+  /// Ưu tiên: đơn drone mới -> hàng đợi MAINTENANCE; cập nhật chuyến drone ->
+  /// timeline customer; noti giao hàng khác -> chi tiết đơn; còn lại -> Thông báo.
   void _handleTapData(Map<String, dynamic> data) {
     final type = data['type']?.toString();
     final delivery = DeliveryNotification.fromData(data);
@@ -321,8 +329,9 @@ class FirebaseMessagingService {
       final context = AppRouter.navigatorKey.currentContext;
       if (context == null) return;
 
-      if (_isDroneDeliveryType(type)) {
-        // Luồng giao drone (Phase 1): mở trang theo dõi timeline theo orderId.
+      if (_isMaintenanceDroneType(type)) {
+        context.go(AppRouter.maintenanceHome);
+      } else if (_isDroneDeliveryType(type)) {
         final orderId = data['orderId']?.toString() ?? '';
         context.go(AppRouter.droneDeliveryTracking, extra: orderId);
       } else if (delivery != null) {

@@ -243,15 +243,21 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<Either<Failure, void>> sendEmailLoginOtp(String email) async {
-    if (!await _networkInfo.isConnected) {
-      return const Left(NetworkFailure('Không có kết nối mạng.'));
-    }
     try {
       await _remoteDataSource.sendEmailLoginOtp(email: email);
       return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } on ValidationException catch (e) {
+      return Left(ValidationFailure(e.message));
+    } on AuthenticationException catch (e) {
+      return Left(AuthenticationFailure(e.message));
+    } on AuthorizationException catch (e) {
+      return Left(AuthorizationFailure(e.message));
     } catch (e) {
-      final msg = _errorMessageFromException(e);
-      return Left(ServerFailure(msg));
+      return Left(UnknownFailure(e.toString()));
     }
   }
 
@@ -260,9 +266,6 @@ class AuthRepositoryImpl implements AuthRepository {
     String email,
     String otp,
   ) async {
-    if (!await _networkInfo.isConnected) {
-      return const Left(NetworkFailure('Không có kết nối mạng.'));
-    }
     try {
       final response = await _remoteDataSource.verifyEmailLoginOtp(
         email: email,
@@ -286,11 +289,19 @@ class AuthRepositoryImpl implements AuthRepository {
         );
       }
 
-      await _localDataSource.cacheToken(tokenEntity);
       return Right(tokenEntity);
+    } on ServerException catch (e) {
+      return Left(_mapVerifyOtpBackendFailure(e.message));
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(e.message));
+    } on ValidationException catch (e) {
+      return Left(_mapVerifyOtpBackendFailure(e.message));
+    } on AuthenticationException catch (e) {
+      return Left(AuthenticationFailure(e.message));
+    } on AuthorizationException catch (e) {
+      return Left(AuthorizationFailure(e.message));
     } catch (e) {
-      final msg = _errorMessageFromException(e);
-      return Left(_mapVerifyOtpBackendFailure(msg));
+      return Left(UnknownFailure(e.toString()));
     }
   }
 

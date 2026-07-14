@@ -30,12 +30,13 @@ class LockerOpsService {
     String path, {
     Map<String, dynamic>? body,
     Map<String, dynamic>? query,
+    Map<String, dynamic>? headers,
   }) async {
     final res = await _dio.request(
       path,
       data: body,
       queryParameters: query,
-      options: Options(method: method),
+      options: Options(method: method, headers: headers),
     );
     final data = res.data?['data'];
     return data is Map<String, dynamic> ? data : <String, dynamic>{};
@@ -92,6 +93,26 @@ class LockerOpsService {
       'hours': hours,
       'note': note,
       if (promotionCode != null) 'promotionCode': promotionCode,
+    },
+  );
+
+  Future<Map<String, dynamic>> createDroneDeliveryOrder({
+    required int destinationLockerId,
+    int? preferredBoxId,
+    String? description,
+    required int parcelWeightGrams,
+    required String paymentMethod,
+    required String idempotencyKey,
+  }) => _map(
+    'POST',
+    '/api/orders/drone-deliveries',
+    headers: {'Idempotency-Key': idempotencyKey},
+    body: {
+      'destinationLockerId': destinationLockerId,
+      if (preferredBoxId != null) 'preferredBoxId': preferredBoxId,
+      if (description != null) 'description': description,
+      'parcelWeightGrams': parcelWeightGrams,
+      'paymentMethod': paymentMethod,
     },
   );
 
@@ -349,6 +370,33 @@ class LockerOpsService {
   Future<List<Map<String, dynamic>>> droneDeliveryQueue({String? status}) =>
       _list('/api/maintenance/drone-deliveries',
           query: status == null ? null : {'status': status});
+
+  /// Hàng đợi order-based cho đội bay theo Phase 2.
+  Future<List<Map<String, dynamic>>> droneOrderQueue({String? deliveryStage}) =>
+      _list('/api/maintenance/drone-orders',
+          query: deliveryStage == null ? null : {'deliveryStage': deliveryStage});
+
+  /// Đội bay tiếp nhận một order drone và gán drone cho mission.
+  Future<Map<String, dynamic>> acceptDroneOrder(
+    int orderId, {
+    required int droneUnitId,
+    required String idempotencyKey,
+  }) => _map(
+        'POST',
+        '/api/maintenance/drone-orders/$orderId/accept',
+        headers: {'Idempotency-Key': idempotencyKey},
+        body: {'droneUnitId': droneUnitId},
+      );
+
+  /// Đội bay phát lệnh launch cho mission đã sẵn sàng.
+  Future<Map<String, dynamic>> launchDroneOrder(
+    int orderId, {
+    required String idempotencyKey,
+  }) => _map(
+        'POST',
+        '/api/maintenance/drone-orders/$orderId/launch',
+        headers: {'Idempotency-Key': idempotencyKey},
+      );
 
   /// Đội bay điều phối yêu cầu; gán [droneUnitId] thì drone đó chuyển IN_FLIGHT.
   Future<Map<String, dynamic>> dispatchDroneDelivery(int id, {int? droneUnitId}) =>

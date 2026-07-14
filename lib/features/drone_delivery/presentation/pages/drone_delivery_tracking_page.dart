@@ -110,11 +110,12 @@ class _TrackingBody extends StatelessWidget {
 
   const _TrackingBody({required this.status, required this.orderId});
 
-  /// Chỉ mời xem live map khi drone đang trên đường (dispatched/approaching) và
+  /// Chỉ mời xem live map khi drone đang trên đường và
   /// cờ Phase 2 bật. Các mốc arrived/delivered/failed không cần bản đồ nữa.
   bool get _canTrackOnMap =>
       FeatureFlags.droneLiveMapEnabled &&
-      (status.stage == DroneDeliveryStage.dispatched ||
+      (status.stage == DroneDeliveryStage.departed ||
+          status.stage == DroneDeliveryStage.enRoute ||
           status.stage == DroneDeliveryStage.approaching);
 
   @override

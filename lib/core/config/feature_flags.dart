@@ -37,11 +37,9 @@ class FeatureFlags {
   /// `/api/auth/ai/register`, `/api/auth/ai/verify` trả 500.
   static const bool faceRecognitionEnabled = false;
 
-  /// Theo dõi đơn giao bằng drone cho NGƯỜI NHẬN (Phase 1: chỉ push
-  /// notification + timeline, chưa có live map).
-  /// Backend chưa có → `GET /api/orders/{orderId}/drone-delivery` 404. Khi tắt,
-  /// datasource trả mock để timeline chạy được mà không gọi endpoint chết.
-  static const bool droneDeliveryEnabled = false;
+  /// Theo dõi đơn giao bằng drone qua read model backend và polling timeline.
+  /// Live map vẫn được gate riêng vì chưa có nguồn telemetry vị trí.
+  static const bool droneDeliveryEnabled = true;
 
   /// Live map theo dõi drone real-time cho NGƯỜI NHẬN (Phase 2, qua STOMP
   /// `/topic/deliveries/{orderId}/position`). Gate nút "Theo dõi trên bản đồ"
