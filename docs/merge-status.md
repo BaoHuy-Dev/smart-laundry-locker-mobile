@@ -6,6 +6,24 @@
 
 ## Files changed
 
+### 2026-07-15 — Drone delivery: maintenance hủy trước launch + customer ẩn PIN chưa thanh toán
+
+Maintenance có thêm nhánh hủy nhiệm vụ **chỉ trước lúc phóng**; customer order card/detail cũng được vá cho đúng gate thanh toán của drone.
+
+- `lib/features/locker_ops/data/locker_ops_service.dart`
+  - thêm `cancelDroneOrder(orderId)` -> **`POST /api/maintenance/drone-orders/{orderId}/cancel`**
+- `lib/features/locker_ops/presentation/pages/maintenance_home_page.dart`
+  - section `ACCEPTED` nay có 2 action: **`Hủy trước khi bay`** và **`Phóng`**; action hủy chỉ xuất hiện trước launch.
+- `lib/features/locker_ops/presentation/pages/my_locker_orders_page.dart`
+  - header metadata card đổi `Row` -> `Wrap` để tránh overflow trên màn hẹp
+  - block `AccessCredentials` chỉ còn hiện khi action pickup được phép; drone chưa thanh toán không còn lộ PIN/QR
+- `test/features/locker_ops/locker_ops_service_test.dart`
+  - thêm test endpoint cancel maintenance
+- `test/features/locker_ops/maintenance_home_page_test.dart`
+  - thêm widget test cho nút `Hủy trước khi bay`
+- `test/features/locker_ops/my_locker_orders_page_test.dart`
+  - thêm widget test xác nhận header wrap và ẩn credential khi drone chưa thanh toán
+
 ### 2026-07-14 — Drone demo tracking: timeline thật theo `orderId`
 
 Luồng demo vẫn dùng cùng order/mission contract production, không tạo ID hay trạng thái cục bộ. Sau khi MAINTENANCE phóng, backend simulator tiến stage và mobile customer poll read model mỗi 3 giây.

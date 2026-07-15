@@ -66,9 +66,11 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
       try {
         final schedules = await _service.maintenanceSchedules();
         if (mounted) {
-          setState(() => _schedules = schedules
-              .where((s) => s['droneUnitId'] != null)
-              .toList(growable: false));
+          setState(
+            () => _schedules = schedules
+                .where((s) => s['droneUnitId'] != null)
+                .toList(growable: false),
+          );
         }
       } catch (_) {}
     } finally {
@@ -106,8 +108,9 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
     try {
       await action();
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(successMsg)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(successMsg)));
       }
       await _load();
     } catch (e) {
@@ -179,10 +182,15 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
                 const SizedBox(height: 2),
-                Text(subtitle,
-                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                Text(
+                  subtitle,
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
               ],
             ),
           ),
@@ -220,7 +228,11 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
             ),
             const SizedBox(height: 8),
             for (final order in accepted)
-              _deliveryCard(order, action: _DeliveryAction.launch),
+              _deliveryCard(
+                order,
+                action: _DeliveryAction.launch,
+                showCancelAction: true,
+              ),
             const SizedBox(height: 8),
           ],
           if (launching.isNotEmpty) ...[
@@ -233,7 +245,9 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
               _deliveryCard(order, action: _DeliveryAction.launching),
             const SizedBox(height: 8),
           ],
-          if (awaiting.isNotEmpty || accepted.isNotEmpty || launching.isNotEmpty) ...[
+          if (awaiting.isNotEmpty ||
+              accepted.isNotEmpty ||
+              launching.isNotEmpty) ...[
             const Divider(),
             const SizedBox(height: 8),
           ],
@@ -241,7 +255,8 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
           const OpsBanner(
             tone: OpsBannerTone.info,
             icon: Icons.flight_outlined,
-            text: 'Pin và trạng thái bay do kỹ thuật viên cập nhật tay — '
+            text:
+                'Pin và trạng thái bay do kỹ thuật viên cập nhật tay — '
                 'chưa có telemetry thật từ drone.',
           ),
           const SizedBox(height: 12),
@@ -263,8 +278,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
             const OpsEmptyState(
               icon: Icons.flight_outlined,
               title: 'Chưa có drone nào',
-              subtitle:
-                  'Đội drone sẽ hiện ở đây khi được thêm vào hệ thống.',
+              subtitle: 'Đội drone sẽ hiện ở đây khi được thêm vào hệ thống.',
             )
           else
             for (final d in _drones) _droneCard(d),
@@ -274,10 +288,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
             const SizedBox(height: 16),
             const Divider(),
             const SizedBox(height: 8),
-            const OpsSectionLabel(
-              'Định kỳ drone',
-              icon: Icons.event_repeat,
-            ),
+            const OpsSectionLabel('Định kỳ drone', icon: Icons.event_repeat),
             for (final s in _schedules)
               _droneScheduleCard(s, due: s['due'] == true),
           ],
@@ -371,10 +382,12 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
   Widget _deliveryCard(
     Map<String, dynamic> order, {
     required _DeliveryAction action,
+    bool showCancelAction = false,
   }) {
     final orderId = _asInt(order['orderId']);
     final lockerId = _asInt(order['destinationLockerId']);
-    final lockerName = order['lockerName'] ??
+    final lockerName =
+        order['lockerName'] ??
         (lockerId == null ? 'Tủ đích chưa rõ' : 'Tủ đích #$lockerId');
     final reservedBoxId = _asInt(order['reservedBoxId']);
     final description = order['description']?.toString();
@@ -431,7 +444,8 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
                       ),
                       Text(
                         [
-                          if (reservedBoxId != null) 'Ô giữ chỗ #$reservedBoxId',
+                          if (reservedBoxId != null)
+                            'Ô giữ chỗ #$reservedBoxId',
                           if (createdAt != null) _formatTime(createdAt),
                           if (droneCode != null) droneCode,
                         ].join(' · '),
@@ -443,42 +457,93 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
                     ],
                   ),
                 ),
-                FilledButton.icon(
-                  onPressed: _actionEnabled(action, orderId)
-                      ? () => _handleDeliveryAction(order, action)
-                      : null,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: switch (action) {
-                      _DeliveryAction.accept => const Color(0xFF6366F1),
-                      _DeliveryAction.launch => const Color(0xFF16A34A),
-                      _DeliveryAction.launching => const Color(0xFF94A3B8),
-                    },
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
+                if (showCancelAction && orderId != null)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextButton.icon(
+                        onPressed: () => _run(
+                          () => _service.cancelDroneOrder(orderId),
+                          'Đã hủy chuyến bay trước khi khởi phóng',
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFFDC2626),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 8,
+                          ),
+                        ),
+                        icon: const Icon(Icons.cancel_outlined, size: 15),
+                        label: const Text(
+                          'Hủy trước khi bay',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        onPressed: _actionEnabled(action, orderId)
+                            ? () => _handleDeliveryAction(order, action)
+                            : null,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF16A34A),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        icon: const Icon(Icons.rocket_launch, size: 15),
+                        label: const Text(
+                          'Phóng',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  FilledButton.icon(
+                    onPressed: _actionEnabled(action, orderId)
+                        ? () => _handleDeliveryAction(order, action)
+                        : null,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: switch (action) {
+                        _DeliveryAction.accept => const Color(0xFF6366F1),
+                        _DeliveryAction.launch => const Color(0xFF16A34A),
+                        _DeliveryAction.launching => const Color(0xFF94A3B8),
+                      },
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  icon: Icon(
-                    switch (action) {
+                    icon: Icon(switch (action) {
                       _DeliveryAction.accept => Icons.send_rounded,
                       _DeliveryAction.launch => Icons.rocket_launch,
                       _DeliveryAction.launching => Icons.hourglass_top,
-                    },
-                    size: 15,
+                    }, size: 15),
+                    label: Text(
+                      switch (action) {
+                        _DeliveryAction.accept => 'Tiếp nhận',
+                        _DeliveryAction.launch => 'Phóng',
+                        _DeliveryAction.launching => 'Đang phóng',
+                      },
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
-                  label: Text(
-                    switch (action) {
-                      _DeliveryAction.accept => 'Tiếp nhận',
-                      _DeliveryAction.launch => 'Phóng',
-                      _DeliveryAction.launching => 'Đang phóng',
-                    },
-                    style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w700),
-                  ),
-                ),
               ],
             ),
             if (description != null && description.isNotEmpty) ...[
@@ -559,8 +624,9 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: const Row(
             children: [
               Icon(Icons.flight, color: Color(0xFF6366F1)),
@@ -583,7 +649,9 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
                 children: [
                   for (final d in candidates)
                     ChoiceChip(
-                      label: Text('${d['code']} · ${d['batteryPercent'] ?? '?'}%'),
+                      label: Text(
+                        '${d['code']} · ${d['batteryPercent'] ?? '?'}%',
+                      ),
                       selected: selectedDroneId == _asInt(d['id']),
                       onSelected: (_) =>
                           setLocal(() => selectedDroneId = _asInt(d['id'])),
@@ -630,8 +698,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
     final status = drone['status'] as String? ?? 'IDLE';
     final battery = _asInt(drone['batteryPercent']) ?? 0;
     final lockerLabel = drone['lockerName'] ?? 'Tủ ${drone['lockerId']}';
-    final technicianName = (drone['assignedTechnicianName'] as String?)
-        ?.trim();
+    final technicianName = (drone['assignedTechnicianName'] as String?)?.trim();
     final faultReason = drone['faultReason'] as String?;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -707,7 +774,8 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
     if (droneId == null) return;
     final status = drone['status'] as String? ?? 'IDLE';
     final battery = _asInt(drone['batteryPercent']) ?? 0;
-    final assignedToMe = drone['assignedTechnicianId'] != null &&
+    final assignedToMe =
+        drone['assignedTechnicianId'] != null &&
         '${drone['assignedTechnicianId']}' == _myUserId;
 
     await showModalBottomSheet<void>(
@@ -818,7 +886,9 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: const Text('Đổi trạng thái drone'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -857,7 +927,9 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: opsPrimary,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               onPressed: () => Navigator.pop(ctx, selected),
               child: const Text('Xác nhận'),
@@ -925,7 +997,9 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
             style: ElevatedButton.styleFrom(
               backgroundColor: opsPrimary,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Lưu'),
@@ -1048,7 +1122,9 @@ class _DroneLogSheetState extends State<_DroneLogSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: SafeArea(
         top: false,
         child: Column(
@@ -1189,7 +1265,13 @@ enum _DeliveryAction { accept, launch, launching }
 
 /// Trạng thái của 1 con drone vật lý (drone_units.status) — khác trạng thái
 /// ô tủ cellType=DRONE ở trên.
-const _droneStatuses = ['IDLE', 'CHARGING', 'IN_FLIGHT', 'MAINTENANCE', 'FAULT'];
+const _droneStatuses = [
+  'IDLE',
+  'CHARGING',
+  'IN_FLIGHT',
+  'MAINTENANCE',
+  'FAULT',
+];
 
 String _droneStatusLabel(String? status) => switch (status) {
   'IDLE' => 'Sẵn sàng',
@@ -1225,7 +1307,11 @@ class _DroneStatusChip extends StatelessWidget {
       ),
       child: Text(
         _droneStatusLabel(status),
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
       ),
     );
   }
