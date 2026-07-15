@@ -16,14 +16,16 @@ import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
 /// to the backend state machine: confirm drop, pickup/complete, delegate,
 /// extend/end rental, report fault, cancel.
 class MyLockerOrdersPage extends StatefulWidget {
-  const MyLockerOrdersPage({super.key});
+  const MyLockerOrdersPage({super.key, this.service});
+
+  final LockerOpsService? service;
 
   @override
   State<MyLockerOrdersPage> createState() => _MyLockerOrdersPageState();
 }
 
 class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
-  final _service = LockerOpsService();
+  late final LockerOpsService _service = widget.service ?? LockerOpsService();
   List<Map<String, dynamic>> _orders = [];
   Map<int, Map<int, int>> _lockerBoxesMap = {};
   Map<int, String> _lockerNamesMap = {};
@@ -745,7 +747,9 @@ class _OrderCard extends StatelessWidget {
     final boxId = order['sendBoxId'] ?? order['receiveBoxId'];
     final deadline = order['pickupDeadline'];
     final overdue =
-        isOverdue(deadline) && rawStatus != 'COMPLETED' && rawStatus != 'CANCELED';
+        isOverdue(deadline) &&
+        rawStatus != 'COMPLETED' &&
+        rawStatus != 'CANCELED';
     final sColor = statusColor(status);
     final isDone = rawStatus == 'COMPLETED' || rawStatus == 'CANCELED';
 
@@ -769,7 +773,10 @@ class _OrderCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Service type + time
-                        Row(
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             Text(
                               typeLabel(type),
@@ -779,11 +786,7 @@ class _OrderCard extends StatelessWidget {
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            if (deadline != null) ...[
-                              Text(
-                                '  ·  ',
-                                style: TextStyle(color: context.textMuted),
-                              ),
+                            if (deadline != null)
                               Text(
                                 fmtDateTime(deadline),
                                 style: TextStyle(
@@ -791,9 +794,6 @@ class _OrderCard extends StatelessWidget {
                                   color: context.textMuted,
                                 ),
                               ),
-                            ],
-                            const Spacer(),
-                            // Status label
                             Text(
                               statusLabel(status),
                               style: TextStyle(
@@ -1055,7 +1055,9 @@ class _DetailSheet extends StatelessWidget {
     final canUsePickupActions = !isDroneDelivery || paymentStatus == 'PAID';
 
     final actions = <Widget>[
-      if (isDroneDelivery && rawStatus != 'COMPLETED' && rawStatus != 'CANCELED')
+      if (isDroneDelivery &&
+          rawStatus != 'COMPLETED' &&
+          rawStatus != 'CANCELED')
         OpsSheetAction(
           label: 'Theo dõi giao drone',
           icon: LucideIcons.navigation,
@@ -1113,7 +1115,8 @@ class _DetailSheet extends StatelessWidget {
           onTap: () => onEndRental(id),
         ),
       ],
-      if (canUsePickupActions && (rawStatus == 'STORING' || rawStatus == 'RETURNED'))
+      if (canUsePickupActions &&
+          (rawStatus == 'STORING' || rawStatus == 'RETURNED'))
         OpsSheetAction(
           label: 'Ủy quyền người khác lấy hộ',
           icon: LucideIcons.userPlus,
@@ -1234,7 +1237,7 @@ class _DetailSheet extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        if (order['pinCode'] != null)
+        if (order['pinCode'] != null && canUsePickupActions)
           Center(
             child: AccessCredentials(
               pin: order['pinCode'] as String?,

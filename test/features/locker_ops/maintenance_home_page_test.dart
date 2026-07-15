@@ -12,24 +12,27 @@ class _FakeMaintenanceService extends LockerOpsService {
   int? acceptedOrderId;
   int? acceptedDroneId;
   int? launchedOrderId;
+  int? canceledOrderId;
 
   @override
   Future<List<Map<String, dynamic>>> droneUnits() async => [
-        {
-          'id': 9,
-          'code': 'DRONE-09',
-          'status': 'IDLE',
-          'batteryPercent': 87,
-          'lockerId': 3,
-          'lockerName': 'Tram 3',
-        },
-      ];
+    {
+      'id': 9,
+      'code': 'DRONE-09',
+      'status': 'IDLE',
+      'batteryPercent': 87,
+      'lockerId': 3,
+      'lockerName': 'Tram 3',
+    },
+  ];
 
   @override
   Future<List<Map<String, dynamic>>> maintenanceSchedules() async => const [];
 
   @override
-  Future<List<Map<String, dynamic>>> droneOrderQueue({String? deliveryStage}) async {
+  Future<List<Map<String, dynamic>>> droneOrderQueue({
+    String? deliveryStage,
+  }) async {
     final items = [
       {
         'orderId': 21,
@@ -49,7 +52,9 @@ class _FakeMaintenanceService extends LockerOpsService {
       },
     ];
     if (deliveryStage == null) return items;
-    return items.where((item) => item['deliveryStage'] == deliveryStage).toList();
+    return items
+        .where((item) => item['deliveryStage'] == deliveryStage)
+        .toList();
   }
 
   @override
@@ -85,14 +90,29 @@ class _FakeMaintenanceService extends LockerOpsService {
       'droneCode': 'DRONE-09',
     };
   }
+
+  @override
+  Future<Map<String, dynamic>> cancelDroneOrder(int orderId) async {
+    canceledOrderId = orderId;
+    return {
+      'orderId': orderId,
+      'missionId': null,
+      'missionStatus': null,
+      'deliveryStage': 'CANCELED',
+    };
+  }
 }
 
 void main() {
   setUp(() {
-    mockSecureStorage({'access_token': makeFakeJwt(sub: '99', roles: ['MAINTENANCE'])});
+    mockSecureStorage({
+      'access_token': makeFakeJwt(sub: '99', roles: ['MAINTENANCE']),
+    });
   });
 
-  testWidgets('renders order-based drone queue and accepts awaiting order', (tester) async {
+  testWidgets('renders order-based drone queue and accepts awaiting order', (
+    tester,
+  ) async {
     final service = _FakeMaintenanceService();
     final router = GoRouter(
       routes: [
@@ -103,9 +123,7 @@ void main() {
       ],
     );
 
-    await tester.pumpWidget(
-      MaterialApp.router(routerConfig: router),
-    );
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('Chờ tiếp nhận'), findsOneWidget);
@@ -120,5 +138,25 @@ void main() {
 
     expect(service.acceptedOrderId, equals(21));
     expect(service.acceptedDroneId, equals(9));
+  });
+
+  testWidgets('shows cancel action for accepted drone orders', (tester) async {
+    final service = _FakeMaintenanceService();
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => MaintenanceHomePage(service: service),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Hủy trước khi bay'));
+    await tester.pumpAndSettle();
+
+    expect(service.canceledOrderId, equals(22));
   });
 }
