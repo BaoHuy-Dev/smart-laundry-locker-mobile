@@ -417,8 +417,18 @@ class LockerOpsService {
     headers: {'Idempotency-Key': idempotencyKey},
   );
 
-  Future<Map<String, dynamic>> cancelDroneOrder(int orderId) =>
-      _map('POST', '/api/maintenance/drone-orders/$orderId/cancel');
+  Future<Map<String, dynamic>> cancelDroneOrder(
+    int orderId, {
+    required int reasonCode,
+    String? note,
+  }) => _map(
+    'POST',
+    '/api/maintenance/drone-orders/$orderId/cancel',
+    body: {
+      'reasonCode': reasonCode,
+      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+    },
+  );
 
   /// Đội bay điều phối yêu cầu; gán [droneUnitId] thì drone đó chuyển IN_FLIGHT.
   Future<Map<String, dynamic>> dispatchDroneDelivery(

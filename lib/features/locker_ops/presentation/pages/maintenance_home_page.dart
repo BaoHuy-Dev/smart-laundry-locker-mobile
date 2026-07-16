@@ -231,7 +231,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
               _deliveryCard(
                 order,
                 action: _DeliveryAction.launch,
-                showCancelAction: true,
+                onCancel: () => _cancelDeliveryFlow(order),
               ),
             const SizedBox(height: 8),
           ],
@@ -382,7 +382,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
   Widget _deliveryCard(
     Map<String, dynamic> order, {
     required _DeliveryAction action,
-    bool showCancelAction = false,
+    VoidCallback? onCancel,
   }) {
     final orderId = _asInt(order['orderId']);
     final lockerId = _asInt(order['destinationLockerId']);
@@ -457,58 +457,7 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
                     ],
                   ),
                 ),
-                if (showCancelAction && orderId != null)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextButton.icon(
-                        onPressed: () => _run(
-                          () => _service.cancelDroneOrder(orderId),
-                          'Đã hủy chuyến bay trước khi khởi phóng',
-                        ),
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFFDC2626),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 8,
-                          ),
-                        ),
-                        icon: const Icon(Icons.cancel_outlined, size: 15),
-                        label: const Text(
-                          'Hủy trước khi bay',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      FilledButton.icon(
-                        onPressed: _actionEnabled(action, orderId)
-                            ? () => _handleDeliveryAction(order, action)
-                            : null,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF16A34A),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        icon: const Icon(Icons.rocket_launch, size: 15),
-                        label: const Text(
-                          'Phóng',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                else
+                if (!(action == _DeliveryAction.launch && onCancel != null))
                   FilledButton.icon(
                     onPressed: _actionEnabled(action, orderId)
                         ? () => _handleDeliveryAction(order, action)
@@ -546,6 +495,61 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
                   ),
               ],
             ),
+            if (action == _DeliveryAction.launch && onCancel != null) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.end,
+                children: [
+                  FilledButton.icon(
+                    onPressed: _actionEnabled(action, orderId)
+                        ? () => _handleDeliveryAction(order, action)
+                        : null,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF16A34A),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    icon: const Icon(Icons.rocket_launch, size: 15),
+                    label: const Text(
+                      'Phóng',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: onCancel,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFDC2626),
+                      side: const BorderSide(color: Color(0xFFDC2626)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    icon: const Icon(Icons.close_rounded, size: 15),
+                    label: const Text(
+                      'Hủy trước khi bay',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             if (description != null && description.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
@@ -591,6 +595,96 @@ class _MaintenanceHomePageState extends State<MaintenanceHomePage> {
       case _DeliveryAction.launching:
         return;
     }
+  }
+
+  Future<void> _cancelDeliveryFlow(Map<String, dynamic> order) async {
+    final orderId = _asInt(order['orderId']);
+    if (orderId == null) return;
+    final noteCtrl = TextEditingController();
+    var selectedReason = _cancelReasons.first;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text('Hủy nhiệm vụ trước khi bay'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final reason in _cancelReasons)
+                    ChoiceChip(
+                      label: Text(reason.label),
+                      selected: selectedReason.code == reason.code,
+                      onSelected: (_) =>
+                          setLocal(() => selectedReason = reason),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteCtrl,
+                minLines: 2,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  labelText: selectedReason.requiresNote
+                      ? 'Ghi chú (bắt buộc)'
+                      : 'Ghi chú (tùy chọn)',
+                  isDense: true,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Hủy'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () {
+                if (selectedReason.requiresNote &&
+                    noteCtrl.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Cần nhập ghi chú khi chọn Khác'),
+                    ),
+                  );
+                  return;
+                }
+                Navigator.pop(ctx, true);
+              },
+              child: const Text('Xác nhận hủy'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    await _run(
+      () => _service.cancelDroneOrder(
+        orderId,
+        reasonCode: selectedReason.code,
+        note: noteCtrl.text.trim().isEmpty ? null : noteCtrl.text.trim(),
+      ),
+      'Đã hủy nhiệm vụ drone',
+    );
   }
 
   String _formatTime(DateTime t) {
@@ -1262,6 +1356,22 @@ int? _asInt(dynamic value) {
 }
 
 enum _DeliveryAction { accept, launch, launching }
+
+class _DroneCancelReason {
+  const _DroneCancelReason(this.code, this.label, {this.requiresNote = false});
+
+  final int code;
+  final String label;
+  final bool requiresNote;
+}
+
+const _cancelReasons = [
+  _DroneCancelReason(1, 'Thời tiết xấu'),
+  _DroneCancelReason(2, 'Drone lỗi'),
+  _DroneCancelReason(3, 'Bãi đáp không sẵn sàng'),
+  _DroneCancelReason(4, 'Lý do vận hành'),
+  _DroneCancelReason(5, 'Khác', requiresNote: true),
+];
 
 /// Trạng thái của 1 con drone vật lý (drone_units.status) — khác trạng thái
 /// ô tủ cellType=DRONE ở trên.
