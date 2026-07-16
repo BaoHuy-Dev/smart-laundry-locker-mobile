@@ -341,24 +341,35 @@ void main() {
       expect(result['deliveryStage'], equals('LAUNCHING'));
     });
 
-    test('cancelDroneOrder() posts to cancel endpoint', () async {
-      adapter.onPost(
-        '/api/maintenance/drone-orders/21/cancel',
-        (server) => server.reply(
-          202,
-          apiOk({
-            'orderId': 21,
-            'missionId': null,
-            'missionStatus': null,
-            'deliveryStage': 'CANCELED',
-          }),
-        ),
-      );
+    test(
+      'cancelDroneOrder() posts reason code and optional note to cancel endpoint',
+      () async {
+        adapter.onPost(
+          '/api/maintenance/drone-orders/22/cancel',
+          (server) {
+            return server.reply(
+              200,
+              apiOk({
+                'orderId': 22,
+                'missionId': 302,
+                'missionStatus': 'CANCELED',
+                'deliveryStage': 'CANCELED',
+              }),
+            );
+          },
+          data: {'reasonCode': 5, 'note': 'Gio giat manh'},
+        );
 
-      final result = await service.cancelDroneOrder(21);
+        final result = await service.cancelDroneOrder(
+          22,
+          reasonCode: 5,
+          note: 'Gio giat manh',
+        );
 
-      expect(result['deliveryStage'], equals('CANCELED'));
-    });
+        expect(result['missionStatus'], equals('CANCELED'));
+        expect(result['deliveryStage'], equals('CANCELED'));
+      },
+    );
   });
 
   // ── CUSTOMER — Order flow ────────────────────────────────────────────────

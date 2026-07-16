@@ -268,6 +268,13 @@ Connected through new USER services:
 - `/api/orders/{id}`
 - `/api/orders/my-orders`
 - `/api/orders/{id}/cancel`
+- `/api/maintenance/drones`
+- `/api/maintenance/drones/{id}/claim`
+- `/api/maintenance/drones/{id}/release`
+- `/api/maintenance/drones/{id}/status`
+- `/api/maintenance/drones/{id}/battery`
+- `/api/maintenance/drones/{id}/logs`
+- `/api/maintenance/drone-orders/{orderId}/cancel`
 - `/api/payments`
 - `/api/payments/order/{orderId}`
 - `/api/notifications/all`

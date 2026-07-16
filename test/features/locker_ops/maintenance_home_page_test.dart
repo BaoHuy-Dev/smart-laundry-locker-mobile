@@ -13,6 +13,8 @@ class _FakeMaintenanceService extends LockerOpsService {
   int? acceptedDroneId;
   int? launchedOrderId;
   int? canceledOrderId;
+  int? canceledReasonCode;
+  String? canceledNote;
 
   @override
   Future<List<Map<String, dynamic>>> droneUnits() async => [
@@ -92,12 +94,18 @@ class _FakeMaintenanceService extends LockerOpsService {
   }
 
   @override
-  Future<Map<String, dynamic>> cancelDroneOrder(int orderId) async {
+  Future<Map<String, dynamic>> cancelDroneOrder(
+    int orderId, {
+    required int reasonCode,
+    String? note,
+  }) async {
     canceledOrderId = orderId;
+    canceledReasonCode = reasonCode;
+    canceledNote = note;
     return {
       'orderId': orderId,
-      'missionId': null,
-      'missionStatus': null,
+      'missionId': 302,
+      'missionStatus': 'CANCELED',
       'deliveryStage': 'CANCELED',
     };
   }
@@ -140,7 +148,9 @@ void main() {
     expect(service.acceptedDroneId, equals(9));
   });
 
-  testWidgets('shows cancel action for accepted drone orders', (tester) async {
+  testWidgets('requires cancel reason before canceling accepted drone order', (
+    tester,
+  ) async {
     final service = _FakeMaintenanceService();
     final router = GoRouter(
       routes: [
@@ -157,6 +167,15 @@ void main() {
     await tester.tap(find.text('Hủy trước khi bay'));
     await tester.pumpAndSettle();
 
+    expect(find.text('Hủy nhiệm vụ trước khi bay'), findsOneWidget);
+    await tester.tap(find.text('Khác'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Gio giat manh');
+    await tester.tap(find.text('Xác nhận hủy'));
+    await tester.pumpAndSettle();
+
     expect(service.canceledOrderId, equals(22));
+    expect(service.canceledReasonCode, equals(5));
+    expect(service.canceledNote, equals('Gio giat manh'));
   });
 }
