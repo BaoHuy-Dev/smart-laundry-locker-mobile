@@ -9,20 +9,22 @@ import 'package:smart_laundry_locker/features/locker_ops/presentation/pages/send
 import 'package:smart_laundry_locker/features/stores/domain/entities/store.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:smart_laundry_locker/shared/widgets/user_ui_kit.dart';
+
 /// Hiển thị lưới ô tủ locker tại một cửa hàng cụ thể.
 /// Load danh sách tủ (cabinets) qua GET /api/lockers?storeId=X,
 /// sau đó lazy-load layout từng tủ khi user mở rộng thẻ tủ.
 class StoreLockerGridPage extends StatefulWidget {
-  const StoreLockerGridPage({super.key, required this.store});
+  const StoreLockerGridPage({super.key, required this.store, this.service});
 
   final Store store;
+  final LockerOpsService? service;
 
   @override
   State<StoreLockerGridPage> createState() => _StoreLockerGridPageState();
 }
 
 class _StoreLockerGridPageState extends State<StoreLockerGridPage> {
-  final _service = LockerOpsService();
+  late final LockerOpsService _service = widget.service ?? LockerOpsService();
   List<Map<String, dynamic>> _lockers = const [];
   bool _loading = true;
   String? _error;
@@ -61,10 +63,7 @@ class _StoreLockerGridPageState extends State<StoreLockerGridPage> {
     Navigator.of(context, rootNavigator: true).push<void>(
       MaterialPageRoute(
         builder: (_) => DirectionsMapPage(
-          destination: LatLng(
-            widget.store.latitude!,
-            widget.store.longitude!,
-          ),
+          destination: LatLng(widget.store.latitude!, widget.store.longitude!),
           title: widget.store.name,
           subtitle: widget.store.address,
         ),
@@ -325,7 +324,8 @@ class _LockerCardState extends State<_LockerCard> {
     final cells =
         (_layout?['cells'] as List?)?.cast<Map<String, dynamic>>() ??
         const <Map<String, dynamic>>[];
-    final totalCells = (_layout?['totalCells'] as num?)?.toInt() ?? cells.length;
+    final totalCells =
+        (_layout?['totalCells'] as num?)?.toInt() ?? cells.length;
     final available = cells.where((c) => c['status'] == 'AVAILABLE').length;
     final isActive =
         (widget.locker['status'] as String?)?.toUpperCase() == 'ACTIVE';
@@ -484,9 +484,22 @@ class _LockerCardState extends State<_LockerCard> {
           _CellGrid(
             cells: cells,
             onCellTap: (cell) => _showBookingSheet(context, cell),
+            onFaultTap: (cell) => _showFaultHint(context, cell),
           ),
       ],
     );
+  }
+
+  void _showFaultHint(BuildContext ctx, Map<String, dynamic> cell) {
+    final boxLabel = _boxLabel(cell);
+    final reason = (cell['faultReason'] as String?)?.trim();
+    final message = reason == null || reason.isEmpty
+        ? '$boxLabel đang hỏng. Hãy chọn ô khác.'
+        : '$boxLabel đang hỏng: $reason. Hãy chọn ô khác.';
+
+    ScaffoldMessenger.of(ctx)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _cellTypeForBooking(Map<String, dynamic> cell) {
@@ -495,6 +508,14 @@ class _LockerCardState extends State<_LockerCard> {
     final size = (cell['size'] as String?)?.toUpperCase() ?? '';
     if (size == 'LARGE') return 'XL';
     return 'STANDARD';
+  }
+
+  String _boxLabel(Map<String, dynamic> cell) {
+    final boxNum = (cell['boxNumber'] as num?)?.toInt();
+    if (boxNum != null) return 'Ô số $boxNum';
+    final r = (cell['rowIndex'] as num?)?.toInt() ?? 0;
+    final c = (cell['colIndex'] as num?)?.toInt() ?? 0;
+    return 'Ô hàng ${r + 1}, cột ${c + 1}';
   }
 
   void _showBookingSheet(BuildContext ctx, Map<String, dynamic> cell) {
@@ -557,11 +578,17 @@ class _LockerCardState extends State<_LockerCard> {
 }
 
 class _CellGrid extends StatelessWidget {
-  const _CellGrid({required this.cells, required this.onCellTap});
+  const _CellGrid({
+    required this.cells,
+    required this.onCellTap,
+    required this.onFaultTap,
+  });
   final List<Map<String, dynamic>> cells;
   final ValueChanged<Map<String, dynamic>> onCellTap;
+  final ValueChanged<Map<String, dynamic>> onFaultTap;
 
-  bool _isXl(Map<String, dynamic> cell) => (cell['cellType'] as String?) == 'XL';
+  bool _isXl(Map<String, dynamic> cell) =>
+      (cell['cellType'] as String?) == 'XL';
 
   @override
   Widget build(BuildContext context) {
@@ -598,19 +625,19 @@ class _CellGrid extends StatelessWidget {
             children: List.generate(numCols, (col) {
               final colChildren = <Widget>[];
               int skipRows = 0;
-              
+
               for (int row = 0; row < numRows; row++) {
                 if (skipRows > 0) {
                   skipRows--;
                   continue;
                 }
-                
+
                 final cell = grid[row][col];
                 final span = cell != null ? (_isXl(cell) ? 2 : 1) : 1;
                 skipRows = span - 1;
-                
+
                 final height = 58.0 * span + 5.0 * (span - 1);
-                
+
                 colChildren.add(
                   Padding(
                     padding: const EdgeInsets.only(bottom: 5),
@@ -619,22 +646,23 @@ class _CellGrid extends StatelessWidget {
                       child: cell != null
                           ? _CellTile(
                               cell: cell,
-                              onTap: cell['status'] == 'AVAILABLE'
-                                  ? () => onCellTap(cell)
-                                  : null,
+                              onTap: switch ((cell['status'] as String?)
+                                  ?.toUpperCase()) {
+                                'AVAILABLE' => () => onCellTap(cell),
+                                'FAULT' => () => onFaultTap(cell),
+                                _ => null,
+                              },
                             )
                           : null,
                     ),
                   ),
                 );
               }
-              
+
               return Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 3),
-                  child: Column(
-                    children: colChildren,
-                  ),
+                  child: Column(children: colChildren),
                 ),
               );
             }),
@@ -723,7 +751,6 @@ abstract class _CellPalette {
   static const Color reserved = Color(0xFFFBBF24);
   static const Color fault = Color(0xFFEF4444);
   static const Color cleaning = Color(0xFF60A5FA);
-  static const Color outOfService = Color(0xFF9CA3AF);
   // Ô drone: tím indigo — phân biệt rõ với ô thường dù status AVAILABLE
   static const Color drone = Color(0xFF6366F1);
 }
@@ -737,18 +764,7 @@ class _CellTile extends StatelessWidget {
   String get _cellType => (cell['cellType'] as String?) ?? 'STANDARD';
   bool get _isDrone => _cellType == 'DRONE';
   bool get _isAvailable => _status == 'AVAILABLE';
-
-  Color get _bg {
-    if (_isDrone) return _CellPalette.drone;
-    return switch (_status) {
-      'AVAILABLE' => _CellPalette.available,
-      'OCCUPIED' || 'IN_USE' => _CellPalette.occupied,
-      'RESERVED' => _CellPalette.reserved,
-      'FAULT' => _CellPalette.fault,
-      'CLEANING' => _CellPalette.cleaning,
-      _ => _CellPalette.outOfService,
-    };
-  }
+  bool get _isFault => _status == 'FAULT';
 
   Gradient get _bgGradient {
     if (_isDrone) {
@@ -760,35 +776,35 @@ class _CellTile extends StatelessWidget {
     }
     return switch (_status) {
       'AVAILABLE' => LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AislBrand.cyan.withValues(alpha: 0.8), AislBrand.cyan],
-        ),
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [AislBrand.cyan.withValues(alpha: 0.8), AislBrand.cyan],
+      ),
       'OCCUPIED' || 'IN_USE' => const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFF1F5F9), Color(0xFFCBD5E1)],
-        ),
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFFF1F5F9), Color(0xFFCBD5E1)],
+      ),
       'RESERVED' => const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFFDE68A), Color(0xFFF59E0B)],
-        ),
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFFFDE68A), Color(0xFFF59E0B)],
+      ),
       'FAULT' => const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFFCA5A5), Color(0xFFDC2626)],
-        ),
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFFFCA5A5), Color(0xFFDC2626)],
+      ),
       'CLEANING' => const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF93C5FD), Color(0xFF3B82F6)],
-        ),
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF93C5FD), Color(0xFF3B82F6)],
+      ),
       _ => const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFE5E7EB), Color(0xFF9CA3AF)],
-        ),
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFFE5E7EB), Color(0xFF9CA3AF)],
+      ),
     };
   }
 
@@ -827,26 +843,47 @@ class _CellTile extends StatelessWidget {
                 ),
               ]
             : _isDrone
-                ? [
-                    BoxShadow(
-                      color: _CellPalette.drone.withValues(alpha: 0.4),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ]
-                : [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    )
-                  ],
+            ? [
+                BoxShadow(
+                  color: _CellPalette.drone.withValues(alpha: 0.4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ]
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Stack(
         children: [
           Positioned.fill(
             child: _isDrone ? _buildDroneContent() : _buildStandardContent(),
           ),
+          if (_isFault)
+            Positioned(
+              left: 6,
+              top: 6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  'HỎNG',
+                  style: TextStyle(
+                    color: Color(0xFFDC2626),
+                    fontSize: 8,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+            ),
           // Tay nắm cửa
           Positioned(
             right: 6,
@@ -875,15 +912,16 @@ class _CellTile extends StatelessWidget {
     );
 
     if (_isAvailable) {
-      content = content.animate(onPlay: (controller) => controller.repeat(reverse: true))
-          .shimmer(duration: 2000.ms, color: Colors.white.withValues(alpha: 0.2))
+      content = content
+          .animate(onPlay: (controller) => controller.repeat(reverse: true))
+          .shimmer(
+            duration: 2000.ms,
+            color: Colors.white.withValues(alpha: 0.2),
+          )
           .scaleXY(end: 1.015, curve: Curves.easeInOutSine, duration: 1500.ms);
     }
 
-    return GestureDetector(
-      onTap: onTap,
-      child: content,
-    );
+    return GestureDetector(onTap: onTap, child: content);
   }
 
   /// Ô drone — icon máy bay không người lái
@@ -918,10 +956,11 @@ class _CellTile extends StatelessWidget {
   Widget _buildStandardContent() {
     final isXl = _cellType == 'XL' || _sizeLabel == 'L';
     final icon = isXl ? LucideIcons.luggage : LucideIcons.box;
+    final iconSize = _isFault ? 20.0 : (isXl ? 32.0 : 24.0);
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(icon, color: _fg.withValues(alpha: 0.95), size: isXl ? 32 : 24),
+        Icon(icon, color: _fg.withValues(alpha: 0.95), size: iconSize),
         if (_isAvailable) ...[
           const SizedBox(height: 6),
           Container(
@@ -938,6 +977,16 @@ class _CellTile extends StatelessWidget {
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.5,
               ),
+            ),
+          ),
+        ] else if (_isFault) ...[
+          const SizedBox(height: 6),
+          const Text(
+            'Hỏng',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
@@ -1157,10 +1206,7 @@ class _SheetInfoTile extends StatelessWidget {
           const SizedBox(height: 5),
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 10,
-              color: AislBrand.textMuted,
-            ),
+            style: const TextStyle(fontSize: 10, color: AislBrand.textMuted),
           ),
           const SizedBox(height: 3),
           Text(
@@ -1266,11 +1312,7 @@ class _Pill extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: fg,
-        ),
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg),
       ),
     );
   }

@@ -71,6 +71,14 @@ C:\flutter\bin\flutter.bat emulators --launch Pixel_8
 C:\flutter\bin\flutter.bat run
 ```
 
+Run on two Android emulators at once from the workspace root:
+
+```bash
+./run-mobile.sh        # starts the first two connected emulators
+./run-mobile.sh 5554   # starts only emulator-5554
+./run-mobile.sh 5556   # starts only emulator-5556
+```
+
 ## Important Files
 
 | File/folder | Purpose |
