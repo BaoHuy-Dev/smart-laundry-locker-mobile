@@ -29,6 +29,7 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
   List<Map<String, dynamic>> _orders = [];
   Map<int, Map<int, int>> _lockerBoxesMap = {};
   Map<int, String> _lockerNamesMap = {};
+  Map<int, Map<String, dynamic>> _activeReportsByBox = {};
   bool _loading = true;
   String _typeFilter = 'ALL';
 
@@ -42,6 +43,7 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
     setState(() => _loading = true);
     try {
       final orders = await _service.myOrders();
+      final reports = await _service.myReports();
 
       // Fetch box layouts to display box numbers instead of box IDs
       final lockerIds = orders
@@ -89,6 +91,7 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
       setState(() {
         _lockerBoxesMap = lockerBoxesMap;
         _lockerNamesMap = lockerNamesMap;
+        _activeReportsByBox = _activeReportsByBoxMap(reports);
         _orders = orders;
       });
     } catch (e) {
@@ -103,6 +106,12 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
       final type = (o['type'] as String? ?? '').toUpperCase();
       return _typeFilter == 'ALL' || type == _typeFilter;
     }).toList();
+  }
+
+  Map<String, dynamic>? _activeReportForOrder(Map<String, dynamic> order) {
+    final boxId = _asInt(order['sendBoxId'] ?? order['receiveBoxId']);
+    if (boxId == null) return null;
+    return _activeReportsByBox[boxId];
   }
 
   static DateTime? _parseOrderDate(Map<String, dynamic> o) {
@@ -444,6 +453,7 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
           child: _DetailSheet(
             order: order,
+            faultReport: _activeReportForOrder(order),
             lockerName: _lockerNamesMap[_asInt(order['lockerId'])],
             sendBoxNumber:
                 _lockerBoxesMap[_asInt(order['lockerId'])]?[_asInt(
@@ -614,6 +624,7 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
                           child:
                               _OrderCard(
                                     order: o,
+                                    faultReport: _activeReportForOrder(o),
                                     lockerName:
                                         _lockerNamesMap[_asInt(o['lockerId'])],
                                     sendBoxNumber:
@@ -727,6 +738,7 @@ class _TypeChip extends StatelessWidget {
 class _OrderCard extends StatelessWidget {
   const _OrderCard({
     required this.order,
+    this.faultReport,
     this.lockerName,
     this.sendBoxNumber,
     this.receiveBoxNumber,
@@ -734,6 +746,7 @@ class _OrderCard extends StatelessWidget {
   });
 
   final Map<String, dynamic> order;
+  final Map<String, dynamic>? faultReport;
   final String? lockerName;
   final int? sendBoxNumber;
   final int? receiveBoxNumber;
@@ -908,6 +921,18 @@ class _OrderCard extends StatelessWidget {
               )
             else
               const SizedBox(height: 0),
+            if (faultReport != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                child: _FaultOrderBanner(
+                  report: faultReport!,
+                  boxLabel: _orderBoxLabel(
+                    sendBoxNumber: sendBoxNumber,
+                    receiveBoxNumber: receiveBoxNumber,
+                    boxId: boxId,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -967,6 +992,77 @@ class _RouteRow extends StatelessWidget {
   }
 }
 
+class _FaultOrderBanner extends StatelessWidget {
+  const _FaultOrderBanner({required this.report, required this.boxLabel});
+
+  final Map<String, dynamic> report;
+  final String boxLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final reason = (report['description'] as String?)?.trim();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFCA5A5)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            LucideIcons.triangleAlert,
+            size: 16,
+            color: Color(0xFFDC2626),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$boxLabel đã được báo lỗi.',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    height: 1.35,
+                    color: Color(0xFFDC2626),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Hãy hủy đơn này và đặt ô khác.',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    height: 1.35,
+                    color: Color(0xFFDC2626),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (reason != null && reason.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Lý do: $reason',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: Color(0xFFDC2626),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 int? _asInt(dynamic value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
@@ -990,9 +1086,34 @@ String _displayStatus(Map<String, dynamic> order, String? fallback) {
   return fallback ?? '';
 }
 
+Map<int, Map<String, dynamic>> _activeReportsByBoxMap(
+  List<Map<String, dynamic>> reports,
+) {
+  final active = <int, Map<String, dynamic>>{};
+  for (final report in reports) {
+    final boxId = _asInt(report['boxId']);
+    final status = (report['status'] as String? ?? '').toUpperCase();
+    if (boxId == null || status == 'RESOLVED' || active.containsKey(boxId)) {
+      continue;
+    }
+    active[boxId] = report;
+  }
+  return active;
+}
+
+String _orderBoxLabel({
+  int? sendBoxNumber,
+  int? receiveBoxNumber,
+  dynamic boxId,
+}) {
+  final label = sendBoxNumber ?? receiveBoxNumber ?? _asInt(boxId);
+  return label == null ? 'Ô này' : 'Ô số $label';
+}
+
 class _DetailSheet extends StatelessWidget {
   const _DetailSheet({
     required this.order,
+    this.faultReport,
     this.lockerName,
     this.sendBoxNumber,
     this.receiveBoxNumber,
@@ -1011,6 +1132,7 @@ class _DetailSheet extends StatelessWidget {
   });
 
   final Map<String, dynamic> order;
+  final Map<String, dynamic>? faultReport;
   final String? lockerName;
   final int? sendBoxNumber;
   final int? receiveBoxNumber;
@@ -1053,6 +1175,11 @@ class _DetailSheet extends StatelessWidget {
     final canPay =
         paymentStatus != 'PAID' && totalNum > 0 && rawStatus != 'CANCELED';
     final canUsePickupActions = !isDroneDelivery || paymentStatus == 'PAID';
+    final boxLabel = _orderBoxLabel(
+      sendBoxNumber: sendBoxNumber,
+      receiveBoxNumber: receiveBoxNumber,
+      boxId: boxId,
+    );
 
     final actions = <Widget>[
       if (isDroneDelivery &&
@@ -1145,6 +1272,10 @@ class _DetailSheet extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (faultReport != null) ...[
+          _FaultOrderBanner(report: faultReport!, boxLabel: boxLabel),
+          const SizedBox(height: 12),
+        ],
         Row(
           children: [
             Container(
