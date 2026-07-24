@@ -550,14 +550,16 @@ class _LockerCardState extends State<_LockerCard> {
           Navigator.push<void>(
             ctx,
             MaterialPageRoute(
-              builder: (_) => RentLockerPage(
-                initialLockerId: _lockerId,
-                initialLockerName: _lockerName,
-                locationName: widget.storeName,
-                initialCellType: cellType,
+                builder: (_) => RentLockerPage(
+                  initialLockerId: _lockerId,
+                  initialLockerName: _lockerName,
+                  locationName: widget.storeName,
+                  initialCellType: cellType,
+                  initialBoxId: (cell['id'] as num?)?.toInt(),
+                  initialBoxNumber: (cell['boxNumber'] as num?)?.toInt(),
+                ),
               ),
-            ),
-          );
+            );
         },
         onSend: () {
           Navigator.pop(ctx);

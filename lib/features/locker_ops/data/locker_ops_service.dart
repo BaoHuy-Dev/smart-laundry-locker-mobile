@@ -84,11 +84,13 @@ class LockerOpsService {
     required int hours,
     String? note,
     String? promotionCode,
+    int? boxId,
   }) => _map(
     'POST',
     '/api/orders/rental',
     body: {
       'lockerId': lockerId,
+      if (boxId != null) 'boxId': boxId,
       'cellType': cellType,
       'hours': hours,
       'note': note,

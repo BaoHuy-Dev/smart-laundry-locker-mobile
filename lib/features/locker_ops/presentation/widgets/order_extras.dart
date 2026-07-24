@@ -405,22 +405,24 @@ class _LoyaltyPointsHintState extends State<LoyaltyPointsHint> {
 
 /// Fetches the order's payments and renders the latest payment status.
 class PaymentStatusChip extends StatefulWidget {
-  const PaymentStatusChip({super.key, required this.orderId});
+  const PaymentStatusChip({super.key, required this.orderId, this.service});
 
   final int orderId;
+  final LockerOpsService? service;
 
   @override
   State<PaymentStatusChip> createState() => _PaymentStatusChipState();
 }
 
 class _PaymentStatusChipState extends State<PaymentStatusChip> {
-  final _service = LockerOpsService();
+  late final LockerOpsService _service;
   bool _loading = true;
   String? _status;
 
   @override
   void initState() {
     super.initState();
+    _service = widget.service ?? LockerOpsService();
     _load();
   }
 

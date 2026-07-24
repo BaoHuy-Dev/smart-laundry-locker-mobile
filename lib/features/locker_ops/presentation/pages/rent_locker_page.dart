@@ -12,13 +12,16 @@ import 'package:smart_laundry_locker/features/locker_ops/presentation/widgets/or
 /// RENTAL flow: chọn tủ + loại ô + thời lượng, trả tiền theo giờ, PIN dùng
 /// nhiều lần tới hết hạn thuê (khớp `order-service` createRental/extend/end).
 class RentLockerPage extends StatefulWidget {
-  const RentLockerPage({
+  RentLockerPage({
     super.key,
     this.initialLockerId,
     this.initialLockerName,
     this.locationName,
     this.initialCellType,
-  });
+    this.initialBoxId,
+    this.initialBoxNumber,
+    LockerOpsService? service,
+  }) : service = service ?? LockerOpsService();
 
   /// Pre-selected locker (cabinet) id — set when opened from the cell grid.
   /// When non-null the locker picker is hidden and the API load is skipped.
@@ -35,6 +38,14 @@ class RentLockerPage extends StatefulWidget {
   /// cell in the locker grid. When set, the "Loại ô" selector is hidden.
   final String? initialCellType;
 
+  /// Pre-selected box id when opened from a specific cell.
+  final int? initialBoxId;
+
+  /// Human box number for the selected cell.
+  final int? initialBoxNumber;
+
+  final LockerOpsService service;
+
   @override
   State<RentLockerPage> createState() => _RentLockerPageState();
 }
@@ -43,7 +54,6 @@ class _RentLockerPageState extends State<RentLockerPage> {
   static const _rates = {'STANDARD': 5000, 'XL': 10000};
   static const _quickHours = [2, 4, 8, 12, 24];
 
-  final _service = LockerOpsService();
   final _noteCtrl = TextEditingController();
 
   List<Map<String, dynamic>> _lockers = [];
@@ -108,16 +118,22 @@ class _RentLockerPageState extends State<RentLockerPage> {
         int std = 0, xl = 0;
         for (final c in cells) {
           if (c['status'] == 'AVAILABLE') {
-            if (c['cellType'] == 'STANDARD') std++;
-            else if (c['cellType'] == 'XL') xl++;
+            if (c['cellType'] == 'STANDARD') {
+              std++;
+            } else if (c['cellType'] == 'XL') {
+              xl++;
+            }
           }
         }
         setState(() {
           _availableCounts = {'STANDARD': std, 'XL': xl};
           // Tự động chuyển loại ô nếu ô đang chọn đã hết
-          if ((_availableCounts?[_cellType] ?? 0) == 0) {
-            if (std > 0) _cellType = 'STANDARD';
-            else if (xl > 0) _cellType = 'XL';
+          if (widget.initialBoxId == null && (_availableCounts?[_cellType] ?? 0) == 0) {
+            if (std > 0) {
+              _cellType = 'STANDARD';
+            } else if (xl > 0) {
+              _cellType = 'XL';
+            }
           }
         });
       }
@@ -136,6 +152,7 @@ class _RentLockerPageState extends State<RentLockerPage> {
     try {
       final order = await _service.createRental(
         lockerId: _lockerId!,
+        boxId: widget.initialBoxId,
         cellType: _cellType,
         hours: _hours.round(),
         note: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
@@ -157,9 +174,14 @@ class _RentLockerPageState extends State<RentLockerPage> {
     try {
       final order = await _service.checkout(id, 'CASH');
       if (!mounted) return;
-      setState(() => _order = order);
+      setState(() {
+        _order = {
+          ...?_order,
+          'paymentStatus': 'PAID',
+          if (order['paidAt'] != null) 'paidAt': order['paidAt'],
+        };
+      });
       _snack('Đã mock thanh toán (CASH) thành công');
-      await _confirmDrop();
     } catch (e) {
       _snack(LockerOpsService.errorMessage(e));
     } finally {
@@ -174,7 +196,14 @@ class _RentLockerPageState extends State<RentLockerPage> {
     try {
       final updated = await _service.confirmDrop(id);
       if (!mounted) return;
-      setState(() => _order = updated);
+      setState(() {
+        final wasPaid = (_order?['paymentStatus'] as String?) == 'PAID';
+        _order = {
+          ...updated,
+          if (wasPaid) 'paymentStatus': 'PAID',
+          if (wasPaid && _order?['paidAt'] != null) 'paidAt': _order?['paidAt'],
+        };
+      });
       _snack('Bắt đầu kỳ thuê — PIN dùng nhiều lần');
     } catch (e) {
       _snack(LockerOpsService.errorMessage(e));
@@ -188,6 +217,14 @@ class _RentLockerPageState extends State<RentLockerPage> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  LockerOpsService get _service => widget.service;
+
+  String _resultBoxLabel(Map<String, dynamic> order) {
+    final boxNumber = widget.initialBoxNumber;
+    if (boxNumber != null) return '$boxNumber';
+    return '${order['sendBoxId'] ?? '-'}';
   }
 
   @override
@@ -620,6 +657,7 @@ class _RentLockerPageState extends State<RentLockerPage> {
     final order = _order!;
     final status = order['status'] as String?;
     final started = status == 'STORING';
+    final unpaid = (order['paymentStatus'] as String?) != 'PAID';
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -645,17 +683,23 @@ class _RentLockerPageState extends State<RentLockerPage> {
               if (order['id'] is int) ...[
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: PaymentStatusChip(orderId: order['id'] as int),
+                  child: PaymentStatusChip(
+                    key: ValueKey(
+                      'payment-${order['id']}-${order['paymentStatus']}-${order['paidAt']}',
+                    ),
+                    orderId: order['id'] as int,
+                    service: widget.service,
+                  ),
                 ),
                 const SizedBox(height: 14),
               ],
-              _ResultHeadline(
-                icon: started ? LucideIcons.lockKeyhole : LucideIcons.packageOpen,
-                title: started ? 'Kỳ thuê đang chạy' : 'Đã giữ ô — bỏ đồ vào',
-                subtitle: started
-                    ? 'PIN mở ô nhiều lần tới ${fmtDateTime(order['pickupDeadline'])}.'
-                    : 'Nhập PIN để mở ô số ${order['sendBoxId'] ?? '-'} và đặt đồ vào.',
-              ),
+                _ResultHeadline(
+                  icon: started ? LucideIcons.lockKeyhole : LucideIcons.packageOpen,
+                  title: started ? 'Kỳ thuê đang chạy' : 'Đã giữ ô — bỏ đồ vào',
+                  subtitle: started
+                      ? 'PIN mở ô nhiều lần tới ${fmtDateTime(order['pickupDeadline'])}.'
+                    : 'Nhập PIN để mở ô số ${_resultBoxLabel(order)} và đặt đồ vào.',
+                ),
               const SizedBox(height: 16),
               AccessCredentials(
                 pin: order['pinCode'] as String?,
@@ -676,13 +720,15 @@ class _RentLockerPageState extends State<RentLockerPage> {
           ),
         ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.05),
         const SizedBox(height: 16),
-        if (!started) ...[
+        if (!started || unpaid) ...[
           OpsPrimaryButton(
             label: 'Đã thanh toán (Mock Ví)',
             icon: LucideIcons.wallet,
             loading: _loading,
             onPressed: _mockPayment,
           ),
+        ],
+        if (!started) ...[
           const SizedBox(height: 12),
           OpsPrimaryButton(
             label: 'Tôi đã bỏ đồ — bắt đầu kỳ thuê',
@@ -690,7 +736,17 @@ class _RentLockerPageState extends State<RentLockerPage> {
             loading: _loading,
             onPressed: _confirmDrop,
           ),
-        ] else
+        ] else ...[
+          if (unpaid) ...[
+            const SizedBox(height: 12),
+            const OpsBanner(
+              tone: OpsBannerTone.warning,
+              icon: LucideIcons.badgeAlert,
+              text:
+                  'Bạn có thể dùng tủ trước, nhưng phải thanh toán xong trước khi kết thúc thuê.',
+            ),
+            const SizedBox(height: 12),
+          ],
           OpsPrimaryButton(
             label: 'Xong — xem trong Đơn của tôi',
             icon: LucideIcons.house,
@@ -702,6 +758,7 @@ class _RentLockerPageState extends State<RentLockerPage> {
               });
             },
           ),
+        ],
       ],
     );
   }

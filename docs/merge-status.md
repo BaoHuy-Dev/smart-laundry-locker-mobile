@@ -1,7 +1,7 @@
 # USER flow merge status
 
 <!-- CURRENT_STATUS_START -->
-> **Cập nhật 2026-06-15:** UX/UI revamp luồng tủ khóa cho Customer đã hoàn tất trên branch `feat/mobile-user-ui-revamp` (develop). Các thay đổi chính: (1) Tab Tủ + Xem tất cả home đều dẫn đến lưới ô tủ thực tế thay vì danh sách địa điểm; (2) Ô DRONE hiển thị icon máy bay + màu indigo + không cho đặt dịch vụ thường; (3) Booking (Thuê tủ/Gửi hàng) bỏ picker khi đến từ lưới ô; (4) CellType.java constants class được thêm vào backend với Javadoc đầy đủ. `flutter analyze` 0 error.
+> **Cập nhật 2026-07-25:** Flow thuê tủ đã được chỉnh lại theo nghiệp vụ “bỏ đồ trước, thanh toán trước khi kết thúc”. Các thay đổi chính: (1) `RentLockerPage` nhận đúng ô đã chọn từ lưới (`boxId` + `boxNumber`) và gửi `boxId` khi tạo rental; (2) nút **`Đã thanh toán (Mock Ví)`** không còn tự gọi confirm và không ghi đè `order.id` bằng `payment.id`; (3) trạng thái trước khi bắt đầu thuê chỉ là **giữ ô**, chưa chạy deadline cho tới lúc bấm **`Tôi đã bỏ đồ — bắt đầu kỳ thuê`**; (4) detail customer vẫn kết thúc thuê theo flow kiosk-guided đã merge trước đó; (5) targeted tests/analyze/build đã pass.
 <!-- CURRENT_STATUS_END -->
 
 ## Files changed
