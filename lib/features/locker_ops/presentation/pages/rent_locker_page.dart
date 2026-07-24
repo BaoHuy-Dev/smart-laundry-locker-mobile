@@ -128,7 +128,7 @@ class _RentLockerPageState extends State<RentLockerPage> {
         setState(() {
           _availableCounts = {'STANDARD': std, 'XL': xl};
           // Tự động chuyển loại ô nếu ô đang chọn đã hết
-          if ((_availableCounts?[_cellType] ?? 0) == 0) {
+          if (widget.initialBoxId == null && (_availableCounts?[_cellType] ?? 0) == 0) {
             if (std > 0) {
               _cellType = 'STANDARD';
             } else if (xl > 0) {
@@ -650,6 +650,7 @@ class _RentLockerPageState extends State<RentLockerPage> {
     final order = _order!;
     final status = order['status'] as String?;
     final started = status == 'STORING';
+    final unpaid = (order['paymentStatus'] as String?) != 'PAID';
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -675,7 +676,12 @@ class _RentLockerPageState extends State<RentLockerPage> {
               if (order['id'] is int) ...[
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: PaymentStatusChip(orderId: order['id'] as int),
+                  child: PaymentStatusChip(
+                    key: ValueKey(
+                      'payment-${order['id']}-${order['paymentStatus']}-${order['paidAt']}',
+                    ),
+                    orderId: order['id'] as int,
+                  ),
                 ),
                 const SizedBox(height: 14),
               ],
@@ -706,13 +712,15 @@ class _RentLockerPageState extends State<RentLockerPage> {
           ),
         ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.05),
         const SizedBox(height: 16),
-        if (!started) ...[
+        if (!started || unpaid) ...[
           OpsPrimaryButton(
             label: 'Đã thanh toán (Mock Ví)',
             icon: LucideIcons.wallet,
             loading: _loading,
             onPressed: _mockPayment,
           ),
+        ],
+        if (!started) ...[
           const SizedBox(height: 12),
           OpsPrimaryButton(
             label: 'Tôi đã bỏ đồ — bắt đầu kỳ thuê',
@@ -720,7 +728,17 @@ class _RentLockerPageState extends State<RentLockerPage> {
             loading: _loading,
             onPressed: _confirmDrop,
           ),
-        ] else
+        ] else ...[
+          if (unpaid) ...[
+            const SizedBox(height: 12),
+            const OpsBanner(
+              tone: OpsBannerTone.warning,
+              icon: LucideIcons.badgeAlert,
+              text:
+                  'Bạn có thể dùng tủ trước, nhưng phải thanh toán xong trước khi kết thúc thuê.',
+            ),
+            const SizedBox(height: 12),
+          ],
           OpsPrimaryButton(
             label: 'Xong — xem trong Đơn của tôi',
             icon: LucideIcons.house,
@@ -732,6 +750,7 @@ class _RentLockerPageState extends State<RentLockerPage> {
               });
             },
           ),
+        ],
       ],
     );
   }

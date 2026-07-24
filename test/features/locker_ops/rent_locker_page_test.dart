@@ -140,5 +140,16 @@ void main() {
 
     expect(service.lastConfirmOrderId, 81);
     expect(service.confirmDropCalls, 1);
+    expect(find.textContaining('Đã thanh toán'), findsOneWidget);
+    final warningText = find.textContaining('kết thúc thuê');
+    await tester.dragUntilVisible(
+      warningText,
+      find.byType(Scrollable).first,
+      const Offset(0, -300),
+    );
+    expect(
+      warningText,
+      findsOneWidget,
+    );
   });
 }
