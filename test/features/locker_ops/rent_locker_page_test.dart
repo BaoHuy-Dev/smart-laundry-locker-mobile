@@ -74,7 +74,19 @@ class _FakeRentLockerOpsService extends LockerOpsService {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> paymentsByOrder(int orderId) async => const [];
+  Future<List<Map<String, dynamic>>> paymentsByOrder(int orderId) async {
+    if (checkoutCalls > 0) {
+      return [
+        {
+          'id': 991,
+          'orderId': orderId,
+          'status': 'COMPLETED',
+          'amount': 20000,
+        }
+      ];
+    }
+    return const [];
+  }
 }
 
 void main() {
@@ -136,19 +148,16 @@ void main() {
       find.ancestor(of: confirmButton, matching: find.byType(InkWell)).first,
     );
     confirmInkWell.onTap?.call();
+    await tester.pump();
+    await tester.pump();
     await tester.pumpAndSettle();
 
     expect(service.lastConfirmOrderId, 81);
     expect(service.confirmDropCalls, 1);
     expect(find.textContaining('Đã thanh toán'), findsOneWidget);
-    final warningText = find.textContaining('kết thúc thuê');
-    await tester.dragUntilVisible(
-      warningText,
-      find.byType(Scrollable).first,
-      const Offset(0, -300),
-    );
+    expect(find.textContaining('Mock Ví'), findsNothing);
     expect(
-      warningText,
+      find.textContaining('Hết hạn thuê'),
       findsOneWidget,
     );
   });

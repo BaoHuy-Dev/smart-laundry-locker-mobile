@@ -196,7 +196,14 @@ class _RentLockerPageState extends State<RentLockerPage> {
     try {
       final updated = await _service.confirmDrop(id);
       if (!mounted) return;
-      setState(() => _order = updated);
+      setState(() {
+        final wasPaid = (_order?['paymentStatus'] as String?) == 'PAID';
+        _order = {
+          ...updated,
+          if (wasPaid) 'paymentStatus': 'PAID',
+          if (wasPaid && _order?['paidAt'] != null) 'paidAt': _order?['paidAt'],
+        };
+      });
       _snack('Bắt đầu kỳ thuê — PIN dùng nhiều lần');
     } catch (e) {
       _snack(LockerOpsService.errorMessage(e));
@@ -681,6 +688,7 @@ class _RentLockerPageState extends State<RentLockerPage> {
                       'payment-${order['id']}-${order['paymentStatus']}-${order['paidAt']}',
                     ),
                     orderId: order['id'] as int,
+                    service: widget.service,
                   ),
                 ),
                 const SizedBox(height: 14),
