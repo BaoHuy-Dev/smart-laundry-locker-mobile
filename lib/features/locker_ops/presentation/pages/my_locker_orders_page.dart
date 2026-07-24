@@ -282,7 +282,7 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
     }
   }
 
-  Future<void> _reportDialog(int boxId) async {
+  Future<void> _reportDialog({required int orderId, int? boxId}) async {
     final reasonCtrl = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
@@ -313,14 +313,18 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
     );
     if (confirmed == true && reasonCtrl.text.trim().isNotEmpty) {
       try {
-        await _service.reportFault(boxId, reasonCtrl.text.trim());
+        await _service.reportOrderFault(orderId, reasonCtrl.text.trim());
         await _load();
         if (!mounted) return;
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
             SnackBar(
-              content: const Text('Đã gửi báo lỗi — đội bảo trì sẽ xử lý'),
+              content: Text(
+                boxId == null
+                    ? 'Đã gửi báo lỗi cho đơn này — đội bảo trì sẽ xử lý'
+                    : 'Đã gửi báo lỗi cho ô $boxId — đội bảo trì sẽ xử lý',
+              ),
               action: SnackBarAction(
                 label: 'Xem',
                 onPressed: () => context.push(AppRouter.myLockerReports),
@@ -331,6 +335,66 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
         _snack(LockerOpsService.errorMessage(e));
       }
     }
+  }
+
+  Future<void> _showRentalCompletionGuide(Map<String, dynamic> order) async {
+    final orderId = _asInt(order['id']);
+    final pin = order['pinCode'] as String?;
+    final qrToken = order['qrToken'] as String?;
+    if (orderId == null) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Lấy đồ tại kiosk',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+                color: opsDark,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Dùng mã này tại kiosk để mở ô, lấy đồ ra, rồi đóng cửa tủ lại trước khi xác nhận kết thúc thuê.',
+              style: TextStyle(fontSize: 14, color: opsMutedText, height: 1.45),
+            ),
+            if ((pin != null && pin.isNotEmpty) ||
+                (qrToken != null && qrToken.isNotEmpty)) ...[
+              const SizedBox(height: 16),
+              Center(
+                child: AccessCredentials(pin: pin, qrToken: qrToken),
+              ),
+            ],
+            const SizedBox(height: 16),
+            OpsSheetAction(
+              label: 'Đã lấy đồ và đóng tủ',
+              icon: LucideIcons.circleCheck,
+              primary: true,
+              onTap: () {
+                Navigator.pop(ctx);
+                _runAction(
+                  () => _service.endRental(orderId),
+                  'Đã kết thúc kỳ thuê',
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _openLockerDirections(Map<String, dynamic> order) async {
@@ -486,10 +550,7 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
             },
             onEndRental: (id) async {
               Navigator.pop(ctx);
-              await _runAction(
-                () => _service.endRental(id),
-                'Đã kết thúc kỳ thuê',
-              );
+              await _showRentalCompletionGuide(order);
             },
             onDelegate: (id) async {
               Navigator.pop(ctx);
@@ -501,7 +562,9 @@ class _MyLockerOrdersPageState extends State<MyLockerOrdersPage> {
             },
             onReport: (boxId) async {
               Navigator.pop(ctx);
-              await _reportDialog(boxId);
+              final orderId = _asInt(order['id']);
+              if (orderId == null) return;
+              await _reportDialog(orderId: orderId, boxId: boxId);
             },
             onCancel: (id) async {
               Navigator.pop(ctx);
@@ -1198,16 +1261,6 @@ class _DetailSheet extends StatelessWidget {
           primary: true,
           onTap: () => onPay(id),
         ),
-      if (boxId != null &&
-          order['pinCode'] != null &&
-          rawStatus != 'COMPLETED' &&
-          rawStatus != 'CANCELED' &&
-          canUsePickupActions)
-        OpsSheetAction(
-          label: 'Mở tủ',
-          icon: LucideIcons.doorOpen,
-          onTap: onOpenLocker,
-        ),
       if (rawStatus == 'COMPLETED' || rawStatus == 'CANCELED')
         OpsSheetAction(
           label: 'Đặt lại đơn',
@@ -1237,7 +1290,7 @@ class _DetailSheet extends StatelessWidget {
           onTap: () => onExtend(id),
         ),
         OpsSheetAction(
-          label: 'Kết thúc thuê & trả ô',
+          label: 'Kết thúc thuê & lấy đồ',
           icon: LucideIcons.logOut,
           onTap: () => onEndRental(id),
         ),

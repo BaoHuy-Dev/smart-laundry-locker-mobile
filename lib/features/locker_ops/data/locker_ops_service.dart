@@ -195,6 +195,13 @@ class LockerOpsService {
   Future<Map<String, dynamic>> reportFault(int boxId, String reason) =>
       _map('POST', '/api/boxes/$boxId/fault', body: {'reason': reason});
 
+  Future<Map<String, dynamic>> reportOrderFault(int orderId, String reason) =>
+      _map(
+        'POST',
+        '/api/orders/$orderId/report-box-fault',
+        body: {'reason': reason},
+      );
+
   /// All fault reports the signed-in customer has filed, newest first.
   Future<List<Map<String, dynamic>>> myReports() =>
       _list('/api/lockers/my-reports');
