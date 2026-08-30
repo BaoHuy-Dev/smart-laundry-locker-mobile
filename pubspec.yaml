@@ -12,6 +12,9 @@ dependencies:
 
   camera: ^0.11.1
   cached_network_image: ^3.4.1
+  # Giữ lại: có package phụ thuộc dựng IconData trỏ font CupertinoIcons.
+  # Gỡ đi thì font không được đóng gói và icon hiện ô vuông trống.
+  cupertino_icons: ^1.0.8
   dartz: ^0.10.1
   dio: ^5.9.0
   envied: ^1.3.2
