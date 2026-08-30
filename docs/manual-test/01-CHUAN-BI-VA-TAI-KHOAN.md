@@ -2,7 +2,7 @@
 
 ## 1. Môi trường
 
-- Backend dùng chung: `http://146.190.84.136:8080`.
+- Backend dùng chung: `https://api.locker-drone.tech`.
 - Kiểm tra file `smart-laundry-locker-mobile/.env` → biến `API_BASE_URL` phải trỏ đúng backend.
 - Nếu đổi `.env`, chạy lại:
   ```powershell

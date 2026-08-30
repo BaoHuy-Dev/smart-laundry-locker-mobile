@@ -12,14 +12,14 @@ dependencies:
 
   camera: ^0.11.1
   cached_network_image: ^3.4.1
-  characters: ^1.4.0
+  # Giữ lại: có package phụ thuộc dựng IconData trỏ font CupertinoIcons.
+  # Gỡ đi thì font không được đóng gói và icon hiện ô vuông trống.
   cupertino_icons: ^1.0.8
   dartz: ^0.10.1
   dio: ^5.9.0
   envied: ^1.3.2
   equatable: ^2.0.7
   file_picker: ^10.3.7
-  fl_chart: ^1.1.1
   flutter_animate: ^4.5.2
   flutter_cache_manager: ^3.4.1
   flutter_image_compress: ^2.4.0
@@ -28,7 +28,6 @@ dependencies:
   firebase_auth: ^5.5.1
   flutter_markdown: ^0.7.7+1
   flutter_riverpod: ^3.0.3
-  flutter_screenutil: ^5.9.3
   flutter_secure_storage: ^9.2.2
   flutter_svg: ^2.2.3
   flutter_bloc: ^9.1.1
@@ -44,9 +43,6 @@ dependencies:
   logger: ^2.6.2
   lucide_icons_flutter: ^3.1.6
   permission_handler: ^12.0.1
-  pinput: ^6.0.1
-  reorderable_grid_view: ^2.2.8
-  riverpod: ^3.0.3
   shadcn_ui: ^0.39.14
   url_launcher: ^6.3.2
   pretty_dio_logger: ^1.4.0
@@ -59,12 +55,10 @@ dependencies:
   flutter_local_notifications: ^20.1.0
   webview_flutter: ^4.13.1
   shared_preferences: ^2.5.4
-  socket_io_client: ^3.0.0
   stomp_dart_client: ^3.0.1
   flutter_facebook_auth: ^7.1.5
 
 dev_dependencies:
-  bloc_test: ^10.0.0
   build_runner: ^2.4.13
   envied_generator: ^1.1.1
   flutter_launcher_icons: ^0.14.4
@@ -73,8 +67,6 @@ dev_dependencies:
     sdk: flutter
   http_mock_adapter: ^0.6.1
   json_serializable: ^6.8.0
-  mockito: ^5.4.4
-  very_good_analysis: ^10.0.0
 
 flutter:
   uses-material-design: true
