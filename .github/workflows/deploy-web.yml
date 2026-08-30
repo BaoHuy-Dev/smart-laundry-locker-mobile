@@ -58,14 +58,17 @@ jobs:
             echo 'Chưa có CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID — bỏ qua bước deploy.'
           fi
 
+      # Gọi wrangler thẳng thay vì cloudflare/wrangler-action@v3: action chạy npx
+      # thiếu --yes nên bị huỷ ở bước tải gói, rồi rơi về một bản wrangler cũ không
+      # hiểu cấu hình assets-only và báo "Missing entry-point". Repo frontend đã
+      # chuyển sang cách này từ trước và deploy được.
       - name: Deploy lên Cloudflare
         id: deploy
         if: steps.co_secret.outputs.du == 'true'
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy
+        run: npx --yes wrangler@4.114.0 deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Ghi tóm tắt vào trang Actions
         if: always()
