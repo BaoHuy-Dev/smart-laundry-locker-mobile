@@ -44,8 +44,23 @@ jobs:
       - name: Build web
         run: flutter build web --release
 
+      # Secret khong dung duoc trong `if:` cua step, phai anh xa qua output truoc.
+      - name: Có đủ secret Cloudflare chưa?
+        id: co_secret
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "$TOKEN" ] && [ -n "$ACCOUNT" ]; then
+            echo 'du=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'du=false' >> "$GITHUB_OUTPUT"
+            echo 'Chưa có CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID — bỏ qua bước deploy.'
+          fi
+
       - name: Deploy lên Cloudflare
         id: deploy
+        if: steps.co_secret.outputs.du == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -68,7 +83,12 @@ jobs:
               echo "| Kích thước build | $(du -sh build/web | cut -f1) |"
             fi
             echo ""
-            if [ "${{ job.status }}" != "success" ]; then
+            if [ "${{ steps.co_secret.outputs.du }}" != "true" ]; then
+              echo "### Đã build xong nhưng CHƯA deploy"
+              echo "Repo này còn thiếu secret \`CLOUDFLARE_API_TOKEN\` và/hoặc \`CLOUDFLARE_ACCOUNT_ID\`."
+              echo "Thêm vào **Settings → Secrets and variables → Actions** rồi chạy lại workflow;"
+              echo "bước deploy sẽ tự bật, không cần sửa file nào."
+            elif [ "${{ job.status }}" != "success" ]; then
               echo "### Deploy THẤT BẠI"
               echo "Xem log các bước phía trên. Nguyên nhân hay gặp:"
               echo "- thiếu secret \`CLOUDFLARE_API_TOKEN\` / \`CLOUDFLARE_ACCOUNT_ID\`"
@@ -95,9 +115,11 @@ jobs:
           NOTE="build $( [ -d build/web ] && du -sh build/web | cut -f1 || echo 'không tạo được' )"
           if [ "${{ job.status }}" != "success" ]; then
             NOTE="THẤT BẠI — xem run ${{ github.run_id }}"
+          elif [ "${{ steps.co_secret.outputs.du }}" != "true" ]; then
+            NOTE="build xong, CHƯA deploy — thiếu secret Cloudflare"
           fi
           # chèn dòng mới ngay dưới hàng tiêu đề để bản ghi mới nhất nằm trên cùng
-          ROW="| $(date -u '+%Y-%m-%d %H:%M') | ${{ job.status }} | [\`$(echo ${{ github.sha }} | cut -c1-7\)\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) | @${{ github.actor }} | $NOTE |"
+          ROW="| $(date -u '+%Y-%m-%d %H:%M') | ${{ job.status }} | [\`$(echo ${{ github.sha }} | cut -c1-7)\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}) | @${{ github.actor }} | $NOTE |"
           awk -v row="$ROW" '/^\|---\|/ && !done { print; print row; done=1; next } { print }' "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"
 
           git config user.name  "github-actions[bot]"
